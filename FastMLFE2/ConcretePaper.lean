@@ -67,8 +67,7 @@ theorem specLocalData_weight_pos {h w : Nat} (params : SpecWeightParams)
 theorem specLocalData_weight_nonneg {h w : Nat} (params : SpecWeightParams)
     (hparams : params.Valid) (alpha fg bg : GrayImage h w) (px : Pixel h w) (t : Fin 4) :
     0 ≤ (specLocalData params alpha fg bg px).weights t := by
-  have hpos := specLocalData_weight_pos params hparams alpha fg bg px t
-  linarith
+  exact le_of_lt (specLocalData_weight_pos params hparams alpha fg bg px t)
 
 theorem specLocalData_totalWeight_pos {h w : Nat} (params : SpecWeightParams)
     (hparams : params.Valid) (alpha fg bg : GrayImage h w) (px : Pixel h w) :
@@ -88,11 +87,9 @@ theorem specUpdateAt_stationary {h w : Nat} (params : SpecWeightParams)
     (hparams : params.Valid) (image alpha fg bg : GrayImage h w) (px : Pixel h w) :
     (specLocalData params alpha fg bg px).stationary (alpha px) (image px)
       ((specSummaryRefinementModel params).updateAt image alpha fg bg px) := by
-  have htotal : 0 < (specLocalData params alpha fg bg px).totalWeight := by
-    exact specLocalData_totalWeight_pos params hparams alpha fg bg px
   simpa [specSummaryRefinementModel, specLocalData] using
     (specSummaryRefinementModel params).updateAt_stationary_of_totalWeight_pos
-      image alpha fg bg px htotal
+      image alpha fg bg px (specLocalData_totalWeight_pos params hparams alpha fg bg px)
 
 section Examples
 

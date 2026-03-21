@@ -6,6 +6,19 @@ namespace LocalData
 
 variable {ι : Type*} [Fintype ι]
 
+private theorem sum_weight_mul_sub (w y : ι → ℝ) (x : ℝ) :
+    (∑ i, w i * (x - y i)) = x * ∑ i, w i - ∑ i, w i * y i := by
+  calc
+    ∑ i, w i * (x - y i) = ∑ i, (w i * x - w i * y i) := by
+      refine Finset.sum_congr rfl ?_
+      intro i hi
+      ring
+    _ = (∑ i, w i * x) - ∑ i, w i * y i := by
+      rw [Finset.sum_sub_distrib]
+    _ = x * ∑ i, w i - ∑ i, w i * y i := by
+      rw [← Finset.sum_mul]
+      ring
+
 /-- The paper writes `(1 / 2) ∂cost / ∂g`; we formalize that quantity directly. -/
 def halfGradient (data : LocalData ι) (α image : ℝ) (g : FBVec) : FBVec :=
   ![
@@ -32,21 +45,7 @@ theorem halfGradient_eq_linearResidual (data : LocalData ι)
         simp [rhs]
       rw [hrhs]
       simp only [compositingResidual_eq, foreground, background]
-      have hsum :
-          ∑ x, data.weights x * (g 0 - data.fgNeighbors x) =
-            g 0 * ∑ x, data.weights x - ∑ x, data.weights x * data.fgNeighbors x := by
-        calc
-          ∑ x, data.weights x * (g 0 - data.fgNeighbors x)
-              = ∑ x, (data.weights x * g 0 - data.weights x * data.fgNeighbors x) := by
-                  refine Finset.sum_congr rfl ?_
-                  intro x hx
-                  ring
-          _ = (∑ x, data.weights x * g 0) - ∑ x, data.weights x * data.fgNeighbors x := by
-                rw [Finset.sum_sub_distrib]
-          _ = g 0 * ∑ x, data.weights x - ∑ x, data.weights x * data.fgNeighbors x := by
-                rw [← Finset.sum_mul]
-                ring
-      rw [hsum]
+      rw [sum_weight_mul_sub data.weights data.fgNeighbors (g 0)]
       rw [LocalData.totalWeight, LocalData.foregroundSum]
       ring
     simpa [halfGradient, Pi.sub_apply] using hcomp
@@ -59,21 +58,7 @@ theorem halfGradient_eq_linearResidual (data : LocalData ι)
         simp [rhs]
       rw [hrhs]
       simp only [compositingResidual_eq, foreground, background]
-      have hsum :
-          ∑ x, data.weights x * (g 1 - data.bgNeighbors x) =
-            g 1 * ∑ x, data.weights x - ∑ x, data.weights x * data.bgNeighbors x := by
-        calc
-          ∑ x, data.weights x * (g 1 - data.bgNeighbors x)
-              = ∑ x, (data.weights x * g 1 - data.weights x * data.bgNeighbors x) := by
-                  refine Finset.sum_congr rfl ?_
-                  intro x hx
-                  ring
-          _ = (∑ x, data.weights x * g 1) - ∑ x, data.weights x * data.bgNeighbors x := by
-                rw [Finset.sum_sub_distrib]
-          _ = g 1 * ∑ x, data.weights x - ∑ x, data.weights x * data.bgNeighbors x := by
-                rw [← Finset.sum_mul]
-                ring
-      rw [hsum]
+      rw [sum_weight_mul_sub data.weights data.bgNeighbors (g 1)]
       rw [LocalData.totalWeight, LocalData.backgroundSum]
       ring
     simpa [halfGradient, Pi.sub_apply] using hcomp

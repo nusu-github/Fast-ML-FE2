@@ -44,30 +44,20 @@ theorem closedForm_solves_localSystem (data : LocalData ι)
     (α image : ℝ) (h : 0 < data.totalWeight) :
     data.localSystem α image (data.closedForm α image) := by
   have hdetPos : 0 < data.closedFormDenom α := by
-    have hsquares : 0 ≤ α ^ 2 + (1 - α) ^ 2 := by positivity
-    have hsum : 0 < data.totalWeight + α ^ 2 + (1 - α) ^ 2 := by
-      nlinarith
-    have : 0 < data.totalWeight * (data.totalWeight + α ^ 2 + (1 - α) ^ 2) := by
-      positivity
-    simpa [closedFormDenom] using this
-  have hdet : data.closedFormDenom α ≠ 0 := by
-    linarith
-  ext i
-  fin_cases i
-  · simp [closedForm, closedFormDenom, foreground, background, systemMatrix,
+    rw [data.closedFormDenom_eq_det]
+    exact data.systemMatrix_det_pos_of_totalWeight_pos (α := α) h
+  ext i; fin_cases i
+  all_goals
+    simp [closedForm, closedFormDenom, foreground, background, systemMatrix,
       rhs, foregroundSum, backgroundSum, summaryDenom, Matrix.mulVec]
-    field_simp [hdet]
-    ring_nf
-  · simp [closedForm, closedFormDenom, foreground, background, systemMatrix,
-      rhs, foregroundSum, backgroundSum, summaryDenom, Matrix.mulVec]
-    field_simp [hdet]
+    field_simp [hdetPos.ne']
     ring_nf
 
 theorem closedForm_stationary (data : LocalData ι)
     (α image : ℝ) (h : 0 < data.totalWeight) :
     data.stationary α image (data.closedForm α image) := by
-  rw [stationary_iff_localSystem]
-  exact data.closedForm_solves_localSystem α image h
+  simpa [stationary_iff_localSystem] using
+    data.closedForm_solves_localSystem α image h
 
 end LocalData
 

@@ -194,12 +194,9 @@ omit [DecidableEq ι] in
 
 @[simp] theorem paperRhs_eq_rhs (data : LocalData ι) (α image : ℝ) :
     data.paperRhs α image = data.rhs α image := by
-  ext i
-  fin_cases i
-  · ring_nf
-    simp [paperRhs, rhs, uVec]
-    ring
-  · ring_nf
+  ext i; fin_cases i
+  all_goals
+    ring_nf
     simp [paperRhs, rhs, uVec]
     ring
 

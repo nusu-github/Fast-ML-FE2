@@ -49,17 +49,13 @@ theorem closedForm_background_eq_summary (data : LocalData ι) (α image : ℝ) 
 
 theorem closedForm_eq_summaryUpdate (data : LocalData ι) (α image : ℝ) :
     data.closedForm α image = data.summaryUpdate α image := by
-  apply ext_fbVec
-  · exact data.closedForm_foreground_eq_summary α image
-  · exact data.closedForm_background_eq_summary α image
+  apply ext_fbVec <;> simp [closedForm_foreground_eq_summary, closedForm_background_eq_summary]
 
 theorem summaryDenom_pos_of_totalWeight_pos (data : LocalData ι) {α : ℝ}
     (h : 0 < data.totalWeight) :
     0 < data.summaryDenom α := by
-  have hdet : 0 < data.closedFormDenom α := by
-    rw [data.closedFormDenom_eq_det]
-    exact data.systemMatrix_det_pos_of_totalWeight_pos (α := α) h
-  simpa [summaryDenom_eq_closedFormDenom] using hdet
+  rw [summaryDenom_eq_closedFormDenom, data.closedFormDenom_eq_det]
+  exact data.systemMatrix_det_pos_of_totalWeight_pos (α := α) h
 
 theorem summaryUpdate_solves_localSystem (data : LocalData ι)
     (α image : ℝ) (h : 0 < data.totalWeight) :
