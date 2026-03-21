@@ -1,4 +1,5 @@
 import FastMLFE2.ConcreteImage
+import FastMLFE2.PrecomputedSummary
 
 namespace FastMLFE2
 
@@ -108,6 +109,15 @@ example (params : SpecWeightParams) (alpha fg bg image : GrayImage 3 4)
     (specSummaryRefinementModel params).updateAt image alpha fg bg px =
       (specLocalData params alpha fg bg px).summaryUpdate (alpha px) (image px) := by
   simp [specSummaryRefinementModel, specLocalData]
+
+example (params : SpecWeightParams) (alpha fg bg image : GrayImage 3 4)
+    (hparams : params.Valid) (px : Pixel 3 4) :
+    (specLocalData params alpha fg bg px).precomputedUpdate (alpha px) (image px) =
+      (specLocalData params alpha fg bg px).summaryUpdate (alpha px) (image px) := by
+  simpa using
+    (specLocalData params alpha fg bg px).precomputedUpdate_eq_summaryUpdate
+      (α := alpha px) (image := image px)
+      (specLocalData_totalWeight_pos params hparams alpha fg bg px)
 
 example :
     fourNeighborhood ((0 : Fin 3), (0 : Fin 4)) 0 = (0, -1) := by

@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <vector>
 
 #include <opencv2/core/mat.hpp>
 #include <opencv2/imgproc.hpp>
@@ -13,6 +14,13 @@ namespace {
 constexpr std::array<std::pair<int, int>, 4> kFourOffsets{{
     {0, -1}, {0, 1}, {-1, 0}, {1, 0},
 }};
+
+struct PixelPrecomputed {
+  std::array<std::size_t, 4> neighbor_indices{};
+  std::array<float, 4> weights{};
+  float total_weight = 0.0f;
+  fastmlfe2_precomputed_coeffs coeffs{};
+};
 
 bool valid_dims(int width, int height) {
   return width > 0 && height > 0;
@@ -61,6 +69,67 @@ void store_at(float *buf, int stride, int x, int y, float value) {
       static_cast<std::size_t>(x)] = value;
 }
 
+std::size_t flat_index(int stride, int x, int y) {
+  return static_cast<std::size_t>(y) * static_cast<std::size_t>(stride) +
+         static_cast<std::size_t>(x);
+}
+
+fastmlfe2_precomputed_coeffs precompute_coeffs(float alpha, float total_weight) {
+  const float beta = 1.0f - alpha;
+  const float level_denom = total_weight + alpha * alpha + beta * beta;
+  return {
+      .image_coeff_fg = alpha / level_denom,
+      .image_coeff_bg = beta / level_denom,
+      .mean_fg_coeff_fg = (beta * beta + total_weight) / level_denom,
+      .mean_bg_coeff_fg = -(alpha * beta) / level_denom,
+      .mean_fg_coeff_bg = -(alpha * beta) / level_denom,
+      .mean_bg_coeff_bg = (alpha * alpha + total_weight) / level_denom,
+  };
+}
+
+fastmlfe2_refine_result apply_precomputed_coeffs(
+    const fastmlfe2_precomputed_coeffs &coeffs,
+    float image,
+    float fg_mean,
+    float bg_mean) {
+  return {
+      .fg = coeffs.image_coeff_fg * image +
+            coeffs.mean_fg_coeff_fg * fg_mean +
+            coeffs.mean_bg_coeff_fg * bg_mean,
+      .bg = coeffs.image_coeff_bg * image +
+            coeffs.mean_fg_coeff_bg * fg_mean +
+            coeffs.mean_bg_coeff_bg * bg_mean,
+  };
+}
+
+PixelPrecomputed precompute_pixel(
+    const float *alpha,
+    int width,
+    int height,
+    int stride,
+    int x,
+    int y,
+    float eps_r,
+    float omega) {
+  PixelPrecomputed pixel;
+  const float alpha_center = load_at(alpha, stride, x, y);
+
+  for (std::size_t i = 0; i < kFourOffsets.size(); ++i) {
+    const auto &[dy, dx] = kFourOffsets[i];
+    const int nx = clamp_index(x + dx, width);
+    const int ny = clamp_index(y + dy, height);
+    const float alpha_neighbor = load_at(alpha, stride, nx, ny);
+    const float weight =
+        eps_r + omega * std::fabs(alpha_center - alpha_neighbor);
+    pixel.neighbor_indices[i] = flat_index(stride, nx, ny);
+    pixel.weights[i] = weight;
+    pixel.total_weight += weight;
+  }
+
+  pixel.coeffs = precompute_coeffs(alpha_center, pixel.total_weight);
+  return pixel;
+}
+
 int choose_interpolation(int src_w, int src_h, int dst_w, int dst_h) {
   if (dst_w < src_w || dst_h < src_h) {
     return cv::INTER_AREA;
@@ -98,6 +167,20 @@ int resize_gray(
 }
 
 }  // namespace
+
+extern "C" fastmlfe2_precomputed_coeffs fastmlfe2_debug_precompute_coeffs(
+    float alpha,
+    float total_weight) {
+  return precompute_coeffs(alpha, total_weight);
+}
+
+extern "C" fastmlfe2_refine_result fastmlfe2_debug_apply_precomputed_coeffs(
+    fastmlfe2_precomputed_coeffs coeffs,
+    float image,
+    float fg_mean,
+    float bg_mean) {
+  return apply_precomputed_coeffs(coeffs, image, fg_mean, bg_mean);
+}
 
 extern "C" int fastmlfe2_resize_float_gray(
     const float *src,
@@ -179,36 +262,40 @@ extern "C" int fastmlfe2_paper_refine_gray_pass(
   std::copy(fg, fg + count, fg_out);
   std::copy(bg, bg + count, bg_out);
 
+  std::vector<PixelPrecomputed> precomputed(
+      static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      precomputed[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) +
+                  static_cast<std::size_t>(x)] =
+          precompute_pixel(alpha, width, height, stride, x, y, eps_r, omega);
+    }
+  }
+
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
       const float image_center = load_at(image, stride, x, y);
-      const float alpha_center = load_at(alpha, stride, x, y);
-      const float beta_center = 1.0f - alpha_center;
+      const PixelPrecomputed &pixel =
+          precomputed[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) +
+                      static_cast<std::size_t>(x)];
 
-      float s = 0.0f;
       float p_f = 0.0f;
       float p_b = 0.0f;
 
-      for (const auto &[dy, dx] : kFourOffsets) {
-        const int nx = clamp_index(x + dx, width);
-        const int ny = clamp_index(y + dy, height);
-        const float alpha_neighbor = load_at(alpha, stride, nx, ny);
-        const float weight =
-            eps_r + omega * std::fabs(alpha_center - alpha_neighbor);
-        s += weight;
-        p_f += weight * load_at(fg_out, stride, nx, ny);
-        p_b += weight * load_at(bg_out, stride, nx, ny);
+      for (std::size_t i = 0; i < pixel.neighbor_indices.size(); ++i) {
+        const std::size_t idx = pixel.neighbor_indices[i];
+        const float weight = pixel.weights[i];
+        p_f += weight * fg_out[idx];
+        p_b += weight * bg_out[idx];
       }
 
-      const float a2 = alpha_center * alpha_center;
-      const float b2 = beta_center * beta_center;
-      const float cross = alpha_center * beta_center;
-      const float denom = s * (s + a2 + b2);
-
-      const float rhs_f = alpha_center * image_center + p_f;
-      const float rhs_b = beta_center * image_center + p_b;
-      const float fg_value = std::clamp(((b2 + s) * rhs_f - cross * rhs_b) / denom, 0.0f, 1.0f);
-      const float bg_value = std::clamp(((a2 + s) * rhs_b - cross * rhs_f) / denom, 0.0f, 1.0f);
+      const float fg_mean = p_f / pixel.total_weight;
+      const float bg_mean = p_b / pixel.total_weight;
+      const fastmlfe2_refine_result result =
+          apply_precomputed_coeffs(pixel.coeffs, image_center, fg_mean, bg_mean);
+      const float fg_value = std::clamp(result.fg, 0.0f, 1.0f);
+      const float bg_value = std::clamp(result.bg, 0.0f, 1.0f);
 
       store_at(fg_out, stride, x, y, fg_value);
       store_at(bg_out, stride, x, y, bg_value);

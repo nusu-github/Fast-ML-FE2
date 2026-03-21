@@ -1,6 +1,7 @@
 #include "fastmlfe2_ffi.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <vector>
 
 namespace {
@@ -9,9 +10,44 @@ bool approx_eq(float lhs, float rhs, float eps = 1.0e-5f) {
   return std::fabs(lhs - rhs) <= eps;
 }
 
+void expect(bool condition, int rc) {
+  if (!condition) {
+    std::exit(rc);
+  }
+}
+
 }
 
 int main() {
+  {
+    constexpr int width = 1;
+    constexpr int height = 1;
+    constexpr int stride = 1;
+
+    std::vector<float> image{0.3f};
+    std::vector<float> alpha{0.25f};
+    std::vector<float> fg{0.8f};
+    std::vector<float> bg{0.1f};
+    std::vector<float> fgOut(width * height, 0.0f);
+    std::vector<float> bgOut(width * height, 0.0f);
+
+    int rc = fastmlfe2_paper_refine_gray_pass(
+        image.data(), alpha.data(), fg.data(), bg.data(),
+        fgOut.data(), bgOut.data(),
+        width, height, stride, 0.5f, 1.0f);
+    if (rc != 0) {
+      return rc;
+    }
+
+    const fastmlfe2_precomputed_coeffs coeffs =
+        fastmlfe2_debug_precompute_coeffs(0.25f, 2.0f);
+    const fastmlfe2_refine_result debug_result =
+        fastmlfe2_debug_apply_precomputed_coeffs(coeffs, 0.3f, 0.8f, 0.1f);
+
+    expect(approx_eq(fgOut[0], debug_result.fg), 12);
+    expect(approx_eq(bgOut[0], debug_result.bg), 13);
+  }
+
   constexpr int width = 2;
   constexpr int height = 1;
   constexpr int stride = 2;
