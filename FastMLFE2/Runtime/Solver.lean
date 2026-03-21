@@ -51,22 +51,6 @@ def referenceInit (image : NativeRgbImage) (alpha : NativeGrayImage) : IO (Nativ
   }
   pure (fg, bg)
 
-def iteratePasses
-    (iterations : Nat)
-    (image : NativeRgbImage) (alpha : NativeGrayImage)
-    (fg bg : NativeRgbImage)
-    (epsR omega : Float) :
-    IO (NativeRgbImage × NativeRgbImage) := do
-  let rec loop (remaining : Nat) (fg bg : NativeRgbImage) : IO (NativeRgbImage × NativeRgbImage) := do
-    if remaining = 0 then
-      pure (fg, bg)
-    else
-      let (fg', bg') ← NativeRgbImage.referenceRefinePass image alpha fg bg epsR omega
-      NativeRgbImage.clamp01 fg'
-      NativeRgbImage.clamp01 bg'
-      loop (remaining - 1) fg' bg'
-  loop iterations fg bg
-
 /-- `reference` is the executable multi-level solver, aligned with the pymatting-style implementation.
 It uses nearest-neighbor resizing and mean-color initialization. This runtime path is distinct
 from the Lean `spec` model and does not claim identical step semantics. -/
@@ -98,7 +82,9 @@ def runMultilevelForegroundEstimation
         let fgLevel ← NativeRgbImage.resizeNearest fg levelW levelH
         let bgLevel ← NativeRgbImage.resizeNearest bg levelW levelH
         let iterations := iterationsForLevel config levelW levelH
-        let (fgNext, bgNext) ← iteratePasses iterations imageLevel alphaLevel fgLevel bgLevel config.epsR config.omega
+        let (fgNext, bgNext) ←
+          NativeRgbImage.referenceRefine
+            iterations imageLevel alphaLevel fgLevel bgLevel config.epsR config.omega
         loop rest fgNext bgNext
   loop schedule fg0 bg0
 

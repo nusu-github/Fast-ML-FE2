@@ -26,8 +26,8 @@ private opaque resizeImpl (image : @& NativeGrayImage) (width height : UInt32) :
 @[extern "lean_fastmlfe2_gray_image_resize_nearest"]
 private opaque resizeNearestImpl (image : @& NativeGrayImage) (width height : UInt32) : IO NativeGrayImage
 
-@[extern "lean_fastmlfe2_gray_image_reference_refine_pass"]
-private opaque referenceRefinePassImpl
+@[extern "lean_fastmlfe2_gray_image_reference_refine_single_pass"]
+private opaque referenceRefineSinglePassImpl
     (image alpha fg bg : @& NativeGrayImage) (epsR omega : Float) :
     IO (NativeGrayImage × NativeGrayImage)
 
@@ -46,6 +46,15 @@ private opaque readPngRgbChannelImpl (path : @& String) (channel : UInt32) : IO 
 @[extern "lean_fastmlfe2_gray_image_write_png_rgb"]
 private opaque writePngRgbImpl
     (path : @& String) (red green blue : @& NativeGrayImage) : IO PUnit
+
+private abbrev NativeGrayTriple := NativeGrayImage × (NativeGrayImage × NativeGrayImage)
+
+@[extern "lean_fastmlfe2_rgb_image_reference_refine"]
+private opaque referenceRefineImpl
+    (imageRed imageGreen imageBlue alpha : @& NativeGrayImage)
+    (fgRed fgGreen fgBlue bgRed bgGreen bgBlue : @& NativeGrayImage)
+    (iterations : UInt32) (epsR omega : Float) :
+    IO (NativeGrayTriple × NativeGrayTriple)
 
 private def maxDim : Nat := 2 ^ 32 - 1
 
@@ -75,10 +84,10 @@ def resize (image : NativeGrayImage) (width height : Nat) : IO NativeGrayImage :
 def resizeNearest (image : NativeGrayImage) (width height : Nat) : IO NativeGrayImage := do
   resizeNearestImpl image (← toDim32 "width" width) (← toDim32 "height" height)
 
-def referenceRefinePass
+def referenceRefineSinglePass
     (image alpha fg bg : NativeGrayImage) (epsR omega : Float) :
     IO (NativeGrayImage × NativeGrayImage) :=
-  referenceRefinePassImpl image alpha fg bg epsR omega
+  referenceRefineSinglePassImpl image alpha fg bg epsR omega
 
 def clamp01 (image : NativeGrayImage) : IO PUnit :=
   clamp01Impl image
@@ -124,6 +133,16 @@ def assertWellFormed (image : NativeRgbImage) : IO PUnit := do
   assertSameShapeGray "NativeRgbImage" image.red image.green
   assertSameShapeGray "NativeRgbImage" image.red image.blue
 
+private def assertCompatibleRefineInputs
+    (image : NativeRgbImage) (alpha : NativeGrayImage)
+    (fg bg : NativeRgbImage) : IO PUnit := do
+  image.assertWellFormed
+  fg.assertWellFormed
+  bg.assertWellFormed
+  assertSameShapeGray "NativeRgbImage.referenceRefine image/alpha" image.red alpha
+  assertSameShapeGray "NativeRgbImage.referenceRefine image/fg" image.red fg.red
+  assertSameShapeGray "NativeRgbImage.referenceRefine image/bg" image.red bg.red
+
 def readPng (path : FilePath) : IO NativeRgbImage := do
   let image : NativeRgbImage := {
     red := ← NativeGrayImage.readPngRgbChannel path 0
@@ -156,20 +175,22 @@ def clamp01 (image : NativeRgbImage) : IO PUnit := do
   image.green.clamp01
   image.blue.clamp01
 
-def referenceRefinePass
+def referenceRefine
+    (iterations : Nat)
     (image : NativeRgbImage) (alpha : NativeGrayImage)
     (fg bg : NativeRgbImage) (epsR omega : Float) :
     IO (NativeRgbImage × NativeRgbImage) := do
-  image.assertWellFormed
-  fg.assertWellFormed
-  bg.assertWellFormed
-  assertSameShapeGray "NativeRgbImage.referenceRefinePass image/alpha" image.red alpha
-  assertSameShapeGray "NativeRgbImage.referenceRefinePass image/fg" image.red fg.red
-  assertSameShapeGray "NativeRgbImage.referenceRefinePass image/bg" image.red bg.red
-  let (fgR, bgR) ← NativeGrayImage.referenceRefinePass image.red alpha fg.red bg.red epsR omega
-  let (fgG, bgG) ← NativeGrayImage.referenceRefinePass image.green alpha fg.green bg.green epsR omega
-  let (fgB, bgB) ← NativeGrayImage.referenceRefinePass image.blue alpha fg.blue bg.blue epsR omega
-  pure ({ red := fgR, green := fgG, blue := fgB }, { red := bgR, green := bgG, blue := bgB })
+  assertCompatibleRefineInputs image alpha fg bg
+  let ((fgR, (fgG, fgB)), (bgR, (bgG, bgB))) ←
+    referenceRefineImpl
+      image.red image.green image.blue alpha
+      fg.red fg.green fg.blue
+      bg.red bg.green bg.blue
+      (← toDim32 "iterations" iterations)
+      epsR omega
+  pure
+    ({ red := fgR, green := fgG, blue := fgB },
+     { red := bgR, green := bgG, blue := bgB })
 
 end NativeRgbImage
 

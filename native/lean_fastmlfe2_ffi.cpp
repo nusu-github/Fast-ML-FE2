@@ -86,6 +86,10 @@ lean_obj_res mk_pair(lean_obj_arg fst, lean_obj_arg snd) {
   return pair;
 }
 
+lean_obj_res mk_gray_triple(lean_obj_arg first, lean_obj_arg second, lean_obj_arg third) {
+  return mk_pair(first, mk_pair(second, third));
+}
+
 GrayImageHandle * alloc_image(int width, int height) {
   return new GrayImageHandle{
       width,
@@ -200,7 +204,7 @@ extern "C" lean_obj_res lean_fastmlfe2_gray_image_resize_nearest(
   return ok(lean_alloc_external(get_gray_image_class(), out));
 }
 
-extern "C" lean_obj_res lean_fastmlfe2_gray_image_reference_refine_pass(
+extern "C" lean_obj_res lean_fastmlfe2_gray_image_reference_refine_single_pass(
     b_lean_obj_arg image_obj,
     b_lean_obj_arg alpha_obj,
     b_lean_obj_arg fg_obj,
@@ -212,14 +216,15 @@ extern "C" lean_obj_res lean_fastmlfe2_gray_image_reference_refine_pass(
   const auto * fg = get_handle(fg_obj);
   const auto * bg = get_handle(bg_obj);
   if (!same_dims(*image, *alpha) || !same_dims(*image, *fg) || !same_dims(*image, *bg)) {
-    return user_error("NativeGrayImage.referenceRefinePass: all images must have matching dimensions");
+    return user_error(
+        "NativeGrayImage.referenceRefineSinglePass: all images must have matching dimensions");
   }
 
   auto * fg_out = new GrayImageHandle{
       image->width, image->height, image->stride, std::vector<float>(pixel_count(*image))};
   auto * bg_out = new GrayImageHandle{
       image->width, image->height, image->stride, std::vector<float>(pixel_count(*image))};
-  const int rc = fastmlfe2_paper_refine_gray_pass(
+  const int rc = fastmlfe2_reference_refine_gray_single_pass(
       image->data.data(), alpha->data.data(), fg->data.data(), bg->data.data(),
       fg_out->data.data(), bg_out->data.data(),
       image->width, image->height, image->stride,
@@ -228,12 +233,83 @@ extern "C" lean_obj_res lean_fastmlfe2_gray_image_reference_refine_pass(
   if (rc != FASTMLFE2_STATUS_OK) {
     delete fg_out;
     delete bg_out;
-    return status_error("NativeGrayImage.referenceRefinePass", rc);
+    return status_error("NativeGrayImage.referenceRefineSinglePass", rc);
   }
 
   return ok(mk_pair(
       lean_alloc_external(get_gray_image_class(), fg_out),
       lean_alloc_external(get_gray_image_class(), bg_out)));
+}
+
+extern "C" lean_obj_res lean_fastmlfe2_rgb_image_reference_refine(
+    b_lean_obj_arg image_red_obj,
+    b_lean_obj_arg image_green_obj,
+    b_lean_obj_arg image_blue_obj,
+    b_lean_obj_arg alpha_obj,
+    b_lean_obj_arg fg_red_obj,
+    b_lean_obj_arg fg_green_obj,
+    b_lean_obj_arg fg_blue_obj,
+    b_lean_obj_arg bg_red_obj,
+    b_lean_obj_arg bg_green_obj,
+    b_lean_obj_arg bg_blue_obj,
+    uint32_t iterations,
+    double eps_r,
+    double omega) {
+  const auto * image_red = get_handle(image_red_obj);
+  const auto * image_green = get_handle(image_green_obj);
+  const auto * image_blue = get_handle(image_blue_obj);
+  const auto * alpha = get_handle(alpha_obj);
+  const auto * fg_red = get_handle(fg_red_obj);
+  const auto * fg_green = get_handle(fg_green_obj);
+  const auto * fg_blue = get_handle(fg_blue_obj);
+  const auto * bg_red = get_handle(bg_red_obj);
+  const auto * bg_green = get_handle(bg_green_obj);
+  const auto * bg_blue = get_handle(bg_blue_obj);
+  if (!same_dims(*image_red, *image_green) || !same_dims(*image_red, *image_blue) ||
+      !same_dims(*image_red, *alpha) ||
+      !same_dims(*image_red, *fg_red) || !same_dims(*image_red, *fg_green) ||
+      !same_dims(*image_red, *fg_blue) ||
+      !same_dims(*image_red, *bg_red) || !same_dims(*image_red, *bg_green) ||
+      !same_dims(*image_red, *bg_blue)) {
+    return user_error("NativeRgbImage.referenceRefine: all images must have matching dimensions");
+  }
+
+  auto * fg_red_out = alloc_image(image_red->width, image_red->height);
+  auto * fg_green_out = alloc_image(image_red->width, image_red->height);
+  auto * fg_blue_out = alloc_image(image_red->width, image_red->height);
+  auto * bg_red_out = alloc_image(image_red->width, image_red->height);
+  auto * bg_green_out = alloc_image(image_red->width, image_red->height);
+  auto * bg_blue_out = alloc_image(image_red->width, image_red->height);
+  const int rc = fastmlfe2_reference_refine_rgb(
+      image_red->data.data(), image_green->data.data(), image_blue->data.data(),
+      alpha->data.data(),
+      fg_red->data.data(), fg_green->data.data(), fg_blue->data.data(),
+      bg_red->data.data(), bg_green->data.data(), bg_blue->data.data(),
+      fg_red_out->data.data(), fg_green_out->data.data(), fg_blue_out->data.data(),
+      bg_red_out->data.data(), bg_green_out->data.data(), bg_blue_out->data.data(),
+      image_red->width, image_red->height, image_red->stride,
+      static_cast<int>(iterations),
+      static_cast<float>(eps_r),
+      static_cast<float>(omega));
+  if (rc != FASTMLFE2_STATUS_OK) {
+    delete fg_red_out;
+    delete fg_green_out;
+    delete fg_blue_out;
+    delete bg_red_out;
+    delete bg_green_out;
+    delete bg_blue_out;
+    return status_error("NativeRgbImage.referenceRefine", rc);
+  }
+
+  return ok(mk_pair(
+      mk_gray_triple(
+          lean_alloc_external(get_gray_image_class(), fg_red_out),
+          lean_alloc_external(get_gray_image_class(), fg_green_out),
+          lean_alloc_external(get_gray_image_class(), fg_blue_out)),
+      mk_gray_triple(
+          lean_alloc_external(get_gray_image_class(), bg_red_out),
+          lean_alloc_external(get_gray_image_class(), bg_green_out),
+          lean_alloc_external(get_gray_image_class(), bg_blue_out))));
 }
 
 extern "C" lean_obj_res lean_fastmlfe2_gray_image_clamp01(

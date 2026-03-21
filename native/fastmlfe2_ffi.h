@@ -14,20 +14,6 @@ enum fastmlfe2_status {
   FASTMLFE2_STATUS_ALIASING = 5
 };
 
-struct fastmlfe2_precomputed_coeffs {
-  float image_coeff_fg;
-  float image_coeff_bg;
-  float mean_fg_coeff_fg;
-  float mean_bg_coeff_fg;
-  float mean_fg_coeff_bg;
-  float mean_bg_coeff_bg;
-};
-
-struct fastmlfe2_refine_result {
-  float fg;
-  float bg;
-};
-
 int fastmlfe2_resize_float_gray(
     const float *src,
     int src_w,
@@ -48,7 +34,7 @@ int fastmlfe2_resize_float_gray_nearest(
     int dst_h,
     int dst_stride);
 
-int fastmlfe2_paper_refine_gray_pass(
+int fastmlfe2_reference_refine_gray_single_pass(
     const float *image,
     const float *alpha,
     const float *fg,
@@ -61,17 +47,31 @@ int fastmlfe2_paper_refine_gray_pass(
     float eps_r,
     float omega);
 
+int fastmlfe2_reference_refine_rgb(
+    const float *image_red,
+    const float *image_green,
+    const float *image_blue,
+    const float *alpha,
+    const float *fg_red,
+    const float *fg_green,
+    const float *fg_blue,
+    const float *bg_red,
+    const float *bg_green,
+    const float *bg_blue,
+    float *fg_red_out,
+    float *fg_green_out,
+    float *fg_blue_out,
+    float *bg_red_out,
+    float *bg_green_out,
+    float *bg_blue_out,
+    int width,
+    int height,
+    int stride,
+    int iterations,
+    float eps_r,
+    float omega);
+
 int fastmlfe2_clamp01_gray(float *buf, int width, int height, int stride);
-
-fastmlfe2_precomputed_coeffs fastmlfe2_debug_precompute_coeffs(
-    float alpha,
-    float total_weight);
-
-fastmlfe2_refine_result fastmlfe2_debug_apply_precomputed_coeffs(
-    fastmlfe2_precomputed_coeffs coeffs,
-    float image,
-    float fg_mean,
-    float bg_mean);
 
 #ifdef __cplusplus
 }

@@ -1,5 +1,5 @@
 import FastMLFE2.ConcreteImage
-import FastMLFE2.PrecomputedSummary
+import FastMLFE2.LevelOperator
 
 namespace FastMLFE2
 
@@ -97,14 +97,31 @@ theorem specUpdateAt_eq_summaryUpdate {h w : Nat} (params : SpecWeightParams)
       (specLocalData params alpha fg bg px).summaryUpdate (alpha px) (image px) := by
   simp [specSummaryRefinementModel, specLocalData]
 
-theorem specPrecomputedUpdate_eq_summaryUpdate {h w : Nat} (params : SpecWeightParams)
+theorem specLevelOperatorUpdate_stationary {h w : Nat} (params : SpecWeightParams)
     (hparams : params.Valid) (image alpha fg bg : GrayImage h w) (px : Pixel h w) :
-    (specLocalData params alpha fg bg px).precomputedUpdate (alpha px) (image px) =
+    (specLocalData params alpha fg bg px).stationary (alpha px) (image px)
+      ((specLocalData params alpha fg bg px).levelOperatorUpdate (alpha px) (image px)) := by
+  exact (specLocalData params alpha fg bg px).levelOperatorUpdate_stationary
+    (α := alpha px) (image := image px)
+    (specLocalData_totalWeight_pos params hparams alpha fg bg px)
+
+theorem specLevelOperatorUpdate_eq_summaryUpdate {h w : Nat} (params : SpecWeightParams)
+    (hparams : params.Valid) (image alpha fg bg : GrayImage h w) (px : Pixel h w) :
+    (specLocalData params alpha fg bg px).levelOperatorUpdate (alpha px) (image px) =
       (specLocalData params alpha fg bg px).summaryUpdate (alpha px) (image px) := by
   simpa using
-    (specLocalData params alpha fg bg px).precomputedUpdate_eq_summaryUpdate
+    (specLocalData params alpha fg bg px).levelOperatorUpdate_eq_summaryUpdate
       (α := alpha px) (image := image px)
       (specLocalData_totalWeight_pos params hparams alpha fg bg px)
+
+theorem specLevelOperatorUpdate_eq_updateAt {h w : Nat} (params : SpecWeightParams)
+    (hparams : params.Valid) (image alpha fg bg : GrayImage h w) (px : Pixel h w) :
+    (specLocalData params alpha fg bg px).levelOperatorUpdate (alpha px) (image px) =
+      (specSummaryRefinementModel params).updateAt image alpha fg bg px := by
+  trans (specLocalData params alpha fg bg px).summaryUpdate (alpha px) (image px)
+  · exact specLevelOperatorUpdate_eq_summaryUpdate params hparams image alpha fg bg px
+  · symm
+    exact specUpdateAt_eq_summaryUpdate params image alpha fg bg px
 
 section Examples
 
@@ -127,9 +144,9 @@ example (params : SpecWeightParams) (alpha fg bg image : GrayImage 3 4)
 
 example (params : SpecWeightParams) (alpha fg bg image : GrayImage 3 4)
     (hparams : params.Valid) (px : Pixel 3 4) :
-    (specLocalData params alpha fg bg px).precomputedUpdate (alpha px) (image px) =
-      (specLocalData params alpha fg bg px).summaryUpdate (alpha px) (image px) := by
-  simpa using specPrecomputedUpdate_eq_summaryUpdate (params := params) (hparams := hparams)
+    (specLocalData params alpha fg bg px).levelOperatorUpdate (alpha px) (image px) =
+      (specSummaryRefinementModel params).updateAt image alpha fg bg px := by
+  simpa using specLevelOperatorUpdate_eq_updateAt (params := params) (hparams := hparams)
     (image := image) (alpha := alpha) (fg := fg) (bg := bg) px
 
 example :

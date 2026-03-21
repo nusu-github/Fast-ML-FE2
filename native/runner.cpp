@@ -177,13 +177,13 @@ int main(int argc, char **argv) {
     GrayImage bg_out = make_image(image.width, image.height);
 
     for (int iter = 0; iter < iterations; ++iter) {
-      const int rc = fastmlfe2_paper_refine_gray_pass(
+      const int rc = fastmlfe2_reference_refine_gray_single_pass(
           image.data.data(), alpha.data.data(), fg.data.data(), bg.data.data(),
           fg_out.data.data(), bg_out.data.data(),
           image.width, image.height, image.stride, eps_r, omega);
       if (rc != FASTMLFE2_STATUS_OK) {
         throw std::runtime_error(
-            "paper_refine_gray_pass failed with status " + std::to_string(rc));
+            "reference_refine_gray_single_pass failed with status " + std::to_string(rc));
       }
       clamp_image(fg_out);
       clamp_image(bg_out);
