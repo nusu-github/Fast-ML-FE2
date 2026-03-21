@@ -31,37 +31,32 @@ def halfGradient (data : LocalData ι) (α image : ℝ) (g : FBVec) : FBVec :=
 def stationary (data : LocalData ι) (α image : ℝ) (g : FBVec) : Prop :=
   data.halfGradient α image g = 0
 
+theorem halfGradient_foreground_eq_linearResidual (data : LocalData ι)
+    (α image : ℝ) (g : FBVec) :
+    foreground (data.halfGradient α image g) =
+      foreground ((data.systemMatrix α).mulVec g - data.rhs α image) := by
+  simp only [halfGradient, compositingResidual_eq, foreground, background, Pi.sub_apply,
+    systemMatrix_mulVec_foreground]
+  rw [sum_weight_mul_sub data.weights data.fgNeighbors (g 0)]
+  simp [LocalData.totalWeight, LocalData.foregroundSum, rhs]
+  ring
+
+theorem halfGradient_background_eq_linearResidual (data : LocalData ι)
+    (α image : ℝ) (g : FBVec) :
+    background (data.halfGradient α image g) =
+      background ((data.systemMatrix α).mulVec g - data.rhs α image) := by
+  simp only [halfGradient, compositingResidual_eq, foreground, background, Pi.sub_apply,
+    systemMatrix_mulVec_background]
+  rw [sum_weight_mul_sub data.weights data.bgNeighbors (g 1)]
+  simp [LocalData.totalWeight, LocalData.backgroundSum, rhs]
+  ring
+
 theorem halfGradient_eq_linearResidual (data : LocalData ι)
     (α image : ℝ) (g : FBVec) :
     data.halfGradient α image g = (data.systemMatrix α).mulVec g - data.rhs α image := by
-  ext i
-  fin_cases i
-  · have hcomp :
-        α * compositingResidual α image g
-            + ∑ j, data.weights j * (foreground g - data.fgNeighbors j) =
-          (data.systemMatrix α).mulVec g 0 - data.rhs α image 0 := by
-      rw [systemMatrix_mulVec_foreground]
-      have hrhs : data.rhs α image 0 = α * image + data.foregroundSum := by
-        simp [rhs]
-      rw [hrhs]
-      simp only [compositingResidual_eq, foreground, background]
-      rw [sum_weight_mul_sub data.weights data.fgNeighbors (g 0)]
-      rw [LocalData.totalWeight, LocalData.foregroundSum]
-      ring
-    simpa [halfGradient, Pi.sub_apply] using hcomp
-  · have hcomp :
-        (1 - α) * compositingResidual α image g
-            + ∑ j, data.weights j * (background g - data.bgNeighbors j) =
-          (data.systemMatrix α).mulVec g 1 - data.rhs α image 1 := by
-      rw [systemMatrix_mulVec_background]
-      have hrhs : data.rhs α image 1 = (1 - α) * image + data.backgroundSum := by
-        simp [rhs]
-      rw [hrhs]
-      simp only [compositingResidual_eq, foreground, background]
-      rw [sum_weight_mul_sub data.weights data.bgNeighbors (g 1)]
-      rw [LocalData.totalWeight, LocalData.backgroundSum]
-      ring
-    simpa [halfGradient, Pi.sub_apply] using hcomp
+  apply ext_fbVec
+  · exact data.halfGradient_foreground_eq_linearResidual α image g
+  · exact data.halfGradient_background_eq_linearResidual α image g
 
 theorem stationary_iff_localSystem (data : LocalData ι) (α image : ℝ) (g : FBVec) :
     data.stationary α image g ↔ data.localSystem α image g := by

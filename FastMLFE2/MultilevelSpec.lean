@@ -45,6 +45,13 @@ noncomputable def updateAt (model : SummaryRefinementModel Image Pixel ι)
   let data := model.localData image alpha fg bg px
   data.summaryUpdate (model.imageOps.sample alpha px) (model.imageOps.sample image px)
 
+theorem updateAt_eq_summaryUpdate (model : SummaryRefinementModel Image Pixel ι)
+    (image alpha fg bg : Image) (px : Pixel) :
+    model.updateAt image alpha fg bg px =
+      (model.localData image alpha fg bg px).summaryUpdate
+        (model.imageOps.sample alpha px) (model.imageOps.sample image px) := by
+  simp [updateAt]
+
 noncomputable def refineForeground (model : SummaryRefinementModel Image Pixel ι)
     (image alpha fg bg : Image) : Image :=
   model.imageOps.reconstruct (fun px => foreground (model.updateAt image alpha fg bg px))

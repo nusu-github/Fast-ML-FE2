@@ -68,13 +68,12 @@ theorem specLocalData_weight_pos {h w : Nat} (params : SpecWeightParams)
 theorem specLocalData_weight_nonneg {h w : Nat} (params : SpecWeightParams)
     (hparams : params.Valid) (alpha fg bg : GrayImage h w) (px : Pixel h w) (t : Fin 4) :
     0 ≤ (specLocalData params alpha fg bg px).weights t := by
-  exact le_of_lt (specLocalData_weight_pos params hparams alpha fg bg px t)
+  exact le_of_lt <| specLocalData_weight_pos params hparams alpha fg bg px t
 
 theorem specLocalData_totalWeight_pos {h w : Nat} (params : SpecWeightParams)
     (hparams : params.Valid) (alpha fg bg : GrayImage h w) (px : Pixel h w) :
     0 < (specLocalData params alpha fg bg px).totalWeight := by
-  have hzero : 0 < (specLocalData params alpha fg bg px).weights 0 := by
-    exact specLocalData_weight_pos params hparams alpha fg bg px 0
+  have hzero := specLocalData_weight_pos params hparams alpha fg bg px 0
   have hle :
       (specLocalData params alpha fg bg px).weights 0 ≤
         (specLocalData params alpha fg bg px).totalWeight := by
@@ -92,6 +91,21 @@ theorem specUpdateAt_stationary {h w : Nat} (params : SpecWeightParams)
     (specSummaryRefinementModel params).updateAt_stationary_of_totalWeight_pos
       image alpha fg bg px (specLocalData_totalWeight_pos params hparams alpha fg bg px)
 
+theorem specUpdateAt_eq_summaryUpdate {h w : Nat} (params : SpecWeightParams)
+    (image alpha fg bg : GrayImage h w) (px : Pixel h w) :
+    (specSummaryRefinementModel params).updateAt image alpha fg bg px =
+      (specLocalData params alpha fg bg px).summaryUpdate (alpha px) (image px) := by
+  simp [specSummaryRefinementModel, specLocalData]
+
+theorem specPrecomputedUpdate_eq_summaryUpdate {h w : Nat} (params : SpecWeightParams)
+    (hparams : params.Valid) (image alpha fg bg : GrayImage h w) (px : Pixel h w) :
+    (specLocalData params alpha fg bg px).precomputedUpdate (alpha px) (image px) =
+      (specLocalData params alpha fg bg px).summaryUpdate (alpha px) (image px) := by
+  simpa using
+    (specLocalData params alpha fg bg px).precomputedUpdate_eq_summaryUpdate
+      (α := alpha px) (image := image px)
+      (specLocalData_totalWeight_pos params hparams alpha fg bg px)
+
 section Examples
 
 example :
@@ -108,16 +122,15 @@ example (params : SpecWeightParams) (alpha fg bg image : GrayImage 3 4)
     (px : Pixel 3 4) :
     (specSummaryRefinementModel params).updateAt image alpha fg bg px =
       (specLocalData params alpha fg bg px).summaryUpdate (alpha px) (image px) := by
-  simp [specSummaryRefinementModel, specLocalData]
+  simpa using specUpdateAt_eq_summaryUpdate (params := params) (image := image)
+    (alpha := alpha) (fg := fg) (bg := bg) px
 
 example (params : SpecWeightParams) (alpha fg bg image : GrayImage 3 4)
     (hparams : params.Valid) (px : Pixel 3 4) :
     (specLocalData params alpha fg bg px).precomputedUpdate (alpha px) (image px) =
       (specLocalData params alpha fg bg px).summaryUpdate (alpha px) (image px) := by
-  simpa using
-    (specLocalData params alpha fg bg px).precomputedUpdate_eq_summaryUpdate
-      (α := alpha px) (image := image px)
-      (specLocalData_totalWeight_pos params hparams alpha fg bg px)
+  simpa using specPrecomputedUpdate_eq_summaryUpdate (params := params) (hparams := hparams)
+    (image := image) (alpha := alpha) (fg := fg) (bg := bg) px
 
 example :
     fourNeighborhood ((0 : Fin 3), (0 : Fin 4)) 0 = (0, -1) := by

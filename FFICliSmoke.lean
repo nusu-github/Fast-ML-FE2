@@ -1,4 +1,5 @@
 import FastMLFE2.CLI
+import FastMLFE2.Runtime
 
 open System
 
@@ -26,7 +27,7 @@ def expectValueRange (context : String) (actual : FloatArray) : IO Unit := do
 
 def main : IO Unit := do
   expectEqNatList "manual level count"
-    (FastMLFE2.CLI.testLevelSizes 100 50 (.manual 4))
+    (FastMLFE2.Runtime.levelSizes 100 50 (.manual 4))
     [(1, 1), (5, 4), (22, 14), (100, 50)]
   let tmp ← IO.FS.createTempDir
   let imagePath := tmp / "image.png"
@@ -42,17 +43,6 @@ def main : IO Unit := do
   let alpha ← makeGray 2 2 [0.0, 0.5, 0.75, 1.0]
   rgb.writePng imagePath
   alpha.writePngGray alphaPath
-  let rejectedPaperMode ← FastMLFE2.CLI.main [
-    "--mode",
-    "paper",
-    imagePath.toString,
-    alphaPath.toString,
-    outFgPath.toString,
-    outBgPath.toString
-  ]
-  if rejectedPaperMode = 0 then
-    throw <| IO.userError "paper mode should be rejected"
-
   let exitCode ← FastMLFE2.CLI.main [
     "--mode",
     "reference",

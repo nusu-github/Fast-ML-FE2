@@ -54,8 +54,13 @@ theorem closedForm_eq_summaryUpdate (data : LocalData ι) (α image : ℝ) :
 theorem summaryDenom_pos_of_totalWeight_pos (data : LocalData ι) {α : ℝ}
     (h : 0 < data.totalWeight) :
     0 < data.summaryDenom α := by
-  rw [summaryDenom_eq_closedFormDenom, data.closedFormDenom_eq_det]
-  exact data.systemMatrix_det_pos_of_totalWeight_pos (α := α) h
+  rw [summaryDenom_eq_closedFormDenom]
+  exact LocalData.closedFormDenom_pos_of_totalWeight_pos (data := data) (α := α) h
+
+theorem summaryDenom_ne_zero_of_totalWeight_pos (data : LocalData ι) {α : ℝ}
+    (h : 0 < data.totalWeight) :
+    data.summaryDenom α ≠ 0 :=
+  (data.summaryDenom_pos_of_totalWeight_pos (α := α) h).ne'
 
 theorem summaryUpdate_solves_localSystem (data : LocalData ι)
     (α image : ℝ) (h : 0 < data.totalWeight) :

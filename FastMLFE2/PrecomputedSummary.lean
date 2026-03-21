@@ -98,28 +98,32 @@ theorem summaryDenom_eq_totalWeight_mul_levelDenom (data : LocalData ι) (α : �
     data.summaryDenom α = data.totalWeight * data.levelDenom α := by
   simp [LocalData.summaryDenom, levelDenom]
 
+theorem precomputedUpdate_foreground_eq_summary (data : LocalData ι)
+    (α image : ℝ) (h : 0 < data.totalWeight) :
+    foreground (data.precomputedUpdate α image) = data.summaryForeground α image := by
+  have hs : data.totalWeight ≠ 0 := data.weightedMeans_wellDefined h
+  have hl : data.levelDenom α ≠ 0 := data.levelDenom_ne_zero_of_totalWeight_pos (α := α) h
+  simp [precomputedUpdate, LocalPrecomputed.apply, precompute, weightedMeans,
+    summaryForeground, levelDenom, data.summaryDenom_eq_totalWeight_mul_levelDenom]
+  field_simp [hs, hl]
+  ring_nf
+
+theorem precomputedUpdate_background_eq_summary (data : LocalData ι)
+    (α image : ℝ) (h : 0 < data.totalWeight) :
+    background (data.precomputedUpdate α image) = data.summaryBackground α image := by
+  have hs : data.totalWeight ≠ 0 := data.weightedMeans_wellDefined h
+  have hl : data.levelDenom α ≠ 0 := data.levelDenom_ne_zero_of_totalWeight_pos (α := α) h
+  simp [precomputedUpdate, LocalPrecomputed.apply, precompute, weightedMeans,
+    summaryBackground, levelDenom, data.summaryDenom_eq_totalWeight_mul_levelDenom]
+  field_simp [hs, hl]
+  ring_nf
+
 theorem precomputedUpdate_eq_summaryUpdate (data : LocalData ι)
     (α image : ℝ) (h : 0 < data.totalWeight) :
     data.precomputedUpdate α image = data.summaryUpdate α image := by
   apply ext_fbVec
-  · have hs : data.totalWeight ≠ 0 := h.ne'
-    have hl : data.levelDenom α ≠ 0 := data.levelDenom_ne_zero_of_totalWeight_pos (α := α) h
-    have hd : data.summaryDenom α ≠ 0 := by
-      rw [data.summaryDenom_eq_totalWeight_mul_levelDenom α]
-      exact mul_ne_zero hs hl
-    simp [precomputedUpdate, LocalPrecomputed.apply, precompute, weightedMeans,
-      summaryUpdate, summaryForeground, levelDenom, data.summaryDenom_eq_totalWeight_mul_levelDenom]
-    field_simp [hs, hl]
-    ring_nf
-  · have hs : data.totalWeight ≠ 0 := h.ne'
-    have hl : data.levelDenom α ≠ 0 := data.levelDenom_ne_zero_of_totalWeight_pos (α := α) h
-    have hd : data.summaryDenom α ≠ 0 := by
-      rw [data.summaryDenom_eq_totalWeight_mul_levelDenom α]
-      exact mul_ne_zero hs hl
-    simp [precomputedUpdate, LocalPrecomputed.apply, precompute, weightedMeans,
-      summaryUpdate, summaryBackground, levelDenom, data.summaryDenom_eq_totalWeight_mul_levelDenom]
-    field_simp [hs, hl]
-    ring_nf
+  · simpa [summaryUpdate] using data.precomputedUpdate_foreground_eq_summary α image h
+  · simpa [summaryUpdate] using data.precomputedUpdate_background_eq_summary α image h
 
 theorem precomputedUpdate_solves_localSystem (data : LocalData ι)
     (α image : ℝ) (h : 0 < data.totalWeight) :
