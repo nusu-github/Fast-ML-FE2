@@ -6,3 +6,4 @@ import FastMLFE2.MultilevelSpec
 import FastMLFE2.ConcreteImage
 import FastMLFE2.ConcretePaper
 import FastMLFE2.NativeFFI
+import FastMLFE2.CLI

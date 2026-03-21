@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "fastmlfe2_ffi.h"
+#include <opencv2/imgcodecs.hpp>
 
 namespace {
 
@@ -83,6 +84,27 @@ lean_obj_res mk_pair(lean_obj_arg fst, lean_obj_arg snd) {
   lean_ctor_set(pair, 0, fst);
   lean_ctor_set(pair, 1, snd);
   return pair;
+}
+
+GrayImageHandle * alloc_image(int width, int height) {
+  return new GrayImageHandle{
+      width,
+      height,
+      width,
+      std::vector<float>(static_cast<std::size_t>(width) * static_cast<std::size_t>(height))};
+}
+
+cv::Mat to_gray_8u(const GrayImageHandle & image) {
+  cv::Mat out(image.height, image.width, CV_8UC1);
+  for (int y = 0; y < image.height; ++y) {
+    for (int x = 0; x < image.width; ++x) {
+      const auto idx =
+          static_cast<std::size_t>(y) * static_cast<std::size_t>(image.stride) + static_cast<std::size_t>(x);
+      const float clamped = std::clamp(image.data[idx], 0.0f, 1.0f);
+      out.at<unsigned char>(y, x) = static_cast<unsigned char>(clamped * 255.0f + 0.5f);
+    }
+  }
+  return out;
 }
 
 }  // namespace
@@ -196,6 +218,89 @@ extern "C" lean_obj_res lean_fastmlfe2_gray_image_clamp01(
   const int rc = fastmlfe2_clamp01_gray(image->data.data(), image->width, image->height, image->stride);
   if (rc != FASTMLFE2_STATUS_OK) {
     return status_error("NativeGrayImage.clamp01", rc);
+  }
+  return ok(lean_box(0));
+}
+
+extern "C" lean_obj_res lean_fastmlfe2_gray_image_read_png_gray(b_lean_obj_arg path_obj) {
+  const std::string path = lean_string_cstr(path_obj);
+  cv::Mat image = cv::imread(path, cv::IMREAD_GRAYSCALE);
+  if (image.empty()) {
+    return user_error("NativeGrayImage.readPngGray: failed to read PNG");
+  }
+  auto * handle = alloc_image(image.cols, image.rows);
+  for (int y = 0; y < image.rows; ++y) {
+    for (int x = 0; x < image.cols; ++x) {
+      handle->data[static_cast<std::size_t>(y) * static_cast<std::size_t>(handle->stride) +
+                   static_cast<std::size_t>(x)] =
+          static_cast<float>(image.at<unsigned char>(y, x)) / 255.0f;
+    }
+  }
+  return ok(lean_alloc_external(get_gray_image_class(), handle));
+}
+
+extern "C" lean_obj_res lean_fastmlfe2_gray_image_write_png_gray(
+    b_lean_obj_arg path_obj,
+    b_lean_obj_arg image_obj) {
+  const std::string path = lean_string_cstr(path_obj);
+  const auto * image = get_handle(image_obj);
+  if (!cv::imwrite(path, to_gray_8u(*image))) {
+    return user_error("NativeGrayImage.writePngGray: failed to write PNG");
+  }
+  return ok(lean_box(0));
+}
+
+extern "C" lean_obj_res lean_fastmlfe2_gray_image_read_png_rgb_channel(
+    b_lean_obj_arg path_obj,
+    uint32_t channel) {
+  if (channel > 2) {
+    return user_error("NativeGrayImage.readPngRgbChannel: channel must be 0, 1, or 2");
+  }
+  const std::string path = lean_string_cstr(path_obj);
+  cv::Mat image = cv::imread(path, cv::IMREAD_COLOR);
+  if (image.empty()) {
+    return user_error("NativeGrayImage.readPngRgbChannel: failed to read PNG");
+  }
+  const int bgr_channel = 2 - static_cast<int>(channel);
+  auto * handle = alloc_image(image.cols, image.rows);
+  for (int y = 0; y < image.rows; ++y) {
+    for (int x = 0; x < image.cols; ++x) {
+      const auto pixel = image.at<cv::Vec3b>(y, x);
+      handle->data[static_cast<std::size_t>(y) * static_cast<std::size_t>(handle->stride) +
+                   static_cast<std::size_t>(x)] =
+          static_cast<float>(pixel[bgr_channel]) / 255.0f;
+    }
+  }
+  return ok(lean_alloc_external(get_gray_image_class(), handle));
+}
+
+extern "C" lean_obj_res lean_fastmlfe2_gray_image_write_png_rgb(
+    b_lean_obj_arg path_obj,
+    b_lean_obj_arg red_obj,
+    b_lean_obj_arg green_obj,
+    b_lean_obj_arg blue_obj) {
+  const std::string path = lean_string_cstr(path_obj);
+  const auto * red = get_handle(red_obj);
+  const auto * green = get_handle(green_obj);
+  const auto * blue = get_handle(blue_obj);
+  if (!same_dims(*red, *green) || !same_dims(*red, *blue)) {
+    return user_error("NativeRgbImage.writePng: RGB channel dimensions must match");
+  }
+
+  cv::Mat image(red->height, red->width, CV_8UC3);
+  for (int y = 0; y < red->height; ++y) {
+    for (int x = 0; x < red->width; ++x) {
+      const auto idx =
+          static_cast<std::size_t>(y) * static_cast<std::size_t>(red->stride) + static_cast<std::size_t>(x);
+      image.at<cv::Vec3b>(y, x) = cv::Vec3b(
+          static_cast<unsigned char>(std::clamp(blue->data[idx], 0.0f, 1.0f) * 255.0f + 0.5f),
+          static_cast<unsigned char>(std::clamp(green->data[idx], 0.0f, 1.0f) * 255.0f + 0.5f),
+          static_cast<unsigned char>(std::clamp(red->data[idx], 0.0f, 1.0f) * 255.0f + 0.5f));
+    }
+  }
+
+  if (!cv::imwrite(path, image)) {
+    return user_error("NativeRgbImage.writePng: failed to write PNG");
   }
   return ok(lean_box(0));
 }
