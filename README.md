@@ -1,13 +1,9 @@
 # Fast-ML-FE2
 
-## GitHub configuration
+This repository has two intentionally separate layers:
 
-To set up your new GitHub repository, follow these steps:
+- `spec`: Lean models and proofs for the simultaneous-update local refinement specification.
+- `reference`: the executable foreground estimator, aligned with the pymatting-style multi-level solver.
 
-* Under your repository name, click **Settings**.
-* In the **Actions** section of the sidebar, click "General".
-* Check the box **Allow GitHub Actions to create and approve pull requests**.
-* Click the **Pages** section of the settings sidebar.
-* In the **Source** dropdown menu, select "GitHub Actions".
-
-After following the steps above, you can remove this section from the README file.
+The executable `reference` solver is the supported runtime path. The Lean `spec` layer is a proof target and
+does not claim identical step semantics with the native iterative solver.

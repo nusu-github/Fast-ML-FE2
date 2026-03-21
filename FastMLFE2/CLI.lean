@@ -4,18 +4,12 @@ open System
 
 namespace FastMLFE2.CLI
 
-inductive ExecutionMode where
-  | paper
-  | reference
-  deriving BEq, DecidableEq, Repr
-
 inductive LevelSchedule where
   | auto
   | manual (count : Nat)
   deriving BEq, DecidableEq, Repr
 
 structure ExecutionConfig where
-  mode : ExecutionMode
   levels : LevelSchedule
   smallSize : Nat
   nSmallIterations : Nat
@@ -24,7 +18,7 @@ structure ExecutionConfig where
   omega : Float
 
 private structure ParsedArgs where
-  mode : Option ExecutionMode := none
+  mode : Option String := none
   levels : Option LevelSchedule := none
   smallSize : Option Nat := none
   nSmallIterations : Option Nat := none
@@ -37,7 +31,7 @@ private def usage : String :=
   String.intercalate "\n"
     [ "usage: fastmlfe-cli [options] image.png alpha.png out_fg.png out_bg.png"
     , "options:"
-    , "  --mode paper|reference"
+    , "  --mode reference"
     , "  --levels auto|N"
     , "  --small-size N"
     , "  --n-small-iterations N"
@@ -73,10 +67,10 @@ private def parseFloatArg (name value : String) : IO Float := do
   | some x => pure (sign * x)
   | none => throw <| IO.userError s!"invalid {name}: {value}"
 
-private def parseModeArg (value : String) : IO ExecutionMode :=
+private def parseModeArg (value : String) : IO String :=
   match value with
-  | "paper" => pure .paper
-  | "reference" => pure .reference
+  | "reference" => pure value
+  | "paper" => throw <| IO.userError "paper mode has been removed; use the reference solver"
   | _ => throw <| IO.userError s!"invalid mode: {value}"
 
 private def parseLevelsArg (value : String) : IO LevelSchedule := do
@@ -111,30 +105,17 @@ private partial def parseCliArgs (args : List String) (acc : ParsedArgs := {}) :
       else
         parseCliArgs rest { acc with positionals := acc.positionals ++ [option] }
 
-private def defaultConfig (mode : ExecutionMode) : ExecutionConfig :=
-  match mode with
-  | .paper =>
-      { mode := .paper
-      , levels := .auto
-      , smallSize := 32
-      , nSmallIterations := 10
-      , nBigIterations := 2
-      , epsR := 0.005
-      , omega := 0.1
-      }
-  | .reference =>
-      { mode := .reference
-      , levels := .auto
-      , smallSize := 32
-      , nSmallIterations := 10
-      , nBigIterations := 2
-      , epsR := 0.00001
-      , omega := 1.0
-      }
+private def defaultConfig : ExecutionConfig :=
+  { levels := .auto
+  , smallSize := 32
+  , nSmallIterations := 10
+  , nBigIterations := 2
+  , epsR := 0.00001
+  , omega := 1.0
+  }
 
 private def finalizeConfig (parsed : ParsedArgs) : ExecutionConfig :=
-  let mode := parsed.mode.getD .reference
-  let defaults := defaultConfig mode
+  let defaults := defaultConfig
   { defaults with
     levels := parsed.levels.getD defaults.levels
     smallSize := parsed.smallSize.getD defaults.smallSize
@@ -201,9 +182,6 @@ private def constantFloatArray (size : Nat) (value : Float) : FloatArray :=
 private def constantGrayImage (width height : Nat) (value : Float) : IO NativeGrayImage :=
   NativeGrayImage.ofFloatArray width height (constantFloatArray (width * height) value)
 
-private def zeroGrayImage (width height : Nat) : IO NativeGrayImage :=
-  constantGrayImage width height 0.0
-
 private def meanColorChannel (channel alpha : NativeGrayImage) (pickForeground : Bool) : IO Float := do
   let channelValues ← NativeGrayImage.toFloatArray channel
   let alphaValues ← NativeGrayImage.toFloatArray alpha
@@ -241,37 +219,6 @@ private def referenceInit (image : NativeRgbImage) (alpha : NativeGrayImage) : I
   }
   pure (fg, bg)
 
-private def paperInit : IO (NativeRgbImage × NativeRgbImage) := do
-  let fg : NativeRgbImage := {
-    red := ← zeroGrayImage 1 1
-    green := ← zeroGrayImage 1 1
-    blue := ← zeroGrayImage 1 1
-  }
-  let bg : NativeRgbImage := {
-    red := ← zeroGrayImage 1 1
-    green := ← zeroGrayImage 1 1
-    blue := ← zeroGrayImage 1 1
-  }
-  pure (fg, bg)
-
-private def initialState (config : ExecutionConfig) (image : NativeRgbImage)
-    (alpha : NativeGrayImage) : IO (NativeRgbImage × NativeRgbImage) := do
-  match config.mode with
-  | .paper => paperInit
-  | .reference => referenceInit image alpha
-
-private def resizeGrayForMode (mode : ExecutionMode)
-    (image : NativeGrayImage) (width height : Nat) : IO NativeGrayImage := do
-  match mode with
-  | .paper => NativeGrayImage.resize image width height
-  | .reference => NativeGrayImage.resizeNearest image width height
-
-private def resizeRgbForMode (mode : ExecutionMode)
-    (image : NativeRgbImage) (width height : Nat) : IO NativeRgbImage := do
-  match mode with
-  | .paper => NativeRgbImage.resize image width height
-  | .reference => NativeRgbImage.resizeNearest image width height
-
 private partial def iteratePasses
     (iterations : Nat)
     (image : NativeRgbImage) (alpha : NativeGrayImage)
@@ -282,12 +229,15 @@ private partial def iteratePasses
     if remaining = 0 then
       pure (fg, bg)
     else
-      let (fg', bg') ← NativeRgbImage.paperRefinePass image alpha fg bg epsR omega
+      let (fg', bg') ← NativeRgbImage.referenceRefinePass image alpha fg bg epsR omega
       NativeRgbImage.clamp01 fg'
       NativeRgbImage.clamp01 bg'
       loop (remaining - 1) fg' bg'
   loop iterations fg bg
 
+/-- `reference` is the executable multi-level solver, aligned with the pymatting-style implementation.
+It uses nearest-neighbor resizing and mean-color initialization. This runtime path is distinct
+from the Lean `spec` model and does not claim identical step semantics. -/
 def runMultilevelForegroundEstimation
     (image : NativeRgbImage) (alpha : NativeGrayImage) (config : ExecutionConfig) :
     IO (NativeRgbImage × NativeRgbImage) := do
@@ -306,15 +256,15 @@ def runMultilevelForegroundEstimation
     throw <| IO.userError
       s!"image/alpha shape mismatch: image={width}x{height}, alpha={alphaWidth}x{alphaHeight}"
   let schedule := levelSizes width height config.levels
-  let (fg0, bg0) ← initialState config image alpha
+  let (fg0, bg0) ← referenceInit image alpha
   let rec loop (sizes : List (Nat × Nat)) (fg bg : NativeRgbImage) : IO (NativeRgbImage × NativeRgbImage) := do
     match sizes with
     | [] => pure (fg, bg)
     | (levelW, levelH) :: rest =>
-        let imageLevel ← resizeRgbForMode config.mode image levelW levelH
-        let alphaLevel ← resizeGrayForMode config.mode alpha levelW levelH
-        let fgLevel ← resizeRgbForMode config.mode fg levelW levelH
-        let bgLevel ← resizeRgbForMode config.mode bg levelW levelH
+        let imageLevel ← NativeRgbImage.resizeNearest image levelW levelH
+        let alphaLevel ← NativeGrayImage.resizeNearest alpha levelW levelH
+        let fgLevel ← NativeRgbImage.resizeNearest fg levelW levelH
+        let bgLevel ← NativeRgbImage.resizeNearest bg levelW levelH
         let iterations := iterationsForLevel config levelW levelH
         let (fgNext, bgNext) ← iteratePasses iterations imageLevel alphaLevel fgLevel bgLevel config.epsR config.omega
         loop rest fgNext bgNext

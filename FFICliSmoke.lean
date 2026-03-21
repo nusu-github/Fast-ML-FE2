@@ -18,6 +18,12 @@ def expectEqNatList (context : String) (actual expected : List (Nat × Nat)) : I
   if actual != expected then
     throw <| IO.userError s!"{context}: expected {expected}, got {actual}"
 
+def expectValueRange (context : String) (actual : FloatArray) : IO Unit := do
+  for i in [0:actual.size] do
+    let value := actual[i]!
+    if value < 0.0 || value > 1.0 then
+      throw <| IO.userError s!"{context}: value out of range at {i}: {value}"
+
 def main : IO Unit := do
   expectEqNatList "manual level count"
     (FastMLFE2.CLI.testLevelSizes 100 50 (.manual 4))
@@ -36,6 +42,16 @@ def main : IO Unit := do
   let alpha ← makeGray 2 2 [0.0, 0.5, 0.75, 1.0]
   rgb.writePng imagePath
   alpha.writePngGray alphaPath
+  let rejectedPaperMode ← FastMLFE2.CLI.main [
+    "--mode",
+    "paper",
+    imagePath.toString,
+    alphaPath.toString,
+    outFgPath.toString,
+    outBgPath.toString
+  ]
+  if rejectedPaperMode = 0 then
+    throw <| IO.userError "paper mode should be rejected"
 
   let exitCode ← FastMLFE2.CLI.main [
     "--mode",
@@ -81,3 +97,41 @@ def main : IO Unit := do
   expectAllEq "bg.red" bgRed 0.0
   expectAllEq "bg.green" bgGreen 0.5
   expectAllEq "bg.blue" bgBlue 1.0
+  let outFgIterPath := tmp / "out_fg_iter.png"
+  let outBgIterPath := tmp / "out_bg_iter.png"
+  let iterExitCode ← FastMLFE2.CLI.main [
+    "--mode",
+    "reference",
+    "--levels",
+    "2",
+    "--n-small-iterations",
+    "1",
+    "--n-big-iterations",
+    "1",
+    "--small-size",
+    "1",
+    "--eps-r",
+    "0.005",
+    "--omega",
+    "0.1",
+    imagePath.toString,
+    alphaPath.toString,
+    outFgIterPath.toString,
+    outBgIterPath.toString
+  ]
+  if iterExitCode != 0 then
+    throw <| IO.userError s!"iterative CLI returned nonzero exit code: {iterExitCode}"
+  let fgIter ← FastMLFE2.NativeRgbImage.readPng outFgIterPath
+  let bgIter ← FastMLFE2.NativeRgbImage.readPng outBgIterPath
+  let fgIterRed ← FastMLFE2.NativeGrayImage.toFloatArray fgIter.red
+  let fgIterGreen ← FastMLFE2.NativeGrayImage.toFloatArray fgIter.green
+  let fgIterBlue ← FastMLFE2.NativeGrayImage.toFloatArray fgIter.blue
+  let bgIterRed ← FastMLFE2.NativeGrayImage.toFloatArray bgIter.red
+  let bgIterGreen ← FastMLFE2.NativeGrayImage.toFloatArray bgIter.green
+  let bgIterBlue ← FastMLFE2.NativeGrayImage.toFloatArray bgIter.blue
+  expectValueRange "fg.iter.red" fgIterRed
+  expectValueRange "fg.iter.green" fgIterGreen
+  expectValueRange "fg.iter.blue" fgIterBlue
+  expectValueRange "bg.iter.red" bgIterRed
+  expectValueRange "bg.iter.green" bgIterGreen
+  expectValueRange "bg.iter.blue" bgIterBlue

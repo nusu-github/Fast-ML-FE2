@@ -200,7 +200,7 @@ extern "C" lean_obj_res lean_fastmlfe2_gray_image_resize_nearest(
   return ok(lean_alloc_external(get_gray_image_class(), out));
 }
 
-extern "C" lean_obj_res lean_fastmlfe2_gray_image_paper_refine_pass(
+extern "C" lean_obj_res lean_fastmlfe2_gray_image_reference_refine_pass(
     b_lean_obj_arg image_obj,
     b_lean_obj_arg alpha_obj,
     b_lean_obj_arg fg_obj,
@@ -212,7 +212,7 @@ extern "C" lean_obj_res lean_fastmlfe2_gray_image_paper_refine_pass(
   const auto * fg = get_handle(fg_obj);
   const auto * bg = get_handle(bg_obj);
   if (!same_dims(*image, *alpha) || !same_dims(*image, *fg) || !same_dims(*image, *bg)) {
-    return user_error("NativeGrayImage.paperRefinePass: all images must have matching dimensions");
+    return user_error("NativeGrayImage.referenceRefinePass: all images must have matching dimensions");
   }
 
   auto * fg_out = new GrayImageHandle{
@@ -228,7 +228,7 @@ extern "C" lean_obj_res lean_fastmlfe2_gray_image_paper_refine_pass(
   if (rc != FASTMLFE2_STATUS_OK) {
     delete fg_out;
     delete bg_out;
-    return status_error("NativeGrayImage.paperRefinePass", rc);
+    return status_error("NativeGrayImage.referenceRefinePass", rc);
   }
 
   return ok(mk_pair(

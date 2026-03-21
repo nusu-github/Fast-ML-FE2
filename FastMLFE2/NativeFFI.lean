@@ -26,8 +26,8 @@ private opaque resizeImpl (image : @& NativeGrayImage) (width height : UInt32) :
 @[extern "lean_fastmlfe2_gray_image_resize_nearest"]
 private opaque resizeNearestImpl (image : @& NativeGrayImage) (width height : UInt32) : IO NativeGrayImage
 
-@[extern "lean_fastmlfe2_gray_image_paper_refine_pass"]
-private opaque paperRefinePassImpl
+@[extern "lean_fastmlfe2_gray_image_reference_refine_pass"]
+private opaque referenceRefinePassImpl
     (image alpha fg bg : @& NativeGrayImage) (epsR omega : Float) :
     IO (NativeGrayImage × NativeGrayImage)
 
@@ -75,10 +75,10 @@ def resize (image : NativeGrayImage) (width height : Nat) : IO NativeGrayImage :
 def resizeNearest (image : NativeGrayImage) (width height : Nat) : IO NativeGrayImage := do
   resizeNearestImpl image (← toDim32 "width" width) (← toDim32 "height" height)
 
-def paperRefinePass
+def referenceRefinePass
     (image alpha fg bg : NativeGrayImage) (epsR omega : Float) :
     IO (NativeGrayImage × NativeGrayImage) :=
-  paperRefinePassImpl image alpha fg bg epsR omega
+  referenceRefinePassImpl image alpha fg bg epsR omega
 
 def clamp01 (image : NativeGrayImage) : IO PUnit :=
   clamp01Impl image
@@ -156,19 +156,19 @@ def clamp01 (image : NativeRgbImage) : IO PUnit := do
   image.green.clamp01
   image.blue.clamp01
 
-def paperRefinePass
+def referenceRefinePass
     (image : NativeRgbImage) (alpha : NativeGrayImage)
     (fg bg : NativeRgbImage) (epsR omega : Float) :
     IO (NativeRgbImage × NativeRgbImage) := do
   image.assertWellFormed
   fg.assertWellFormed
   bg.assertWellFormed
-  assertSameShapeGray "NativeRgbImage.paperRefinePass image/alpha" image.red alpha
-  assertSameShapeGray "NativeRgbImage.paperRefinePass image/fg" image.red fg.red
-  assertSameShapeGray "NativeRgbImage.paperRefinePass image/bg" image.red bg.red
-  let (fgR, bgR) ← NativeGrayImage.paperRefinePass image.red alpha fg.red bg.red epsR omega
-  let (fgG, bgG) ← NativeGrayImage.paperRefinePass image.green alpha fg.green bg.green epsR omega
-  let (fgB, bgB) ← NativeGrayImage.paperRefinePass image.blue alpha fg.blue bg.blue epsR omega
+  assertSameShapeGray "NativeRgbImage.referenceRefinePass image/alpha" image.red alpha
+  assertSameShapeGray "NativeRgbImage.referenceRefinePass image/fg" image.red fg.red
+  assertSameShapeGray "NativeRgbImage.referenceRefinePass image/bg" image.red bg.red
+  let (fgR, bgR) ← NativeGrayImage.referenceRefinePass image.red alpha fg.red bg.red epsR omega
+  let (fgG, bgG) ← NativeGrayImage.referenceRefinePass image.green alpha fg.green bg.green epsR omega
+  let (fgB, bgB) ← NativeGrayImage.referenceRefinePass image.blue alpha fg.blue bg.blue epsR omega
   pure ({ red := fgR, green := fgG, blue := fgB }, { red := bgR, green := bgG, blue := bgB })
 
 end NativeRgbImage

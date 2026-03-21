@@ -60,10 +60,26 @@ def main : IO Unit := do
   let fg ← FastMLFE2.NativeGrayImage.ofFloatArray 1 1 fgPixels
   let bg ← FastMLFE2.NativeGrayImage.ofFloatArray 1 1 bgPixels
   let singleImage ← FastMLFE2.NativeGrayImage.ofFloatArray 1 1 imagePixels
-  let (fgOut, bgOut) ← FastMLFE2.NativeGrayImage.paperRefinePass singleImage alpha fg bg 0.5 1.0
+  let (fgOut, bgOut) ← FastMLFE2.NativeGrayImage.referenceRefinePass singleImage alpha fg bg 0.5 1.0
   let fgRoundTrip ← FastMLFE2.NativeGrayImage.toFloatArray fgOut
   let bgRoundTrip ← FastMLFE2.NativeGrayImage.toFloatArray bgOut
   if fgRoundTrip.size != 1 || bgRoundTrip.size != 1 then
     throw <| IO.userError "unexpected refine output shape"
   expectApproxEqArray "four-neighbor refine fg" fgRoundTrip (([0.8023809524] : List Float).toFloatArray)
   expectApproxEqArray "four-neighbor refine bg" bgRoundTrip (([0.1071428571] : List Float).toFloatArray)
+  let image2 ← FastMLFE2.NativeGrayImage.ofFloatArray 2 2 (([0.1, 0.4, 0.7, 0.9] : List Float).toFloatArray)
+  let alpha2 ← FastMLFE2.NativeGrayImage.ofFloatArray 2 2 (([0.0, 0.3, 0.8, 1.0] : List Float).toFloatArray)
+  let fg2 ← FastMLFE2.NativeGrayImage.ofFloatArray 2 2 (([0.2, 0.2, 0.8, 0.8] : List Float).toFloatArray)
+  let bg2 ← FastMLFE2.NativeGrayImage.ofFloatArray 2 2 (([0.0, 0.1, 0.4, 0.5] : List Float).toFloatArray)
+  let (fgOut2, bgOut2) ← FastMLFE2.NativeGrayImage.referenceRefinePass image2 alpha2 fg2 bg2 0.005 0.1
+  let fgRoundTrip2 ← FastMLFE2.NativeGrayImage.toFloatArray fgOut2
+  let bgRoundTrip2 ← FastMLFE2.NativeGrayImage.toFloatArray bgOut2
+  if fgRoundTrip2.size != 4 || bgRoundTrip2.size != 4 then
+    throw <| IO.userError "unexpected multi-pixel refine output shape"
+  for i in [0:fgRoundTrip2.size] do
+    let fgValue := fgRoundTrip2[i]!
+    let bgValue := bgRoundTrip2[i]!
+    if fgValue < 0.0 || fgValue > 1.0 then
+      throw <| IO.userError s!"multi-pixel refine fg out of range at {i}: {fgValue}"
+    if bgValue < 0.0 || bgValue > 1.0 then
+      throw <| IO.userError s!"multi-pixel refine bg out of range at {i}: {bgValue}"
