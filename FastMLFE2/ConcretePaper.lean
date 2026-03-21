@@ -1,5 +1,6 @@
 import FastMLFE2.ConcreteImage
 import FastMLFE2.LevelOperator
+import FastMLFE2.MultilevelSpec
 
 namespace FastMLFE2
 
@@ -122,6 +123,24 @@ theorem specLevelOperatorUpdate_eq_updateAt {h w : Nat} (params : SpecWeightPara
   · exact specLevelOperatorUpdate_eq_summaryUpdate params hparams image alpha fg bg px
   · symm
     exact specUpdateAt_eq_summaryUpdate params image alpha fg bg px
+
+theorem specLocalResidualInfNorm_eq_zero_iff_stationary {h w : Nat} (params : SpecWeightParams)
+    (image alpha fg bg : GrayImage h w) (px : Pixel h w) (g : FBVec) :
+    (specLocalData params alpha fg bg px).localResidualInfNorm (alpha px) (image px) g = 0 ↔
+      (specLocalData params alpha fg bg px).stationary (alpha px) (image px) g := by
+  exact (specLocalData params alpha fg bg px).localResidualInfNorm_eq_zero_iff_stationary
+    (α := alpha px) (image := image px) (g := g)
+
+theorem specRedBlackFixedPoint_stationary {h w : Nat} (params : SpecWeightParams)
+    (hparams : params.Valid) (isRed : Pixel h w → Bool)
+    (image alpha fg bg : GrayImage h w) (px : Pixel h w)
+    (hFixed : (specSummaryRefinementModel params).redBlackFixedPoint isRed image alpha fg bg) :
+    (specLocalData params alpha fg bg px).stationary (alpha px) (image px)
+      ((specSummaryRefinementModel params).currentAt fg bg px) := by
+  simpa [specSummaryRefinementModel, specLocalData] using
+    (specSummaryRefinementModel params).redBlackFixedPoint_stationary_of_totalWeight_pos
+      isRed image alpha fg bg px hFixed
+      (specLocalData_totalWeight_pos params hparams alpha fg bg px)
 
 section Examples
 

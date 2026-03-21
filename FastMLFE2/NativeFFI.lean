@@ -53,7 +53,7 @@ private abbrev NativeGrayTriple := NativeGrayImage × (NativeGrayImage × Native
 private opaque referenceRefineImpl
     (imageRed imageGreen imageBlue alpha : @& NativeGrayImage)
     (fgRed fgGreen fgBlue bgRed bgGreen bgBlue : @& NativeGrayImage)
-    (iterations : UInt32) (epsR omega : Float) :
+    (iterations : UInt32) (epsR omega residualTol updateTol : Float) :
     IO (NativeGrayTriple × NativeGrayTriple)
 
 private def maxDim : Nat := 2 ^ 32 - 1
@@ -176,9 +176,9 @@ def clamp01 (image : NativeRgbImage) : IO PUnit := do
   image.blue.clamp01
 
 def referenceRefine
-    (iterations : Nat)
+    (maxIterations : Nat)
     (image : NativeRgbImage) (alpha : NativeGrayImage)
-    (fg bg : NativeRgbImage) (epsR omega : Float) :
+    (fg bg : NativeRgbImage) (epsR omega residualTol updateTol : Float) :
     IO (NativeRgbImage × NativeRgbImage) := do
   assertCompatibleRefineInputs image alpha fg bg
   let ((fgR, (fgG, fgB)), (bgR, (bgG, bgB))) ←
@@ -186,8 +186,8 @@ def referenceRefine
       image.red image.green image.blue alpha
       fg.red fg.green fg.blue
       bg.red bg.green bg.blue
-      (← toDim32 "iterations" iterations)
-      epsR omega
+      (← toDim32 "maxIterations" maxIterations)
+      epsR omega residualTol updateTol
   pure
     ({ red := fgR, green := fgG, blue := fgB },
      { red := bgR, green := bgG, blue := bgB })

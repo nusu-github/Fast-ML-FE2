@@ -5,19 +5,28 @@ inductive LevelSchedule where
   | manual (count : Nat)
   deriving BEq, DecidableEq, Repr
 
+structure LevelStopPolicy where
+  maxIterations : Nat
+  residualTol : Float
+  updateTol : Float
+
 structure ExecutionConfig where
   levels : LevelSchedule
   smallSize : Nat
-  nSmallIterations : Nat
-  nBigIterations : Nat
+  smallMaxIterations : Nat
+  bigMaxIterations : Nat
+  smallResidualTol : Float
+  bigUpdateTol : Float
   epsR : Float
   omega : Float
 
 def defaultConfig : ExecutionConfig :=
   { levels := .auto
   , smallSize := 32
-  , nSmallIterations := 10
-  , nBigIterations := 2
+  , smallMaxIterations := 10
+  , bigMaxIterations := 2
+  , smallResidualTol := 0.001
+  , bigUpdateTol := 0.0001
   , epsR := 0.00001
   , omega := 1.0
   }
@@ -60,10 +69,16 @@ def levelSizes (width height : Nat) (levels : LevelSchedule) : List (Nat × Nat)
   | .auto => autoLevelSizes width height
   | .manual count => manualLevelSizes width height count
 
-def iterationsForLevel (config : ExecutionConfig) (width height : Nat) : Nat :=
+def stopPolicyForLevel (config : ExecutionConfig) (width height : Nat) : LevelStopPolicy :=
   if width ≤ config.smallSize && height ≤ config.smallSize then
-    config.nSmallIterations
+    { maxIterations := config.smallMaxIterations
+    , residualTol := config.smallResidualTol
+    , updateTol := 0.0
+    }
   else
-    config.nBigIterations
+    { maxIterations := config.bigMaxIterations
+    , residualTol := 0.0
+    , updateTol := config.bigUpdateTol
+    }
 
 end FastMLFE2.Runtime

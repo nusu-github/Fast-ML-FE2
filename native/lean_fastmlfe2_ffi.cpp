@@ -254,7 +254,9 @@ extern "C" lean_obj_res lean_fastmlfe2_rgb_image_reference_refine(
     b_lean_obj_arg bg_blue_obj,
     uint32_t iterations,
     double eps_r,
-    double omega) {
+    double omega,
+    double residual_tol,
+    double update_tol) {
   const auto * image_red = get_handle(image_red_obj);
   const auto * image_green = get_handle(image_green_obj);
   const auto * image_blue = get_handle(image_blue_obj);
@@ -290,7 +292,9 @@ extern "C" lean_obj_res lean_fastmlfe2_rgb_image_reference_refine(
       image_red->width, image_red->height, image_red->stride,
       static_cast<int>(iterations),
       static_cast<float>(eps_r),
-      static_cast<float>(omega));
+      static_cast<float>(omega),
+      static_cast<float>(residual_tol),
+      static_cast<float>(update_tol));
   if (rc != FASTMLFE2_STATUS_OK) {
     delete fg_red_out;
     delete fg_green_out;

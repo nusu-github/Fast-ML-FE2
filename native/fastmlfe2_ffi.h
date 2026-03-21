@@ -69,7 +69,9 @@ int fastmlfe2_reference_refine_rgb(
     int stride,
     int iterations,
     float eps_r,
-    float omega);
+    float omega,
+    float residual_tol,
+    float update_tol);
 
 int fastmlfe2_clamp01_gray(float *buf, int width, int height, int stride);
 

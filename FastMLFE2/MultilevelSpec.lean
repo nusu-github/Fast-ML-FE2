@@ -45,12 +45,48 @@ noncomputable def updateAt (model : SummaryRefinementModel Image Pixel ι)
   let data := model.localData image alpha fg bg px
   data.summaryUpdate (model.imageOps.sample alpha px) (model.imageOps.sample image px)
 
+noncomputable def currentAt (model : SummaryRefinementModel Image Pixel ι)
+    (fg bg : Image) (px : Pixel) : FBVec :=
+  mkFBVec (model.imageOps.sample fg px) (model.imageOps.sample bg px)
+
 theorem updateAt_eq_summaryUpdate (model : SummaryRefinementModel Image Pixel ι)
     (image alpha fg bg : Image) (px : Pixel) :
     model.updateAt image alpha fg bg px =
       (model.localData image alpha fg bg px).summaryUpdate
         (model.imageOps.sample alpha px) (model.imageOps.sample image px) := by
   simp [updateAt]
+
+@[simp] theorem currentAt_foreground (model : SummaryRefinementModel Image Pixel ι)
+    (fg bg : Image) (px : Pixel) :
+    foreground (model.currentAt fg bg px) = model.imageOps.sample fg px := by
+  simp [currentAt]
+
+@[simp] theorem currentAt_background (model : SummaryRefinementModel Image Pixel ι)
+    (fg bg : Image) (px : Pixel) :
+    background (model.currentAt fg bg px) = model.imageOps.sample bg px := by
+  simp [currentAt]
+
+def colorFixedPoint (model : SummaryRefinementModel Image Pixel ι)
+    (isRed : Pixel → Bool) (target : Bool)
+    (image alpha fg bg : Image) : Prop :=
+  ∀ px, isRed px = target → model.currentAt fg bg px = model.updateAt image alpha fg bg px
+
+def redBlackFixedPoint (model : SummaryRefinementModel Image Pixel ι)
+    (isRed : Pixel → Bool) (image alpha fg bg : Image) : Prop :=
+  model.colorFixedPoint isRed true image alpha fg bg ∧
+    model.colorFixedPoint isRed false image alpha fg bg
+
+theorem currentAt_eq_updateAt_of_redBlackFixedPoint
+    (model : SummaryRefinementModel Image Pixel ι)
+    (isRed : Pixel → Bool) (image alpha fg bg : Image) (px : Pixel)
+    (hFixed : model.redBlackFixedPoint isRed image alpha fg bg) :
+    model.currentAt fg bg px = model.updateAt image alpha fg bg px := by
+  rcases hFixed with ⟨hRed, hBlack⟩
+  by_cases hColor : isRed px = true
+  · exact hRed px hColor
+  · have hBlackColor : isRed px = false := by
+      cases h : isRed px <;> simp_all
+    exact hBlack px hBlackColor
 
 noncomputable def refineForeground (model : SummaryRefinementModel Image Pixel ι)
     (image alpha fg bg : Image) : Image :=
@@ -98,6 +134,20 @@ theorem updateAt_stationary_of_totalWeight_pos (model : SummaryRefinementModel I
   simpa [updateAt] using
     (model.localData image alpha fg bg px).summaryUpdate_stationary
       (model.imageOps.sample alpha px) (model.imageOps.sample image px) h
+
+theorem redBlackFixedPoint_stationary_of_totalWeight_pos
+    (model : SummaryRefinementModel Image Pixel ι)
+    (isRed : Pixel → Bool)
+    (image alpha fg bg : Image) (px : Pixel)
+    (hFixed : model.redBlackFixedPoint isRed image alpha fg bg)
+    (h : 0 < (model.localData image alpha fg bg px).totalWeight) :
+    (model.localData image alpha fg bg px).stationary
+      (model.imageOps.sample alpha px) (model.imageOps.sample image px)
+      (model.currentAt fg bg px) := by
+  have hUpdate :=
+    model.updateAt_stationary_of_totalWeight_pos image alpha fg bg px h
+  simpa [model.currentAt_eq_updateAt_of_redBlackFixedPoint isRed image alpha fg bg px hFixed] using
+    hUpdate
 
 end SummaryRefinementModel
 

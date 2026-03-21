@@ -132,14 +132,28 @@ def main : IO Unit := do
     [0.9, 0.7, 0.3, 0.1]
     [0.2, 0.4, 0.6, 0.8]
   let (fgOutRgb, bgOutRgb) ←
-    FastMLFE2.NativeRgbImage.referenceRefine 3 rgbImage rgbAlpha fgRgbInit bgRgbInit 0.005 0.1
+    FastMLFE2.NativeRgbImage.referenceRefine
+      3 rgbImage rgbAlpha fgRgbInit bgRgbInit 0.005 0.1 0.0 0.0
   let fgExpected ← makeRgb 2 2
-    [0.811771, 0.864838, 0.837793, 0.896152]
-    [0.49459, 0.766521, 0.360411, 0.787745]
-    [0.0904351, 0.0740971, 0.0498697, 0.0971273]
+    [0.830597758, 0.88038969, 0.843004763, 0.894744515]
+    [0.461264521, 0.739589155, 0.351412773, 0.784993887]
+    [0.102423653, 0.0851337761, 0.0536182709, 0.10242942]
   let bgExpected ← makeRgb 2 2
-    [0.110297, 0.199114, 0.142401, 0.188636]
-    [0.206804, 0.492881, 0.19722, 0.416796]
-    [0.885632, 0.696953, 0.831104, 0.728247]
+    [0.107164577, 0.189354777, 0.128722265, 0.194471642]
+    [0.212035656, 0.509556174, 0.220379204, 0.447383642]
+    [0.883042753, 0.689597011, 0.820391357, 0.680520773]
   expectRgbApproxEq "rgb canonical refine fg" 1.0e-5 fgOutRgb fgExpected
   expectRgbApproxEq "rgb canonical refine bg" 1.0e-5 bgOutRgb bgExpected
+  let (fgOneSweep, bgOneSweep) ←
+    FastMLFE2.NativeRgbImage.referenceRefine
+      1 rgbImage rgbAlpha fgRgbInit bgRgbInit 0.005 0.1 0.0 0.0
+  let (fgResidualStop, bgResidualStop) ←
+    FastMLFE2.NativeRgbImage.referenceRefine
+      5 rgbImage rgbAlpha fgRgbInit bgRgbInit 0.005 0.1 100.0 0.0
+  expectRgbApproxEq "rgb residual stop fg" 1.0e-6 fgResidualStop fgOneSweep
+  expectRgbApproxEq "rgb residual stop bg" 1.0e-6 bgResidualStop bgOneSweep
+  let (fgUpdateStop, bgUpdateStop) ←
+    FastMLFE2.NativeRgbImage.referenceRefine
+      5 rgbImage rgbAlpha fgRgbInit bgRgbInit 0.005 0.1 0.0 100.0
+  expectRgbApproxEq "rgb update stop fg" 1.0e-6 fgUpdateStop fgOneSweep
+  expectRgbApproxEq "rgb update stop bg" 1.0e-6 bgUpdateStop bgOneSweep

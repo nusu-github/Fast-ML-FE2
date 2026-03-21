@@ -10,6 +10,8 @@ structure ParsedCliArgs where
   smallSize : Option Nat := none
   nSmallIterations : Option Nat := none
   nBigIterations : Option Nat := none
+  smallResidualTol : Option Float := none
+  bigUpdateTol : Option Float := none
   epsR : Option Float := none
   omega : Option Float := none
   positionals : List String := []
@@ -30,6 +32,8 @@ def cliUsage : String :=
     , "  --small-size N"
     , "  --n-small-iterations N"
     , "  --n-big-iterations N"
+    , "  --small-residual-tol X"
+    , "  --big-update-tol X"
     , "  --eps-r X"
     , "  --omega X"
     ]
@@ -89,6 +93,10 @@ private partial def parseCliArgs (args : List String) (acc : ParsedCliArgs := {}
       parseCliArgs rest { acc with nSmallIterations := some (← parseUnsignedNatArg "n_small_iterations" value) }
   | "--n-big-iterations" :: value :: rest =>
       parseCliArgs rest { acc with nBigIterations := some (← parseUnsignedNatArg "n_big_iterations" value) }
+  | "--small-residual-tol" :: value :: rest =>
+      parseCliArgs rest { acc with smallResidualTol := some (← parseFloatArg "small_residual_tol" value) }
+  | "--big-update-tol" :: value :: rest =>
+      parseCliArgs rest { acc with bigUpdateTol := some (← parseFloatArg "big_update_tol" value) }
   | "--eps-r" :: value :: rest =>
       parseCliArgs rest { acc with epsR := some (← parseFloatArg "eps_r" value) }
   | "--omega" :: value :: rest =>
@@ -104,8 +112,10 @@ def finalizeConfig (parsed : ParsedCliArgs) : ExecutionConfig :=
   { defaults with
     levels := parsed.levels.getD defaults.levels
     smallSize := parsed.smallSize.getD defaults.smallSize
-    nSmallIterations := parsed.nSmallIterations.getD defaults.nSmallIterations
-    nBigIterations := parsed.nBigIterations.getD defaults.nBigIterations
+    smallMaxIterations := parsed.nSmallIterations.getD defaults.smallMaxIterations
+    bigMaxIterations := parsed.nBigIterations.getD defaults.bigMaxIterations
+    smallResidualTol := parsed.smallResidualTol.getD defaults.smallResidualTol
+    bigUpdateTol := parsed.bigUpdateTol.getD defaults.bigUpdateTol
     epsR := parsed.epsR.getD defaults.epsR
     omega := parsed.omega.getD defaults.omega }
 

@@ -16,14 +16,22 @@ constexpr std::array<std::pair<int, int>, 4> kFourOffsets{{
 }};
 
 struct PixelLevelOperator {
+  std::size_t state_index{};
   std::array<std::size_t, 4> neighbor_indices{};
   // Lean's weightedMeans is Σ w_ij * value_j / s_i. We pre-normalize to
   // λ_ij = w_ij / s_i at build time so the runtime kernel can apply the
   // same operator without carrying total_weight through each iteration.
   std::array<float, 4> normalized_weights{};
+  float total_weight = 0.0f;
   float alpha = 0.0f;
   float beta = 0.0f;
   float inv_level_denom = 0.0f;
+};
+
+struct BuiltLevelOperator {
+  std::vector<PixelLevelOperator> pixels{};
+  std::vector<std::size_t> red_pixel_indices{};
+  std::vector<std::size_t> black_pixel_indices{};
 };
 
 struct RefinePair {
@@ -132,6 +140,23 @@ RefinePair apply_mean_residual_correction(
   };
 }
 
+float compute_local_residual_inf_norm(
+    const PixelLevelOperator &pixel,
+    float image,
+    const float *fg,
+    const float *bg) {
+  const RefinePair means = compute_weighted_means(pixel, fg, bg);
+  const float fg_center = fg[pixel.state_index];
+  const float bg_center = bg[pixel.state_index];
+  const float compositing_error =
+      pixel.alpha * fg_center + pixel.beta * bg_center - image;
+  const float fg_residual =
+      pixel.total_weight * (fg_center - means.fg) + pixel.alpha * compositing_error;
+  const float bg_residual =
+      pixel.total_weight * (bg_center - means.bg) + pixel.beta * compositing_error;
+  return std::max(std::fabs(fg_residual), std::fabs(bg_residual));
+}
+
 PixelLevelOperator build_pixel_level_operator(
     const float *alpha,
     int width,
@@ -142,6 +167,7 @@ PixelLevelOperator build_pixel_level_operator(
     float eps_r,
     float omega) {
   PixelLevelOperator pixel;
+  pixel.state_index = flat_index(stride, x, y);
   const float alpha_center = load_at(alpha, stride, x, y);
   pixel.alpha = alpha_center;
   pixel.beta = 1.0f - alpha_center;
@@ -162,26 +188,38 @@ PixelLevelOperator build_pixel_level_operator(
   for (float &weight : pixel.normalized_weights) {
     weight /= total_weight;
   }
+  pixel.total_weight = total_weight;
   const float level_denom =
       total_weight + pixel.alpha * pixel.alpha + pixel.beta * pixel.beta;
   pixel.inv_level_denom = 1.0f / level_denom;
   return pixel;
 }
 
-std::vector<PixelLevelOperator> build_level_operator(
+BuiltLevelOperator build_level_operator(
     const float *alpha,
     int width,
     int height,
     int stride,
     float eps_r,
     float omega) {
-  std::vector<PixelLevelOperator> level_operator(
-      static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+  const std::size_t pixel_count =
+      static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+  BuiltLevelOperator level_operator;
+  level_operator.pixels.resize(pixel_count);
+  level_operator.red_pixel_indices.reserve((pixel_count + 1) / 2);
+  level_operator.black_pixel_indices.reserve(pixel_count / 2);
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
-      level_operator[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) +
-                     static_cast<std::size_t>(x)] =
+      const std::size_t pixel_index =
+          static_cast<std::size_t>(y) * static_cast<std::size_t>(width) +
+          static_cast<std::size_t>(x);
+      level_operator.pixels[pixel_index] =
           build_pixel_level_operator(alpha, width, height, stride, x, y, eps_r, omega);
+      if ((x + y) % 2 == 0) {
+        level_operator.red_pixel_indices.push_back(pixel_index);
+      } else {
+        level_operator.black_pixel_indices.push_back(pixel_index);
+      }
     }
   }
   return level_operator;
@@ -189,61 +227,81 @@ std::vector<PixelLevelOperator> build_level_operator(
 
 void apply_level_operator_gray_pass(
     const float *image,
-    int width,
-    int height,
-    int stride,
-    const std::vector<PixelLevelOperator> &level_operator,
+    const BuiltLevelOperator &level_operator,
     float *fg_state,
     float *bg_state) {
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      const PixelLevelOperator &pixel =
-          level_operator[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) +
-                         static_cast<std::size_t>(x)];
-      const float image_center = load_at(image, stride, x, y);
-      const RefinePair result =
-          apply_mean_residual_correction(pixel, image_center, fg_state, bg_state);
-      store_at(fg_state, stride, x, y, std::clamp(result.fg, 0.0f, 1.0f));
-      store_at(bg_state, stride, x, y, std::clamp(result.bg, 0.0f, 1.0f));
-    }
+  for (const PixelLevelOperator &pixel : level_operator.pixels) {
+    const RefinePair result =
+        apply_mean_residual_correction(pixel, image[pixel.state_index], fg_state, bg_state);
+    fg_state[pixel.state_index] = std::clamp(result.fg, 0.0f, 1.0f);
+    bg_state[pixel.state_index] = std::clamp(result.bg, 0.0f, 1.0f);
   }
 }
 
-void apply_level_operator_rgb_pass(
+float apply_level_operator_rgb_half_pass(
     const float *image_red,
     const float *image_green,
     const float *image_blue,
-    int width,
-    int height,
-    int stride,
-    const std::vector<PixelLevelOperator> &level_operator,
+    const BuiltLevelOperator &level_operator,
+    const std::vector<std::size_t> &active_pixels,
     float *fg_red,
     float *fg_green,
     float *fg_blue,
     float *bg_red,
     float *bg_green,
-    float *bg_blue) {
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      const PixelLevelOperator &pixel =
-          level_operator[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) +
-                         static_cast<std::size_t>(x)];
-      const auto apply_channel =
-          [&](const float *image_channel, float *fg_channel, float *bg_channel) {
-            const RefinePair result =
-                apply_mean_residual_correction(
-                    pixel,
-                    load_at(image_channel, stride, x, y),
-                    fg_channel,
-                    bg_channel);
-            store_at(fg_channel, stride, x, y, std::clamp(result.fg, 0.0f, 1.0f));
-            store_at(bg_channel, stride, x, y, std::clamp(result.bg, 0.0f, 1.0f));
-          };
-      apply_channel(image_red, fg_red, bg_red);
-      apply_channel(image_green, fg_green, bg_green);
-      apply_channel(image_blue, fg_blue, bg_blue);
-    }
+    float *bg_blue,
+    bool track_update) {
+  float max_update = 0.0f;
+  for (std::size_t pixel_index : active_pixels) {
+    const PixelLevelOperator &pixel = level_operator.pixels[pixel_index];
+    const auto apply_channel =
+        [&](const float *image_channel, float *fg_channel, float *bg_channel) {
+          const RefinePair result =
+              apply_mean_residual_correction(
+                  pixel,
+                  image_channel[pixel.state_index],
+                  fg_channel,
+                  bg_channel);
+          const float new_fg = std::clamp(result.fg, 0.0f, 1.0f);
+          const float new_bg = std::clamp(result.bg, 0.0f, 1.0f);
+          if (track_update) {
+            max_update = std::max(max_update, std::fabs(new_fg - fg_channel[pixel.state_index]));
+            max_update = std::max(max_update, std::fabs(new_bg - bg_channel[pixel.state_index]));
+          }
+          fg_channel[pixel.state_index] = new_fg;
+          bg_channel[pixel.state_index] = new_bg;
+        };
+    apply_channel(image_red, fg_red, bg_red);
+    apply_channel(image_green, fg_green, bg_green);
+    apply_channel(image_blue, fg_blue, bg_blue);
   }
+  return max_update;
+}
+
+float compute_level_operator_rgb_residual_inf_norm(
+    const float *image_red,
+    const float *image_green,
+    const float *image_blue,
+    const BuiltLevelOperator &level_operator,
+    const float *fg_red,
+    const float *fg_green,
+    const float *fg_blue,
+    const float *bg_red,
+    const float *bg_green,
+    const float *bg_blue) {
+  float max_residual = 0.0f;
+  for (const PixelLevelOperator &pixel : level_operator.pixels) {
+    max_residual = std::max(
+        max_residual,
+        compute_local_residual_inf_norm(pixel, image_red[pixel.state_index], fg_red, bg_red));
+    max_residual = std::max(
+        max_residual,
+        compute_local_residual_inf_norm(pixel, image_green[pixel.state_index], fg_green, bg_green));
+    max_residual = std::max(
+        max_residual,
+        compute_local_residual_inf_norm(pixel, image_blue[pixel.state_index], fg_blue, bg_blue));
+  }
+  return max_residual;
 }
 
 int choose_interpolation(int src_w, int src_h, int dst_w, int dst_h) {
@@ -365,10 +423,9 @@ extern "C" int fastmlfe2_reference_refine_gray_single_pass(
 
   std::copy(fg, fg + count, fg_out);
   std::copy(bg, bg + count, bg_out);
-  const std::vector<PixelLevelOperator> level_operator =
+  const BuiltLevelOperator level_operator =
       build_level_operator(alpha, width, height, stride, eps_r, omega);
-  apply_level_operator_gray_pass(
-      image, width, height, stride, level_operator, fg_out, bg_out);
+  apply_level_operator_gray_pass(image, level_operator, fg_out, bg_out);
   return FASTMLFE2_STATUS_OK;
 }
 
@@ -394,7 +451,9 @@ extern "C" int fastmlfe2_reference_refine_rgb(
     int stride,
     int iterations,
     float eps_r,
-    float omega) {
+    float omega,
+    float residual_tol,
+    float update_tol) {
   int rc = validate_gray_buffer(image_red, width, height, stride);
   if (rc != FASTMLFE2_STATUS_OK) {
     return rc;
@@ -459,7 +518,8 @@ extern "C" int fastmlfe2_reference_refine_rgb(
   if (rc != FASTMLFE2_STATUS_OK) {
     return rc;
   }
-  if (iterations < 0 || eps_r <= 0.0f || omega < 0.0f) {
+  if (iterations < 0 || eps_r <= 0.0f || omega < 0.0f ||
+      residual_tol < 0.0f || update_tol < 0.0f) {
     return FASTMLFE2_STATUS_INVALID_PARAMS;
   }
 
@@ -483,14 +543,47 @@ extern "C" int fastmlfe2_reference_refine_rgb(
   std::copy(bg_green, bg_green + count, bg_green_out);
   std::copy(bg_blue, bg_blue + count, bg_blue_out);
 
-  const std::vector<PixelLevelOperator> level_operator =
+  const BuiltLevelOperator level_operator =
       build_level_operator(alpha, width, height, stride, eps_r, omega);
   for (int iteration = 0; iteration < iterations; ++iteration) {
-    apply_level_operator_rgb_pass(
-        image_red, image_green, image_blue,
-        width, height, stride, level_operator,
-        fg_red_out, fg_green_out, fg_blue_out,
-        bg_red_out, bg_green_out, bg_blue_out);
+    float max_update = 0.0f;
+    max_update = std::max(
+        max_update,
+        apply_level_operator_rgb_half_pass(
+            image_red, image_green, image_blue,
+            level_operator, level_operator.red_pixel_indices,
+            fg_red_out, fg_green_out, fg_blue_out,
+            bg_red_out, bg_green_out, bg_blue_out,
+            update_tol > 0.0f));
+    max_update = std::max(
+        max_update,
+        apply_level_operator_rgb_half_pass(
+            image_red, image_green, image_blue,
+            level_operator, level_operator.black_pixel_indices,
+            fg_red_out, fg_green_out, fg_blue_out,
+            bg_red_out, bg_green_out, bg_blue_out,
+            update_tol > 0.0f));
+    float max_residual = 0.0f;
+    if (residual_tol > 0.0f) {
+      max_residual = compute_level_operator_rgb_residual_inf_norm(
+          image_red, image_green, image_blue,
+          level_operator,
+          fg_red_out, fg_green_out, fg_blue_out,
+          bg_red_out, bg_green_out, bg_blue_out);
+    }
+    bool has_active_stop = false;
+    bool converged = true;
+    if (residual_tol > 0.0f) {
+      has_active_stop = true;
+      converged = converged && max_residual <= residual_tol;
+    }
+    if (update_tol > 0.0f) {
+      has_active_stop = true;
+      converged = converged && max_update <= update_tol;
+    }
+    if (has_active_stop && converged) {
+      break;
+    }
   }
   return FASTMLFE2_STATUS_OK;
 }

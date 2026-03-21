@@ -53,7 +53,8 @@ def referenceInit (image : NativeRgbImage) (alpha : NativeGrayImage) : IO (Nativ
 
 /-- `reference` is the executable multi-level solver, aligned with the pymatting-style implementation.
 It uses nearest-neighbor resizing and mean-color initialization. This runtime path is distinct
-from the Lean `spec` model and does not claim identical step semantics. -/
+from the Lean `spec` model and does not claim identical step semantics. Each level now uses
+RBGS with a max-iteration cap plus level-dependent adaptive stopping. -/
 def runMultilevelForegroundEstimation
     (image : NativeRgbImage) (alpha : NativeGrayImage) (config : ExecutionConfig) :
     IO (NativeRgbImage × NativeRgbImage) := do
@@ -63,6 +64,10 @@ def runMultilevelForegroundEstimation
     throw <| IO.userError "eps_r must be positive"
   if config.omega < 0.0 then
     throw <| IO.userError "omega must be nonnegative"
+  if config.smallResidualTol < 0.0 then
+    throw <| IO.userError "small_residual_tol must be nonnegative"
+  if config.bigUpdateTol < 0.0 then
+    throw <| IO.userError "big_update_tol must be nonnegative"
   image.assertWellFormed
   let width ← NativeRgbImage.width image
   let height ← NativeRgbImage.height image
@@ -81,10 +86,13 @@ def runMultilevelForegroundEstimation
         let alphaLevel ← NativeGrayImage.resizeNearest alpha levelW levelH
         let fgLevel ← NativeRgbImage.resizeNearest fg levelW levelH
         let bgLevel ← NativeRgbImage.resizeNearest bg levelW levelH
-        let iterations := iterationsForLevel config levelW levelH
+        let stopPolicy := stopPolicyForLevel config levelW levelH
         let (fgNext, bgNext) ←
           NativeRgbImage.referenceRefine
-            iterations imageLevel alphaLevel fgLevel bgLevel config.epsR config.omega
+            stopPolicy.maxIterations
+            imageLevel alphaLevel fgLevel bgLevel
+            config.epsR config.omega
+            stopPolicy.residualTol stopPolicy.updateTol
         loop rest fgNext bgNext
   loop schedule fg0 bg0
 

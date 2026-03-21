@@ -132,17 +132,68 @@ int main() {
         bgRed.data(), bgGreen.data(), bgBlue.data(),
         fgRedOut.data(), fgGreenOut.data(), fgBlueOut.data(),
         bgRedOut.data(), bgGreenOut.data(), bgBlueOut.data(),
-        rgbWidth, rgbHeight, rgbStride, 3, 5e-3f, 1e-1f);
+        rgbWidth, rgbHeight, rgbStride, 3, 5e-3f, 1e-1f, 0.0f, 0.0f);
     if (rc != 0) {
       return rc;
     }
 
-    expect_vec(fgRedOut, {0.811771f, 0.864838f, 0.837793f, 0.896152f}, 14);
-    expect_vec(fgGreenOut, {0.49459f, 0.766521f, 0.360411f, 0.787745f}, 15);
-    expect_vec(fgBlueOut, {0.0904351f, 0.0740971f, 0.0498697f, 0.0971273f}, 16);
-    expect_vec(bgRedOut, {0.110297f, 0.199114f, 0.142401f, 0.188636f}, 17);
-    expect_vec(bgGreenOut, {0.206804f, 0.492881f, 0.19722f, 0.416796f}, 18);
-    expect_vec(bgBlueOut, {0.885632f, 0.696953f, 0.831104f, 0.728247f}, 19);
+    expect_vec(fgRedOut, {0.830597758f, 0.88038969f, 0.843004763f, 0.894744515f}, 14);
+    expect_vec(fgGreenOut, {0.461264521f, 0.739589155f, 0.351412773f, 0.784993887f}, 15);
+    expect_vec(fgBlueOut, {0.102423653f, 0.0851337761f, 0.0536182709f, 0.10242942f}, 16);
+    expect_vec(bgRedOut, {0.107164577f, 0.189354777f, 0.128722265f, 0.194471642f}, 17);
+    expect_vec(bgGreenOut, {0.212035656f, 0.509556174f, 0.220379204f, 0.447383642f}, 18);
+    expect_vec(bgBlueOut, {0.883042753f, 0.689597011f, 0.820391357f, 0.680520773f}, 19);
+
+    std::vector<float> fgRedOne(4), fgGreenOne(4), fgBlueOne(4);
+    std::vector<float> bgRedOne(4), bgGreenOne(4), bgBlueOne(4);
+    rc = fastmlfe2_reference_refine_rgb(
+        imageRed.data(), imageGreen.data(), imageBlue.data(), alphaRgb.data(),
+        fgRed.data(), fgGreen.data(), fgBlue.data(),
+        bgRed.data(), bgGreen.data(), bgBlue.data(),
+        fgRedOne.data(), fgGreenOne.data(), fgBlueOne.data(),
+        bgRedOne.data(), bgGreenOne.data(), bgBlueOne.data(),
+        rgbWidth, rgbHeight, rgbStride, 1, 5e-3f, 1e-1f, 0.0f, 0.0f);
+    if (rc != 0) {
+      return rc;
+    }
+
+    std::vector<float> fgRedResidual(4), fgGreenResidual(4), fgBlueResidual(4);
+    std::vector<float> bgRedResidual(4), bgGreenResidual(4), bgBlueResidual(4);
+    rc = fastmlfe2_reference_refine_rgb(
+        imageRed.data(), imageGreen.data(), imageBlue.data(), alphaRgb.data(),
+        fgRed.data(), fgGreen.data(), fgBlue.data(),
+        bgRed.data(), bgGreen.data(), bgBlue.data(),
+        fgRedResidual.data(), fgGreenResidual.data(), fgBlueResidual.data(),
+        bgRedResidual.data(), bgGreenResidual.data(), bgBlueResidual.data(),
+        rgbWidth, rgbHeight, rgbStride, 5, 5e-3f, 1e-1f, 100.0f, 0.0f);
+    if (rc != 0) {
+      return rc;
+    }
+    expect_vec(fgRedResidual, fgRedOne, 20);
+    expect_vec(fgGreenResidual, fgGreenOne, 21);
+    expect_vec(fgBlueResidual, fgBlueOne, 22);
+    expect_vec(bgRedResidual, bgRedOne, 23);
+    expect_vec(bgGreenResidual, bgGreenOne, 24);
+    expect_vec(bgBlueResidual, bgBlueOne, 25);
+
+    std::vector<float> fgRedUpdate(4), fgGreenUpdate(4), fgBlueUpdate(4);
+    std::vector<float> bgRedUpdate(4), bgGreenUpdate(4), bgBlueUpdate(4);
+    rc = fastmlfe2_reference_refine_rgb(
+        imageRed.data(), imageGreen.data(), imageBlue.data(), alphaRgb.data(),
+        fgRed.data(), fgGreen.data(), fgBlue.data(),
+        bgRed.data(), bgGreen.data(), bgBlue.data(),
+        fgRedUpdate.data(), fgGreenUpdate.data(), fgBlueUpdate.data(),
+        bgRedUpdate.data(), bgGreenUpdate.data(), bgBlueUpdate.data(),
+        rgbWidth, rgbHeight, rgbStride, 5, 5e-3f, 1e-1f, 0.0f, 100.0f);
+    if (rc != 0) {
+      return rc;
+    }
+    expect_vec(fgRedUpdate, fgRedOne, 26);
+    expect_vec(fgGreenUpdate, fgGreenOne, 27);
+    expect_vec(fgBlueUpdate, fgBlueOne, 28);
+    expect_vec(bgRedUpdate, bgRedOne, 29);
+    expect_vec(bgGreenUpdate, bgGreenOne, 30);
+    expect_vec(bgBlueUpdate, bgBlueOne, 31);
   }
 
   return fastmlfe2_resize_float_gray(
