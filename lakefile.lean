@@ -53,6 +53,7 @@ package «Fast-ML-FE2» where
     ⟨`maxSynthPendingDepth, 3⟩]
 
 require mathlib from git "https://github.com/leanprover-community/mathlib4.git"@"v4.28.0"
+require repl from git "https://github.com/leanprover-community/repl.git"@"v4.28.0"
 
 extern_lib fastmlfe2ffi pkg := do
   buildFastMlfe2Ffi pkg
