@@ -39,13 +39,13 @@ theorem summaryDenom_eq_closedFormDenom (data : LocalData ι) (α : ℝ) :
 
 theorem closedForm_foreground_eq_summary (data : LocalData ι) (α image : ℝ) :
     foreground (data.closedForm α image) = data.summaryForeground α image := by
-  simp [LocalData.closedForm, summaryForeground, foreground, background, rhs, foregroundSum,
-    backgroundSum, LocalData.summaryDenom]
+  simp [LocalData.closedForm, summaryForeground, foreground, background, rhs,
+    LocalData.summaryDenom]
 
 theorem closedForm_background_eq_summary (data : LocalData ι) (α image : ℝ) :
     background (data.closedForm α image) = data.summaryBackground α image := by
-  simp [LocalData.closedForm, summaryBackground, foreground, background, rhs, foregroundSum,
-    backgroundSum, LocalData.summaryDenom]
+  simp [LocalData.closedForm, summaryBackground, foreground, background, rhs,
+    LocalData.summaryDenom]
 
 theorem closedForm_eq_summaryUpdate (data : LocalData ι) (α image : ℝ) :
     data.closedForm α image = data.summaryUpdate α image := by
@@ -64,14 +64,14 @@ theorem summaryDenom_pos_of_totalWeight_pos (data : LocalData ι) {α : ℝ}
 theorem summaryUpdate_solves_localSystem (data : LocalData ι)
     (α image : ℝ) (h : 0 < data.totalWeight) :
     data.localSystem α image (data.summaryUpdate α image) := by
-  rw [← data.closedForm_eq_summaryUpdate α image]
-  exact data.closedForm_solves_localSystem α image h
+  simpa [data.closedForm_eq_summaryUpdate α image] using
+    data.closedForm_solves_localSystem α image h
 
 theorem summaryUpdate_stationary (data : LocalData ι)
     (α image : ℝ) (h : 0 < data.totalWeight) :
     data.stationary α image (data.summaryUpdate α image) := by
-  rw [← data.closedForm_eq_summaryUpdate α image]
-  exact data.closedForm_stationary α image h
+  simpa [data.closedForm_eq_summaryUpdate α image] using
+    data.closedForm_stationary α image h
 
 section Examples
 

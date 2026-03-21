@@ -138,51 +138,69 @@ omit [DecidableEq ι] in
 @[simp] theorem compositingMatrix_apply (α : ℝ) (i j : FBIdx) :
     compositingMatrix α i j = uVec α i * uVec α j := rfl
 
+@[simp] theorem weightedBroadcastMatrix_apply_00 (data : LocalData ι) :
+    ((((broadcastMatrix (ι := ι)).transpose * data.weightMatrix *
+        (broadcastMatrix (ι := ι))) 0) 0) =
+      data.totalWeight := by
+  simp [broadcastMatrix, weightMatrix, totalWeight, Matrix.transpose_apply,
+    Matrix.mul_apply, Matrix.diagonal, Fintype.sum_sum_type]
+
+@[simp] theorem weightedBroadcastMatrix_apply_01 (data : LocalData ι) :
+    ((((broadcastMatrix (ι := ι)).transpose * data.weightMatrix *
+        (broadcastMatrix (ι := ι))) 0) 1) = 0 := by
+  simp [broadcastMatrix, weightMatrix, Matrix.transpose_apply,
+    Matrix.mul_apply, Matrix.diagonal, Fintype.sum_sum_type]
+
+@[simp] theorem weightedBroadcastMatrix_apply_10 (data : LocalData ι) :
+    ((((broadcastMatrix (ι := ι)).transpose * data.weightMatrix *
+        (broadcastMatrix (ι := ι))) 1) 0) = 0 := by
+  simp [broadcastMatrix, weightMatrix, Matrix.transpose_apply,
+    Matrix.mul_apply, Matrix.diagonal, Fintype.sum_sum_type]
+
+@[simp] theorem weightedBroadcastMatrix_apply_11 (data : LocalData ι) :
+    ((((broadcastMatrix (ι := ι)).transpose * data.weightMatrix *
+        (broadcastMatrix (ι := ι))) 1) 1) =
+      data.totalWeight := by
+  simp [broadcastMatrix, weightMatrix, totalWeight, Matrix.transpose_apply,
+    Matrix.mul_apply, Matrix.diagonal, Fintype.sum_sum_type]
+
+@[simp] theorem weightedBroadcastRhs_foreground (data : LocalData ι) :
+    ((((broadcastMatrix (ι := ι)).transpose * data.weightMatrix).mulVec data.neighborVec) 0) =
+      data.foregroundSum := by
+  simp [Matrix.mulVec, Matrix.mul_apply, dotProduct, broadcastMatrix, weightMatrix,
+    neighborVec, weightVec, foregroundSum, Matrix.transpose_apply, Matrix.diagonal,
+    Fintype.sum_sum_type]
+
+@[simp] theorem weightedBroadcastRhs_background (data : LocalData ι) :
+    ((((broadcastMatrix (ι := ι)).transpose * data.weightMatrix).mulVec data.neighborVec) 1) =
+      data.backgroundSum := by
+  simp [Matrix.mulVec, Matrix.mul_apply, dotProduct, broadcastMatrix, weightMatrix,
+    neighborVec, weightVec, backgroundSum, Matrix.transpose_apply, Matrix.diagonal,
+    Fintype.sum_sum_type]
+
 @[simp] theorem paperSystemMatrix_eq_systemMatrix (data : LocalData ι) (α : ℝ) :
     data.paperSystemMatrix α = data.systemMatrix α := by
-  let M : Matrix FBIdx FBIdx ℝ :=
-    (broadcastMatrix (ι := ι)).transpose * data.weightMatrix * broadcastMatrix
-  have h00 : M 0 0 = data.totalWeight := by
-    simp [M, broadcastMatrix, weightMatrix, totalWeight, Matrix.transpose_apply,
-      Matrix.mul_apply, Matrix.diagonal, Fintype.sum_sum_type]
-  have h01 : M 0 1 = 0 := by
-    simp [M, broadcastMatrix, weightMatrix, Matrix.transpose_apply,
-      Matrix.mul_apply, Matrix.diagonal, Fintype.sum_sum_type]
-  have h10 : M 1 0 = 0 := by
-    simp [M, broadcastMatrix, weightMatrix, Matrix.transpose_apply,
-      Matrix.mul_apply, Matrix.diagonal, Fintype.sum_sum_type]
-  have h11 : M 1 1 = data.totalWeight := by
-    simp [M, broadcastMatrix, weightMatrix, totalWeight, Matrix.transpose_apply,
-      Matrix.mul_apply, Matrix.diagonal, Fintype.sum_sum_type]
   ext i j
   fin_cases i <;> fin_cases j
-  · simp [paperSystemMatrix, systemMatrix, compositingMatrix, M, h00, uVec, pow_two]
-  · simp [paperSystemMatrix, systemMatrix, compositingMatrix, M, h01, uVec]
-  · simp [paperSystemMatrix, systemMatrix, compositingMatrix, M, h10, uVec]
+  · simp [paperSystemMatrix, systemMatrix, compositingMatrix, uVec, pow_two,
+      weightedBroadcastMatrix_apply_00]
+  · simp [paperSystemMatrix, systemMatrix, compositingMatrix, uVec,
+      weightedBroadcastMatrix_apply_01]
+  · simp [paperSystemMatrix, systemMatrix, compositingMatrix, uVec,
+      weightedBroadcastMatrix_apply_10]
     ring
-  · simp [paperSystemMatrix, systemMatrix, compositingMatrix, M, h11, uVec, pow_two]
+  · simp [paperSystemMatrix, systemMatrix, compositingMatrix, uVec, pow_two,
+      weightedBroadcastMatrix_apply_11]
 
 @[simp] theorem paperRhs_eq_rhs (data : LocalData ι) (α image : ℝ) :
     data.paperRhs α image = data.rhs α image := by
-  have h0 :
-      ((((broadcastMatrix (ι := ι)).transpose * data.weightMatrix).mulVec data.neighborVec) 0) =
-        data.foregroundSum := by
-    simp [Matrix.mulVec, Matrix.mul_apply, dotProduct, broadcastMatrix, weightMatrix,
-      neighborVec, weightVec, foregroundSum, Matrix.transpose_apply, Matrix.diagonal,
-      Fintype.sum_sum_type]
-  have h1 :
-      ((((broadcastMatrix (ι := ι)).transpose * data.weightMatrix).mulVec data.neighborVec) 1) =
-        data.backgroundSum := by
-    simp [Matrix.mulVec, Matrix.mul_apply, dotProduct, broadcastMatrix, weightMatrix,
-      neighborVec, weightVec, backgroundSum, Matrix.transpose_apply, Matrix.diagonal,
-      Fintype.sum_sum_type]
   ext i
   fin_cases i
   · ring_nf
-    simp [paperRhs, rhs, h0, uVec]
+    simp [paperRhs, rhs, uVec]
     ring
   · ring_nf
-    simp [paperRhs, rhs, h1, uVec]
+    simp [paperRhs, rhs, uVec]
     ring
 
 end LocalData
