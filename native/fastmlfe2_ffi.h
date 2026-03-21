@@ -24,6 +24,16 @@ int fastmlfe2_resize_float_gray(
     int dst_h,
     int dst_stride);
 
+int fastmlfe2_resize_float_gray_nearest(
+    const float *src,
+    int src_w,
+    int src_h,
+    int src_stride,
+    float *dst,
+    int dst_w,
+    int dst_h,
+    int dst_stride);
+
 int fastmlfe2_paper_refine_gray_pass(
     const float *image,
     const float *alpha,

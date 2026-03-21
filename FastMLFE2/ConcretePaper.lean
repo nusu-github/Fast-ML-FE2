@@ -9,35 +9,35 @@ structure PaperWeightParams where
 def PaperWeightParams.Valid (params : PaperWeightParams) : Prop :=
   0 < params.εr ∧ 0 ≤ params.ω
 
-def eightOffsets : Fin 8 → Offset :=
-  ![(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+def fourOffsets : Fin 4 → Offset :=
+  ![(0, -1), (0, 1), (-1, 0), (1, 0)]
 
-def eightNeighborhood {h w : Nat} : Neighborhood h w 8 :=
-  fun _ t => eightOffsets t
+def fourNeighborhood {h w : Nat} : Neighborhood h w 4 :=
+  fun _ t => fourOffsets t
 
-def paperWeight {h w : Nat} (params : PaperWeightParams) : WeightRule h w 8 :=
+def paperWeight {h w : Nat} (params : PaperWeightParams) : WeightRule h w 4 :=
   fun alpha px _t neighbor =>
     params.εr + params.ω * |alpha px - alpha neighbor|
 
 def paperLocalData {h w : Nat} (params : PaperWeightParams)
-    (alpha fg bg : GrayImage h w) (px : Pixel h w) : LocalData (Fin 8) :=
-  localDataOfNeighborhood alpha fg bg eightNeighborhood (paperWeight params) px
+    (alpha fg bg : GrayImage h w) (px : Pixel h w) : LocalData (Fin 4) :=
+  localDataOfNeighborhood alpha fg bg fourNeighborhood (paperWeight params) px
 
 noncomputable def paperSummaryRefinementModel {h w : Nat} (params : PaperWeightParams) :
-    SummaryRefinementModel (GrayImage h w) (Pixel h w) (Fin 8) :=
-  summaryRefinementModelOfNeighborhood eightNeighborhood (paperWeight params)
+    SummaryRefinementModel (GrayImage h w) (Pixel h w) (Fin 4) :=
+  summaryRefinementModelOfNeighborhood fourNeighborhood (paperWeight params)
 
-@[simp] theorem eightNeighborhood_apply {h w : Nat} (px : Pixel h w) (t : Fin 8) :
-    eightNeighborhood px t = eightOffsets t := rfl
+@[simp] theorem fourNeighborhood_apply {h w : Nat} (px : Pixel h w) (t : Fin 4) :
+    fourNeighborhood px t = fourOffsets t := rfl
 
 @[simp] theorem paperWeight_apply {h w : Nat} (params : PaperWeightParams)
-    (alpha : GrayImage h w) (px : Pixel h w) (t : Fin 8) (neighbor : Pixel h w) :
+    (alpha : GrayImage h w) (px : Pixel h w) (t : Fin 4) (neighbor : Pixel h w) :
     paperWeight params alpha px t neighbor =
       params.εr + params.ω * |alpha px - alpha neighbor| := rfl
 
 theorem paperWeight_nonneg {h w : Nat} (params : PaperWeightParams)
     (hparams : params.Valid) (alpha : GrayImage h w) (px : Pixel h w)
-    (t : Fin 8) (neighbor : Pixel h w) :
+    (t : Fin 4) (neighbor : Pixel h w) :
     0 ≤ paperWeight params alpha px t neighbor := by
   rcases hparams with ⟨hε, hω⟩
   have habs : 0 ≤ |alpha px - alpha neighbor| := abs_nonneg _
@@ -46,7 +46,7 @@ theorem paperWeight_nonneg {h w : Nat} (params : PaperWeightParams)
 
 theorem paperWeight_pos {h w : Nat} (params : PaperWeightParams)
     (hparams : params.Valid) (alpha : GrayImage h w) (px : Pixel h w)
-    (t : Fin 8) (neighbor : Pixel h w) :
+    (t : Fin 4) (neighbor : Pixel h w) :
     0 < paperWeight params alpha px t neighbor := by
   rcases hparams with ⟨hε, hω⟩
   have habs : 0 ≤ |alpha px - alpha neighbor| := abs_nonneg _
@@ -54,13 +54,13 @@ theorem paperWeight_pos {h w : Nat} (params : PaperWeightParams)
   nlinarith [hε, hω, habs]
 
 theorem paperLocalData_weight_pos {h w : Nat} (params : PaperWeightParams)
-    (hparams : params.Valid) (alpha fg bg : GrayImage h w) (px : Pixel h w) (t : Fin 8) :
+    (hparams : params.Valid) (alpha fg bg : GrayImage h w) (px : Pixel h w) (t : Fin 4) :
     0 < (paperLocalData params alpha fg bg px).weights t := by
   simpa [paperLocalData, localDataOfNeighborhood_weights] using
-    paperWeight_pos params hparams alpha px t (neighborPixel eightNeighborhood px t)
+    paperWeight_pos params hparams alpha px t (neighborPixel fourNeighborhood px t)
 
 theorem paperLocalData_weight_nonneg {h w : Nat} (params : PaperWeightParams)
-    (hparams : params.Valid) (alpha fg bg : GrayImage h w) (px : Pixel h w) (t : Fin 8) :
+    (hparams : params.Valid) (alpha fg bg : GrayImage h w) (px : Pixel h w) (t : Fin 4) :
     0 ≤ (paperLocalData params alpha fg bg px).weights t := by
   have hpos := paperLocalData_weight_pos params hparams alpha fg bg px t
   linarith
@@ -92,13 +92,13 @@ theorem paperUpdateAt_stationary {h w : Nat} (params : PaperWeightParams)
 section Examples
 
 example :
-    Neighborhood 3 4 8 :=
-  eightNeighborhood
+    Neighborhood 3 4 4 :=
+  fourNeighborhood
 
 example (params : PaperWeightParams) (alpha : GrayImage 3 4)
-    (px : Pixel 3 4) (t : Fin 8) :
-    paperWeight params alpha px t (neighborPixel eightNeighborhood px t) =
-      params.εr + params.ω * |alpha px - alpha (neighborPixel eightNeighborhood px t)| :=
+    (px : Pixel 3 4) (t : Fin 4) :
+    paperWeight params alpha px t (neighborPixel fourNeighborhood px t) =
+      params.εr + params.ω * |alpha px - alpha (neighborPixel fourNeighborhood px t)| :=
   rfl
 
 example (params : PaperWeightParams) (alpha fg bg image : GrayImage 3 4)
@@ -108,11 +108,11 @@ example (params : PaperWeightParams) (alpha fg bg image : GrayImage 3 4)
   simp [paperSummaryRefinementModel, paperLocalData]
 
 example :
-    eightNeighborhood ((0 : Fin 3), (0 : Fin 4)) 0 = (-1, -1) := by
+    fourNeighborhood ((0 : Fin 3), (0 : Fin 4)) 0 = (0, -1) := by
   rfl
 
 example :
-    neighborPixel eightNeighborhood ((0 : Fin 1), (0 : Fin 1)) 7 =
+    neighborPixel fourNeighborhood ((0 : Fin 1), (0 : Fin 1)) 3 =
       ((0 : Fin 1), (0 : Fin 1)) := by
   rfl
 

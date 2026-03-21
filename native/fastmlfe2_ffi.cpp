@@ -10,9 +10,8 @@
 
 namespace {
 
-constexpr std::array<std::pair<int, int>, 8> kEightOffsets{{
-    {-1, -1}, {-1, 0}, {-1, 1}, {0, -1},
-    {0, 1},   {1, -1}, {1, 0},  {1, 1},
+constexpr std::array<std::pair<int, int>, 4> kFourOffsets{{
+    {0, -1}, {0, 1}, {-1, 0}, {1, 0},
 }};
 
 bool valid_dims(int width, int height) {
@@ -69,9 +68,7 @@ int choose_interpolation(int src_w, int src_h, int dst_w, int dst_h) {
   return cv::INTER_LINEAR;
 }
 
-}  // namespace
-
-extern "C" int fastmlfe2_resize_float_gray(
+int resize_gray(
     const float *src,
     int src_w,
     int src_h,
@@ -79,7 +76,8 @@ extern "C" int fastmlfe2_resize_float_gray(
     float *dst,
     int dst_w,
     int dst_h,
-    int dst_stride) {
+    int dst_stride,
+    int interpolation) {
   int rc = validate_gray_buffer(src, src_w, src_h, src_stride);
   if (rc != FASTMLFE2_STATUS_OK) {
     return rc;
@@ -95,9 +93,40 @@ extern "C" int fastmlfe2_resize_float_gray(
   cv::Mat dst_mat(dst_h, dst_w, CV_32FC1,
                   dst,
                   static_cast<std::size_t>(dst_stride) * sizeof(float));
-  cv::resize(src_mat, dst_mat, cv::Size(dst_w, dst_h), 0.0, 0.0,
-             choose_interpolation(src_w, src_h, dst_w, dst_h));
+  cv::resize(src_mat, dst_mat, cv::Size(dst_w, dst_h), 0.0, 0.0, interpolation);
   return FASTMLFE2_STATUS_OK;
+}
+
+}  // namespace
+
+extern "C" int fastmlfe2_resize_float_gray(
+    const float *src,
+    int src_w,
+    int src_h,
+    int src_stride,
+    float *dst,
+    int dst_w,
+    int dst_h,
+    int dst_stride) {
+  return resize_gray(
+      src, src_w, src_h, src_stride,
+      dst, dst_w, dst_h, dst_stride,
+      choose_interpolation(src_w, src_h, dst_w, dst_h));
+}
+
+extern "C" int fastmlfe2_resize_float_gray_nearest(
+    const float *src,
+    int src_w,
+    int src_h,
+    int src_stride,
+    float *dst,
+    int dst_w,
+    int dst_h,
+    int dst_stride) {
+  return resize_gray(
+      src, src_w, src_h, src_stride,
+      dst, dst_w, dst_h, dst_stride,
+      cv::INTER_NEAREST);
 }
 
 extern "C" int fastmlfe2_paper_refine_gray_pass(
@@ -147,6 +176,9 @@ extern "C" int fastmlfe2_paper_refine_gray_pass(
     return FASTMLFE2_STATUS_ALIASING;
   }
 
+  std::copy(fg, fg + count, fg_out);
+  std::copy(bg, bg + count, bg_out);
+
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
       const float image_center = load_at(image, stride, x, y);
@@ -157,15 +189,15 @@ extern "C" int fastmlfe2_paper_refine_gray_pass(
       float p_f = 0.0f;
       float p_b = 0.0f;
 
-      for (const auto &[dy, dx] : kEightOffsets) {
+      for (const auto &[dy, dx] : kFourOffsets) {
         const int nx = clamp_index(x + dx, width);
         const int ny = clamp_index(y + dy, height);
         const float alpha_neighbor = load_at(alpha, stride, nx, ny);
         const float weight =
             eps_r + omega * std::fabs(alpha_center - alpha_neighbor);
         s += weight;
-        p_f += weight * load_at(fg, stride, nx, ny);
-        p_b += weight * load_at(bg, stride, nx, ny);
+        p_f += weight * load_at(fg_out, stride, nx, ny);
+        p_b += weight * load_at(bg_out, stride, nx, ny);
       }
 
       const float a2 = alpha_center * alpha_center;
@@ -175,8 +207,8 @@ extern "C" int fastmlfe2_paper_refine_gray_pass(
 
       const float rhs_f = alpha_center * image_center + p_f;
       const float rhs_b = beta_center * image_center + p_b;
-      const float fg_value = ((b2 + s) * rhs_f - cross * rhs_b) / denom;
-      const float bg_value = ((a2 + s) * rhs_b - cross * rhs_f) / denom;
+      const float fg_value = std::clamp(((b2 + s) * rhs_f - cross * rhs_b) / denom, 0.0f, 1.0f);
+      const float bg_value = std::clamp(((a2 + s) * rhs_b - cross * rhs_f) / denom, 0.0f, 1.0f);
 
       store_at(fg_out, stride, x, y, fg_value);
       store_at(bg_out, stride, x, y, bg_value);

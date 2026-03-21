@@ -23,6 +23,9 @@ private opaque heightImpl (image : @& NativeGrayImage) : IO UInt32
 @[extern "lean_fastmlfe2_gray_image_resize"]
 private opaque resizeImpl (image : @& NativeGrayImage) (width height : UInt32) : IO NativeGrayImage
 
+@[extern "lean_fastmlfe2_gray_image_resize_nearest"]
+private opaque resizeNearestImpl (image : @& NativeGrayImage) (width height : UInt32) : IO NativeGrayImage
+
 @[extern "lean_fastmlfe2_gray_image_paper_refine_pass"]
 private opaque paperRefinePassImpl
     (image alpha fg bg : @& NativeGrayImage) (epsR omega : Float) :
@@ -68,6 +71,9 @@ def height (image : NativeGrayImage) : IO Nat := do
 
 def resize (image : NativeGrayImage) (width height : Nat) : IO NativeGrayImage := do
   resizeImpl image (← toDim32 "width" width) (← toDim32 "height" height)
+
+def resizeNearest (image : NativeGrayImage) (width height : Nat) : IO NativeGrayImage := do
+  resizeNearestImpl image (← toDim32 "width" width) (← toDim32 "height" height)
 
 def paperRefinePass
     (image alpha fg bg : NativeGrayImage) (epsR omega : Float) :
@@ -136,6 +142,13 @@ def resize (image : NativeRgbImage) (width height : Nat) : IO NativeRgbImage := 
     red := ← image.red.resize width height
     green := ← image.green.resize width height
     blue := ← image.blue.resize width height
+  }
+
+def resizeNearest (image : NativeRgbImage) (width height : Nat) : IO NativeRgbImage := do
+  pure {
+    red := ← image.red.resizeNearest width height
+    green := ← image.green.resizeNearest width height
+    blue := ← image.blue.resizeNearest width height
   }
 
 def clamp01 (image : NativeRgbImage) : IO PUnit := do

@@ -5,7 +5,23 @@ open System
 def makeGray (w h : Nat) (values : List Float) : IO FastMLFE2.NativeGrayImage :=
   FastMLFE2.NativeGrayImage.ofFloatArray w h values.toFloatArray
 
+def approxEq (x y : Float) : Bool :=
+  Float.abs (x - y) ≤ 1.0e-2
+
+def expectAllEq (context : String) (actual : FloatArray) (expected : Float) : IO Unit := do
+  for i in [0:actual.size] do
+    if !approxEq actual[i]! expected then
+      throw <| IO.userError
+        s!"{context}: expected all entries {expected}, got {actual}"
+
+def expectEqNatList (context : String) (actual expected : List (Nat × Nat)) : IO Unit := do
+  if actual != expected then
+    throw <| IO.userError s!"{context}: expected {expected}, got {actual}"
+
 def main : IO Unit := do
+  expectEqNatList "manual level count"
+    (FastMLFE2.CLI.testLevelSizes 100 50 (.manual 4))
+    [(1, 1), (5, 4), (22, 14), (100, 50)]
   let tmp ← IO.FS.createTempDir
   let imagePath := tmp / "image.png"
   let alphaPath := tmp / "alpha.png"
@@ -22,14 +38,24 @@ def main : IO Unit := do
   alpha.writePngGray alphaPath
 
   let exitCode ← FastMLFE2.CLI.main [
+    "--mode",
+    "reference",
+    "--levels",
+    "auto",
+    "--n-small-iterations",
+    "0",
+    "--n-big-iterations",
+    "0",
+    "--small-size",
+    "32",
+    "--eps-r",
+    "0.005",
+    "--omega",
+    "0.1",
     imagePath.toString,
     alphaPath.toString,
     outFgPath.toString,
-    outBgPath.toString,
-    "2",
-    "1",
-    "0.001",
-    "1.0"
+    outBgPath.toString
   ]
   if exitCode != 0 then
     throw <| IO.userError s!"CLI returned nonzero exit code: {exitCode}"
@@ -43,3 +69,15 @@ def main : IO Unit := do
   let bgH ← bg.height
   if fgW != 2 || fgH != 2 || bgW != 2 || bgH != 2 then
     throw <| IO.userError "CLI output dimensions are incorrect"
+  let fgRed ← FastMLFE2.NativeGrayImage.toFloatArray fg.red
+  let fgGreen ← FastMLFE2.NativeGrayImage.toFloatArray fg.green
+  let fgBlue ← FastMLFE2.NativeGrayImage.toFloatArray fg.blue
+  let bgRed ← FastMLFE2.NativeGrayImage.toFloatArray bg.red
+  let bgGreen ← FastMLFE2.NativeGrayImage.toFloatArray bg.green
+  let bgBlue ← FastMLFE2.NativeGrayImage.toFloatArray bg.blue
+  expectAllEq "fg.red" fgRed 0.8
+  expectAllEq "fg.green" fgGreen 0.1
+  expectAllEq "fg.blue" fgBlue 0.6
+  expectAllEq "bg.red" bgRed 0.0
+  expectAllEq "bg.green" bgGreen 0.5
+  expectAllEq "bg.blue" bgBlue 1.0

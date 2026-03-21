@@ -176,6 +176,30 @@ extern "C" lean_obj_res lean_fastmlfe2_gray_image_resize(
   return ok(lean_alloc_external(get_gray_image_class(), out));
 }
 
+extern "C" lean_obj_res lean_fastmlfe2_gray_image_resize_nearest(
+    b_lean_obj_arg image_obj,
+    uint32_t width_u32,
+    uint32_t height_u32) {
+  if (width_u32 == 0 || height_u32 == 0) {
+    return user_error("NativeGrayImage.resizeNearest: dimensions must be positive");
+  }
+
+  const auto * image = get_handle(image_obj);
+  auto * out = new GrayImageHandle{
+      static_cast<int>(width_u32),
+      static_cast<int>(height_u32),
+      static_cast<int>(width_u32),
+      std::vector<float>(static_cast<std::size_t>(width_u32) * static_cast<std::size_t>(height_u32))};
+  const int rc = fastmlfe2_resize_float_gray_nearest(
+      image->data.data(), image->width, image->height, image->stride,
+      out->data.data(), out->width, out->height, out->stride);
+  if (rc != FASTMLFE2_STATUS_OK) {
+    delete out;
+    return status_error("NativeGrayImage.resizeNearest", rc);
+  }
+  return ok(lean_alloc_external(get_gray_image_class(), out));
+}
+
 extern "C" lean_obj_res lean_fastmlfe2_gray_image_paper_refine_pass(
     b_lean_obj_arg image_obj,
     b_lean_obj_arg alpha_obj,
