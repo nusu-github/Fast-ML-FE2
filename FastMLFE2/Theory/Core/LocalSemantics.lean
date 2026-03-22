@@ -25,6 +25,10 @@ def SolvesNormalEquation (ctx : Ctx ι) (g : Unknown) : Prop :=
 def IsLocalSolution (ctx : Ctx ι) (g : Unknown) : Prop :=
   SolvesNormalEquation ctx g
 
+def IsCostStationary (ctx : Ctx ι) (g : Unknown) : Prop :=
+  HasDerivAt (fun t : ℝ => ctx.foregroundLineCost g t) 0 0 ∧
+    HasDerivAt (fun t : ℝ => ctx.backgroundLineCost g t) 0 0
+
 @[simp] theorem totalWeight_eq_sum_neighborWeight (ctx : Ctx ι) :
     ctx.totalWeight = ∑ j, ctx.neighborWeight j := rfl
 
@@ -39,6 +43,11 @@ def IsLocalSolution (ctx : Ctx ι) (g : Unknown) : Prop :=
 
 @[simp] theorem isLocalSolution_iff (ctx : Ctx ι) (g : Unknown) :
     ctx.IsLocalSolution g ↔ ctx.normalMatrix.mulVec g = ctx.rhs := Iff.rfl
+
+@[simp] theorem isCostStationary_iff (ctx : Ctx ι) (g : Unknown) :
+    ctx.IsCostStationary g ↔
+      HasDerivAt (fun t : ℝ => ctx.foregroundLineCost g t) 0 0 ∧
+        HasDerivAt (fun t : ℝ => ctx.backgroundLineCost g t) 0 0 := Iff.rfl
 
 end LocalContext
 
