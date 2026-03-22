@@ -6,6 +6,7 @@ import FastMLFE2.Theory.Assumptions.Bundles
 import FastMLFE2.Theory.Theorems.Invertibility
 import FastMLFE2.Theory.Theorems.ClosedForm
 import FastMLFE2.Theory.Theorems.CostToNormalEquation
+import FastMLFE2.Theory.Theorems.Conditioning
 
 namespace FastMLFE2
 
