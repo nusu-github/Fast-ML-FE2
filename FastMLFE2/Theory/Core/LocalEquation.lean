@@ -79,6 +79,18 @@ def localCost (ctx : LocalContext ι) (g : LocalUnknown) : ℝ :=
     ∑ j, ctx.neighborWeight j *
       ((foreground g - ctx.fgNeighbor j) ^ 2 + (background g - ctx.bgNeighbor j) ^ 2)
 
+def perturbForeground (g : LocalUnknown) (t : ℝ) : LocalUnknown :=
+  mkLocalUnknown (foreground g + t) (background g)
+
+def perturbBackground (g : LocalUnknown) (t : ℝ) : LocalUnknown :=
+  mkLocalUnknown (foreground g) (background g + t)
+
+def foregroundLineCost (ctx : LocalContext ι) (g : LocalUnknown) (t : ℝ) : ℝ :=
+  ctx.localCost (perturbForeground g t)
+
+def backgroundLineCost (ctx : LocalContext ι) (g : LocalUnknown) (t : ℝ) : ℝ :=
+  ctx.localCost (perturbBackground g t)
+
 /-- The reduced `2 x 2` normal matrix `U Uᵀ + Rᵀ V R`. -/
 def normalMatrix (ctx : LocalContext ι) : Matrix LocalIdx LocalIdx ℝ :=
   ![![ctx.alphaCenter ^ 2 + ctx.totalWeight, ctx.alphaCenter * (1 - ctx.alphaCenter)],
@@ -109,6 +121,42 @@ omit [Fintype ι] in
 @[simp] theorem rhs_background (ctx : LocalContext ι) :
     background ctx.rhs = (1 - ctx.alphaCenter) * ctx.imageValue + ctx.backgroundSum := by
   simp [rhs, background]
+
+@[simp] theorem perturbForeground_zero (g : LocalUnknown) :
+    perturbForeground g 0 = g := by
+  ext i
+  fin_cases i
+  all_goals simp [perturbForeground, mkLocalUnknown, foreground, background]
+
+@[simp] theorem perturbBackground_zero (g : LocalUnknown) :
+    perturbBackground g 0 = g := by
+  ext i
+  fin_cases i
+  all_goals simp [perturbBackground, mkLocalUnknown, foreground, background]
+
+@[simp] theorem foreground_perturbForeground (g : LocalUnknown) (t : ℝ) :
+    foreground (perturbForeground g t) = foreground g + t := by
+  simp [perturbForeground, foreground, mkLocalUnknown]
+
+@[simp] theorem background_perturbForeground (g : LocalUnknown) (t : ℝ) :
+    background (perturbForeground g t) = background g := by
+  simp [perturbForeground, background, mkLocalUnknown]
+
+@[simp] theorem foreground_perturbBackground (g : LocalUnknown) (t : ℝ) :
+    foreground (perturbBackground g t) = foreground g := by
+  simp [perturbBackground, foreground, mkLocalUnknown]
+
+@[simp] theorem background_perturbBackground (g : LocalUnknown) (t : ℝ) :
+    background (perturbBackground g t) = background g + t := by
+  simp [perturbBackground, background, mkLocalUnknown]
+
+@[simp] theorem foregroundLineCost_zero (ctx : LocalContext ι) (g : LocalUnknown) :
+    ctx.foregroundLineCost g 0 = ctx.localCost g := by
+  simp [foregroundLineCost]
+
+@[simp] theorem backgroundLineCost_zero (ctx : LocalContext ι) (g : LocalUnknown) :
+    ctx.backgroundLineCost g 0 = ctx.localCost g := by
+  simp [backgroundLineCost]
 
 @[simp] theorem normalMatrix_mulVec_foreground (ctx : LocalContext ι) (g : LocalUnknown) :
     ctx.normalMatrix.mulVec g 0 =
