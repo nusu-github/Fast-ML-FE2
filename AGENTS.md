@@ -1,7 +1,19 @@
 # Repository Guidelines
 
+## Project Goal
+The long-term goal of this project is to formalize Germer et al.'s Fast Multi-Level Foreground Estimation in Lean 4 as a theory-first system for proof-directed optimal implementation derivation, not to preserve the current runtime/FFI stack as the architectural center.
+
+Prioritize work that strengthens:
+
+- the shallow mathematical core for the single-pixel local equation,
+- the canonical Germer/PyMatting semantics where the paper and authored CPU/GPU implementations agree,
+- the relational theorem layer for backend-specific divergences,
+- the deep refinement layer that derives efficient CPU/GPU forms from proved equalities.
+
+When a trade-off appears between preserving legacy executable behavior and improving the theory architecture, prefer the theory architecture unless the task explicitly says otherwise.
+
 ## Project Structure & Module Organization
-`FastMLFE2/` holds the main Lean modules. The `spec` side lives in files such as `MultilevelSpec.lean`, `LocalModel.lean`, and related proof-oriented modules; the executable reference path is exposed through `NativeFFI.lean` and `CLI.lean`. `FastMLFE2.lean` is the umbrella import. Top-level entrypoints `FFILeanSmoke.lean`, `FFICliSmoke.lean`, and `FastMLFECli.lean` build runnable executables. Native C++ FFI sources live in `native/`.
+`FastMLFE2/` holds the main Lean modules. The repository currently still contains older proof-oriented modules such as `MultilevelSpec.lean` and `LocalModel.lean`, along with legacy executable-reference paths exposed through `NativeFFI.lean` and `CLI.lean`. `FastMLFE2.lean` is the umbrella import. Top-level entrypoints `FFILeanSmoke.lean`, `FFICliSmoke.lean`, and `FastMLFECli.lean` build runnable executables. Native C++ FFI sources live in `native/`. During the refoundation, treat runtime/native code as legacy comparison artifacts rather than as the architectural source of truth.
 
 ## Build, Test, and Development Commands
 Use Lake for all routine work:
