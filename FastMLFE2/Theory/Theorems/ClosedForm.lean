@@ -1,5 +1,6 @@
 import FastMLFE2.Theory.Core.LocalSemantics
 import FastMLFE2.Theory.Theorems.Invertibility
+import FastMLFE2.Theory.Theorems.CostToNormalEquation
 
 namespace FastMLFE2.Theory.Theorems
 
@@ -136,6 +137,11 @@ theorem closedForm_solvesNormalEquation (ctx : LocalContext ι) [CoreMathAssumpt
 theorem closedForm_eq_inverseSolution (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     closedFormSolution ctx = inverseSolution ctx := by
   exact eq_inverseSolution_of_solves ctx (closedForm_solvesNormalEquation ctx)
+
+theorem closedForm_isCostStationary (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
+    ctx.IsCostStationary (closedFormSolution ctx) := by
+  exact (isCostStationary_iff_solvesNormalEquation ctx (closedFormSolution ctx)).2
+    (closedForm_solvesNormalEquation ctx)
 
 end LocalContext
 

@@ -22,12 +22,17 @@ private theorem foreground_weightedDiff
             refine Finset.sum_congr rfl ?_
             intro j _
             ring
-    _ = (∑ j, ctx.neighborWeight j * foreground g) - ∑ j, ctx.neighborWeight j * ctx.fgNeighbor j := by
+    _ =
+      (∑ j, ctx.neighborWeight j * foreground g) -
+        ∑ j, ctx.neighborWeight j * ctx.fgNeighbor j := by
           rw [Finset.sum_sub_distrib]
-    _ = foreground g * (∑ j, ctx.neighborWeight j) - ∑ j, ctx.neighborWeight j * ctx.fgNeighbor j := by
+    _ =
+      foreground g * (∑ j, ctx.neighborWeight j) -
+        ∑ j, ctx.neighborWeight j * ctx.fgNeighbor j := by
           congr 1
           calc
-            ∑ j, ctx.neighborWeight j * foreground g = ∑ j, foreground g * ctx.neighborWeight j := by
+            ∑ j, ctx.neighborWeight j * foreground g =
+                ∑ j, foreground g * ctx.neighborWeight j := by
               refine Finset.sum_congr rfl ?_
               intro j _
               ring
@@ -49,12 +54,17 @@ private theorem background_weightedDiff
             refine Finset.sum_congr rfl ?_
             intro j _
             ring
-    _ = (∑ j, ctx.neighborWeight j * background g) - ∑ j, ctx.neighborWeight j * ctx.bgNeighbor j := by
+    _ =
+      (∑ j, ctx.neighborWeight j * background g) -
+        ∑ j, ctx.neighborWeight j * ctx.bgNeighbor j := by
           rw [Finset.sum_sub_distrib]
-    _ = background g * (∑ j, ctx.neighborWeight j) - ∑ j, ctx.neighborWeight j * ctx.bgNeighbor j := by
+    _ =
+      background g * (∑ j, ctx.neighborWeight j) -
+        ∑ j, ctx.neighborWeight j * ctx.bgNeighbor j := by
           congr 1
           calc
-            ∑ j, ctx.neighborWeight j * background g = ∑ j, background g * ctx.neighborWeight j := by
+            ∑ j, ctx.neighborWeight j * background g =
+                ∑ j, background g * ctx.neighborWeight j := by
               refine Finset.sum_congr rfl ?_
               intro j _
               ring
@@ -69,16 +79,20 @@ private theorem background_weightedDiff
 private theorem foreground_neighborCost_expand
     (ctx : LocalContext ι) (g : LocalUnknown) (t : ℝ) :
     (∑ j, ctx.neighborWeight j *
-      ((foreground (FastMLFE2.Theory.Core.LocalContext.perturbForeground g t) - ctx.fgNeighbor j) ^ 2 +
-        (background (FastMLFE2.Theory.Core.LocalContext.perturbForeground g t) - ctx.bgNeighbor j) ^ 2)) =
+      ((foreground
+          (FastMLFE2.Theory.Core.LocalContext.perturbForeground g t) - ctx.fgNeighbor j) ^ 2 +
+        (background
+          (FastMLFE2.Theory.Core.LocalContext.perturbForeground g t) - ctx.bgNeighbor j) ^ 2)) =
       (∑ j, ctx.neighborWeight j *
         ((foreground g - ctx.fgNeighbor j) ^ 2 + (background g - ctx.bgNeighbor j) ^ 2)) +
         t ^ 2 * ctx.totalWeight +
         2 * t * (ctx.totalWeight * foreground g - ctx.foregroundSum) := by
   calc
     ∑ j, ctx.neighborWeight j *
-      ((foreground (FastMLFE2.Theory.Core.LocalContext.perturbForeground g t) - ctx.fgNeighbor j) ^ 2 +
-        (background (FastMLFE2.Theory.Core.LocalContext.perturbForeground g t) - ctx.bgNeighbor j) ^ 2)
+      ((foreground
+          (FastMLFE2.Theory.Core.LocalContext.perturbForeground g t) - ctx.fgNeighbor j) ^ 2 +
+        (background
+          (FastMLFE2.Theory.Core.LocalContext.perturbForeground g t) - ctx.bgNeighbor j) ^ 2)
         =
       ∑ j,
         (ctx.neighborWeight j *
@@ -123,16 +137,20 @@ private theorem foreground_neighborCost_expand
 private theorem background_neighborCost_expand
     (ctx : LocalContext ι) (g : LocalUnknown) (t : ℝ) :
     (∑ j, ctx.neighborWeight j *
-      ((foreground (FastMLFE2.Theory.Core.LocalContext.perturbBackground g t) - ctx.fgNeighbor j) ^ 2 +
-        (background (FastMLFE2.Theory.Core.LocalContext.perturbBackground g t) - ctx.bgNeighbor j) ^ 2)) =
+      ((foreground
+          (FastMLFE2.Theory.Core.LocalContext.perturbBackground g t) - ctx.fgNeighbor j) ^ 2 +
+        (background
+          (FastMLFE2.Theory.Core.LocalContext.perturbBackground g t) - ctx.bgNeighbor j) ^ 2)) =
       (∑ j, ctx.neighborWeight j *
         ((foreground g - ctx.fgNeighbor j) ^ 2 + (background g - ctx.bgNeighbor j) ^ 2)) +
         t ^ 2 * ctx.totalWeight +
         2 * t * (ctx.totalWeight * background g - ctx.backgroundSum) := by
   calc
     ∑ j, ctx.neighborWeight j *
-      ((foreground (FastMLFE2.Theory.Core.LocalContext.perturbBackground g t) - ctx.fgNeighbor j) ^ 2 +
-        (background (FastMLFE2.Theory.Core.LocalContext.perturbBackground g t) - ctx.bgNeighbor j) ^ 2)
+      ((foreground
+          (FastMLFE2.Theory.Core.LocalContext.perturbBackground g t) - ctx.fgNeighbor j) ^ 2 +
+        (background
+          (FastMLFE2.Theory.Core.LocalContext.perturbBackground g t) - ctx.bgNeighbor j) ^ 2)
         =
       ∑ j,
         (ctx.neighborWeight j *
@@ -278,6 +296,35 @@ theorem hasDerivAt_backgroundLineCost
     ((1 - ctx.alphaCenter) ^ 2 + ctx.totalWeight)
     (ctx.normalMatrix.mulVec g 1 - ctx.rhs 1)
     (ctx.localCost g)
+
+theorem isCostStationary_iff_solvesNormalEquation
+    (ctx : LocalContext ι) (g : LocalUnknown) :
+    ctx.IsCostStationary g ↔ ctx.SolvesNormalEquation g := by
+  constructor
+  · intro hstationary
+    rcases hstationary with ⟨hfg0, hbg0⟩
+    have hfg :
+        2 * (ctx.normalMatrix.mulVec g 0 - ctx.rhs 0) = 0 :=
+      HasDerivAt.unique (hasDerivAt_foregroundLineCost ctx g) hfg0
+    have hbg :
+        2 * (ctx.normalMatrix.mulVec g 1 - ctx.rhs 1) = 0 :=
+      HasDerivAt.unique (hasDerivAt_backgroundLineCost ctx g) hbg0
+    have hfgEq : ctx.normalMatrix.mulVec g 0 = ctx.rhs 0 := by
+      nlinarith [hfg]
+    have hbgEq : ctx.normalMatrix.mulVec g 1 = ctx.rhs 1 := by
+      nlinarith [hbg]
+    funext i
+    fin_cases i
+    · exact hfgEq
+    · exact hbgEq
+  · intro hsolve
+    constructor
+    · have hfg : ctx.normalMatrix.mulVec g 0 = ctx.rhs 0 := by
+        simpa using congrFun hsolve 0
+      simpa [hfg] using hasDerivAt_foregroundLineCost ctx g
+    · have hbg : ctx.normalMatrix.mulVec g 1 = ctx.rhs 1 := by
+        simpa using congrFun hsolve 1
+      simpa [hbg] using hasDerivAt_backgroundLineCost ctx g
 
 end LocalContext
 
