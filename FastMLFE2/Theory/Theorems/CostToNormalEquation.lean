@@ -226,10 +226,40 @@ theorem foregroundLineCost_expand
     simp [FastMLFE2.Theory.Core.LocalContext.rhs]
   have hfgsum : (∑ x, ctx.neighborWeight x * ctx.fgNeighbor x) = ctx.foregroundSum := by
     simp [FastMLFE2.Theory.Core.LocalContext.foregroundSum]
-  simp [FastMLFE2.Theory.Core.LocalContext.localCost,
-    FastMLFE2.Theory.Core.LocalContext.compositingResidual_eq,
-    FastMLFE2.Theory.Core.LocalContext.normalMatrix_mulVec_foreground,
-    pow_two]
+  suffices hsimp :
+      (ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g - ctx.imageValue) *
+            ((ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g) -
+              ctx.imageValue) +
+          t * t * (ctx.alphaCenter * ctx.alphaCenter) +
+        2 * t *
+          (ctx.alphaCenter *
+            ((ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g) -
+              ctx.imageValue)) +
+      ((∑ x,
+            ctx.neighborWeight x *
+              ((foreground g - ctx.fgNeighbor x) * (foreground g - ctx.fgNeighbor x) +
+                (background g - ctx.bgNeighbor x) * (background g - ctx.bgNeighbor x))) +
+          t * t * ∑ j, ctx.neighborWeight j +
+        2 * t *
+          ((∑ j, ctx.neighborWeight j) * foreground g -
+            ∑ j, ctx.neighborWeight j * ctx.fgNeighbor j)) =
+        (ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g - ctx.imageValue) *
+              ((ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g) -
+                ctx.imageValue) +
+            ∑ x,
+              ctx.neighborWeight x *
+                ((foreground g - ctx.fgNeighbor x) * (foreground g - ctx.fgNeighbor x) +
+                  (background g - ctx.bgNeighbor x) * (background g - ctx.bgNeighbor x)) +
+          t * t * (ctx.alphaCenter * ctx.alphaCenter + ∑ j, ctx.neighborWeight j) +
+        2 * t *
+          ((ctx.alphaCenter * ctx.alphaCenter + ∑ j, ctx.neighborWeight j) * foreground g +
+            ctx.alphaCenter * (1 - ctx.alphaCenter) * background g -
+            ctx.rhs 0) by
+    rw [hrhs, hfgsum] at hsimp
+    simpa [FastMLFE2.Theory.Core.LocalContext.localCost,
+      FastMLFE2.Theory.Core.LocalContext.compositingResidual_eq,
+      FastMLFE2.Theory.Core.LocalContext.normalMatrix_mulVec_foreground,
+      pow_two] using hsimp
   rw [hrhs, hfgsum]
   ring
 
@@ -254,10 +284,41 @@ theorem backgroundLineCost_expand
     simp [FastMLFE2.Theory.Core.LocalContext.rhs]
   have hbgsum : (∑ x, ctx.neighborWeight x * ctx.bgNeighbor x) = ctx.backgroundSum := by
     simp [FastMLFE2.Theory.Core.LocalContext.backgroundSum]
-  simp [FastMLFE2.Theory.Core.LocalContext.localCost,
-    FastMLFE2.Theory.Core.LocalContext.compositingResidual_eq,
-    FastMLFE2.Theory.Core.LocalContext.normalMatrix_mulVec_background,
-    pow_two]
+  suffices hsimp :
+      (ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g - ctx.imageValue) *
+            ((ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g) -
+              ctx.imageValue) +
+          t * t * ((1 - ctx.alphaCenter) * (1 - ctx.alphaCenter)) +
+        2 * t *
+          ((1 - ctx.alphaCenter) *
+            ((ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g) -
+              ctx.imageValue)) +
+      ((∑ x,
+            ctx.neighborWeight x *
+              ((foreground g - ctx.fgNeighbor x) * (foreground g - ctx.fgNeighbor x) +
+                (background g - ctx.bgNeighbor x) * (background g - ctx.bgNeighbor x))) +
+          t * t * ∑ j, ctx.neighborWeight j +
+        2 * t *
+          ((∑ j, ctx.neighborWeight j) * background g -
+            ∑ j, ctx.neighborWeight j * ctx.bgNeighbor j)) =
+        (ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g - ctx.imageValue) *
+              ((ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g) -
+                ctx.imageValue) +
+            ∑ x,
+              ctx.neighborWeight x *
+                ((foreground g - ctx.fgNeighbor x) * (foreground g - ctx.fgNeighbor x) +
+                  (background g - ctx.bgNeighbor x) * (background g - ctx.bgNeighbor x)) +
+          t * t * ((1 - ctx.alphaCenter) * (1 - ctx.alphaCenter) + ∑ j, ctx.neighborWeight j) +
+        2 * t *
+          (ctx.alphaCenter * (1 - ctx.alphaCenter) * foreground g +
+            (((1 - ctx.alphaCenter) * (1 - ctx.alphaCenter) + ∑ j, ctx.neighborWeight j) *
+              background g) -
+            ctx.rhs 1) by
+    rw [hrhs, hbgsum] at hsimp
+    simpa [FastMLFE2.Theory.Core.LocalContext.localCost,
+      FastMLFE2.Theory.Core.LocalContext.compositingResidual_eq,
+      FastMLFE2.Theory.Core.LocalContext.normalMatrix_mulVec_background,
+      pow_two] using hsimp
   rw [hrhs, hbgsum]
   ring
 
