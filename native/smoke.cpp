@@ -194,6 +194,63 @@ int main() {
     expect_vec(bgRedUpdate, bgRedOne, 29);
     expect_vec(bgGreenUpdate, bgGreenOne, 30);
     expect_vec(bgBlueUpdate, bgBlueOne, 31);
+
+    std::vector<float> fgRedVcycleZero(4), fgGreenVcycleZero(4), fgBlueVcycleZero(4);
+    std::vector<float> bgRedVcycleZero(4), bgGreenVcycleZero(4), bgBlueVcycleZero(4);
+    rc = fastmlfe2_global_spd_vcycle_rgb(
+        imageRed.data(), imageGreen.data(), imageBlue.data(), alphaRgb.data(),
+        fgRed.data(), fgGreen.data(), fgBlue.data(),
+        bgRed.data(), bgGreen.data(), bgBlue.data(),
+        fgRedVcycleZero.data(), fgGreenVcycleZero.data(), fgBlueVcycleZero.data(),
+        bgRedVcycleZero.data(), bgGreenVcycleZero.data(), bgBlueVcycleZero.data(),
+        rgbWidth, rgbHeight, rgbStride, 2, 0, 1, 1, 4, 5e-3f, 1e-1f, 0.0f);
+    if (rc != 0) {
+      return rc;
+    }
+    expect_vec(fgRedVcycleZero, fgRed, 32);
+    expect_vec(fgGreenVcycleZero, fgGreen, 33);
+    expect_vec(fgBlueVcycleZero, fgBlue, 34);
+    expect_vec(bgRedVcycleZero, bgRed, 35);
+    expect_vec(bgGreenVcycleZero, bgGreen, 36);
+    expect_vec(bgBlueVcycleZero, bgBlue, 37);
+
+    std::vector<float> fgRedVcycle(4), fgGreenVcycle(4), fgBlueVcycle(4);
+    std::vector<float> bgRedVcycle(4), bgGreenVcycle(4), bgBlueVcycle(4);
+    rc = fastmlfe2_global_spd_vcycle_rgb(
+        imageRed.data(), imageGreen.data(), imageBlue.data(), alphaRgb.data(),
+        fgRed.data(), fgGreen.data(), fgBlue.data(),
+        bgRed.data(), bgGreen.data(), bgBlue.data(),
+        fgRedVcycle.data(), fgGreenVcycle.data(), fgBlueVcycle.data(),
+        bgRedVcycle.data(), bgGreenVcycle.data(), bgBlueVcycle.data(),
+        rgbWidth, rgbHeight, rgbStride, 2, 1, 1, 1, 4, 5e-3f, 1e-1f, 0.0f);
+    if (rc != 0) {
+      return rc;
+    }
+    expect_vec(fgRedVcycle, {0.807818f, 0.873886f, 0.839679f, 0.891312f}, 38);
+    expect_vec(fgGreenVcycle, {0.467442f, 0.74083f, 0.352024f, 0.785147f}, 39);
+    expect_vec(fgBlueVcycle, {0.158402f, 0.110178f, 0.0641333f, 0.110752f}, 40);
+    expect_vec(bgRedVcycle, {0.108411f, 0.192118f, 0.132425f, 0.199902f}, 41);
+    expect_vec(bgGreenVcycle, {0.212984f, 0.509907f, 0.220897f, 0.45419f}, 42);
+    expect_vec(bgBlueVcycle, {0.876525f, 0.675309f, 0.800832f, 0.63526f}, 43);
+
+    std::vector<float> fgRedVcycleStop(4), fgGreenVcycleStop(4), fgBlueVcycleStop(4);
+    std::vector<float> bgRedVcycleStop(4), bgGreenVcycleStop(4), bgBlueVcycleStop(4);
+    rc = fastmlfe2_global_spd_vcycle_rgb(
+        imageRed.data(), imageGreen.data(), imageBlue.data(), alphaRgb.data(),
+        fgRed.data(), fgGreen.data(), fgBlue.data(),
+        bgRed.data(), bgGreen.data(), bgBlue.data(),
+        fgRedVcycleStop.data(), fgGreenVcycleStop.data(), fgBlueVcycleStop.data(),
+        bgRedVcycleStop.data(), bgGreenVcycleStop.data(), bgBlueVcycleStop.data(),
+        rgbWidth, rgbHeight, rgbStride, 2, 5, 1, 1, 4, 5e-3f, 1e-1f, 100.0f);
+    if (rc != 0) {
+      return rc;
+    }
+    expect_vec(fgRedVcycleStop, fgRedVcycle, 44);
+    expect_vec(fgGreenVcycleStop, fgGreenVcycle, 45);
+    expect_vec(fgBlueVcycleStop, fgBlueVcycle, 46);
+    expect_vec(bgRedVcycleStop, bgRedVcycle, 47);
+    expect_vec(bgGreenVcycleStop, bgGreenVcycle, 48);
+    expect_vec(bgBlueVcycleStop, bgBlueVcycle, 49);
   }
 
   return fastmlfe2_resize_float_gray(

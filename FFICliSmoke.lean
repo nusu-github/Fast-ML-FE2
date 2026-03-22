@@ -43,14 +43,32 @@ def main : IO Unit := do
   let alpha ← makeGray 2 2 [0.0, 0.5, 0.75, 1.0]
   rgb.writePng imagePath
   alpha.writePngGray alphaPath
+  let parsedGlobal ← FastMLFE2.Runtime.parseCliInvocation [
+    "--solver",
+    "global-vcycle",
+    imagePath.toString,
+    alphaPath.toString,
+    outFgPath.toString,
+    outBgPath.toString
+  ]
+  if parsedGlobal.config.solver != .globalVcycle then
+    throw <| IO.userError "CLI parse did not preserve global-vcycle solver selection"
+  let parsedRbgs ← FastMLFE2.Runtime.parseCliInvocation [
+    "--solver",
+    "rbgs",
+    imagePath.toString,
+    alphaPath.toString,
+    outFgPath.toString,
+    outBgPath.toString
+  ]
+  if parsedRbgs.config.solver != .rbgs then
+    throw <| IO.userError "CLI parse did not preserve rbgs solver selection"
   let exitCode ← FastMLFE2.CLI.main [
     "--mode",
     "reference",
     "--levels",
     "auto",
-    "--n-small-iterations",
-    "0",
-    "--n-big-iterations",
+    "--vcycle-cycles",
     "0",
     "--small-size",
     "32",
@@ -92,6 +110,8 @@ def main : IO Unit := do
   let iterExitCode ← FastMLFE2.CLI.main [
     "--mode",
     "reference",
+    "--solver",
+    "rbgs",
     "--levels",
     "2",
     "--n-small-iterations",

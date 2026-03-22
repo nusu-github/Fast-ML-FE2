@@ -73,6 +73,35 @@ int fastmlfe2_reference_refine_rgb(
     float residual_tol,
     float update_tol);
 
+int fastmlfe2_global_spd_vcycle_rgb(
+    const float *image_red,
+    const float *image_green,
+    const float *image_blue,
+    const float *alpha,
+    const float *fg_red,
+    const float *fg_green,
+    const float *fg_blue,
+    const float *bg_red,
+    const float *bg_green,
+    const float *bg_blue,
+    float *fg_red_out,
+    float *fg_green_out,
+    float *fg_blue_out,
+    float *bg_red_out,
+    float *bg_green_out,
+    float *bg_blue_out,
+    int width,
+    int height,
+    int stride,
+    int level_count,
+    int max_cycles,
+    int pre_smoothing,
+    int post_smoothing,
+    int coarse_iterations,
+    float eps_r,
+    float omega,
+    float residual_tol);
+
 int fastmlfe2_clamp01_gray(float *buf, int width, int height, int stride);
 
 #ifdef __cplusplus

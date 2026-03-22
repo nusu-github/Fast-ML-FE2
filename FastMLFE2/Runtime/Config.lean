@@ -1,5 +1,10 @@
 namespace FastMLFE2.Runtime
 
+inductive SolverFamily where
+  | rbgs
+  | globalVcycle
+  deriving BEq, DecidableEq, Repr
+
 inductive LevelSchedule where
   | auto
   | manual (count : Nat)
@@ -11,22 +16,34 @@ structure LevelStopPolicy where
   updateTol : Float
 
 structure ExecutionConfig where
+  solver : SolverFamily
   levels : LevelSchedule
   smallSize : Nat
   smallMaxIterations : Nat
   bigMaxIterations : Nat
   smallResidualTol : Float
   bigUpdateTol : Float
+  vcycleMaxCycles : Nat
+  vcyclePreSmoothing : Nat
+  vcyclePostSmoothing : Nat
+  vcycleCoarseIterations : Nat
+  vcycleResidualTol : Float
   epsR : Float
   omega : Float
 
 def defaultConfig : ExecutionConfig :=
-  { levels := .auto
+  { solver := .globalVcycle
+  , levels := .auto
   , smallSize := 32
   , smallMaxIterations := 10
   , bigMaxIterations := 2
   , smallResidualTol := 0.001
   , bigUpdateTol := 0.0001
+  , vcycleMaxCycles := 6
+  , vcyclePreSmoothing := 1
+  , vcyclePostSmoothing := 1
+  , vcycleCoarseIterations := 8
+  , vcycleResidualTol := 0.001
   , epsR := 0.00001
   , omega := 1.0
   }

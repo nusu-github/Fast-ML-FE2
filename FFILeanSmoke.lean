@@ -25,6 +25,12 @@ def expectApproxEqArrayTol
 def expectApproxEqArray (context : String) (actual expected : FloatArray) : IO Unit := do
   expectApproxEqArrayTol context 1.0e-6 actual expected
 
+def expectArrayInRange (context : String) (actual : FloatArray) : IO Unit := do
+  for i in [0:actual.size] do
+    let value := actual[i]!
+    if value < 0.0 || value > 1.0 then
+      throw <| IO.userError s!"{context}: value out of range at {i}: {value}"
+
 def makeRgb
     (width height : Nat)
     (red green blue : List Float) : IO FastMLFE2.NativeRgbImage := do
@@ -157,3 +163,38 @@ def main : IO Unit := do
       5 rgbImage rgbAlpha fgRgbInit bgRgbInit 0.005 0.1 0.0 100.0
   expectRgbApproxEq "rgb update stop fg" 1.0e-6 fgUpdateStop fgOneSweep
   expectRgbApproxEq "rgb update stop bg" 1.0e-6 bgUpdateStop bgOneSweep
+  let (fgVcycleZero, bgVcycleZero) ←
+    FastMLFE2.NativeRgbImage.globalSpdVcycle
+      2 0 1 1 4 rgbImage rgbAlpha fgRgbInit bgRgbInit 0.005 0.1 0.0
+  expectRgbApproxEq "rgb vcycle zero fg" 1.0e-6 fgVcycleZero fgRgbInit
+  expectRgbApproxEq "rgb vcycle zero bg" 1.0e-6 bgVcycleZero bgRgbInit
+  let (fgVcycle, bgVcycle) ←
+    FastMLFE2.NativeRgbImage.globalSpdVcycle
+      2 1 1 1 4 rgbImage rgbAlpha fgRgbInit bgRgbInit 0.005 0.1 0.0
+  let fgVcycleExpected ← makeRgb 2 2
+    [0.807817996, 0.87388587, 0.83967936, 0.891311824]
+    [0.467442304, 0.740829587, 0.352023721, 0.785146832]
+    [0.158401713, 0.110177621, 0.0641333014, 0.110751525]
+  let bgVcycleExpected ← makeRgb 2 2
+    [0.108410649, 0.192118362, 0.132425442, 0.199902028]
+    [0.212983996, 0.509907484, 0.220896989, 0.454189509]
+    [0.876524687, 0.675309062, 0.800831616, 0.635260463]
+  expectRgbApproxEq "rgb vcycle fg" 1.0e-5 fgVcycle fgVcycleExpected
+  expectRgbApproxEq "rgb vcycle bg" 1.0e-5 bgVcycle bgVcycleExpected
+  let (fgVcycleStop, bgVcycleStop) ←
+    FastMLFE2.NativeRgbImage.globalSpdVcycle
+      2 5 1 1 4 rgbImage rgbAlpha fgRgbInit bgRgbInit 0.005 0.1 100.0
+  expectRgbApproxEq "rgb vcycle residual stop fg" 1.0e-6 fgVcycleStop fgVcycle
+  expectRgbApproxEq "rgb vcycle residual stop bg" 1.0e-6 bgVcycleStop bgVcycle
+  let fgVcycleRed ← FastMLFE2.NativeGrayImage.toFloatArray fgVcycle.red
+  let fgVcycleGreen ← FastMLFE2.NativeGrayImage.toFloatArray fgVcycle.green
+  let fgVcycleBlue ← FastMLFE2.NativeGrayImage.toFloatArray fgVcycle.blue
+  let bgVcycleRed ← FastMLFE2.NativeGrayImage.toFloatArray bgVcycle.red
+  let bgVcycleGreen ← FastMLFE2.NativeGrayImage.toFloatArray bgVcycle.green
+  let bgVcycleBlue ← FastMLFE2.NativeGrayImage.toFloatArray bgVcycle.blue
+  expectArrayInRange "rgb vcycle fg.red" fgVcycleRed
+  expectArrayInRange "rgb vcycle fg.green" fgVcycleGreen
+  expectArrayInRange "rgb vcycle fg.blue" fgVcycleBlue
+  expectArrayInRange "rgb vcycle bg.red" bgVcycleRed
+  expectArrayInRange "rgb vcycle bg.green" bgVcycleGreen
+  expectArrayInRange "rgb vcycle bg.blue" bgVcycleBlue

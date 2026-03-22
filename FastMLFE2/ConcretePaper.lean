@@ -1,4 +1,5 @@
 import FastMLFE2.ConcreteImage
+import FastMLFE2.GlobalSystem
 import FastMLFE2.LevelOperator
 import FastMLFE2.MultilevelSpec
 
@@ -33,6 +34,21 @@ native executable reference solver. -/
 noncomputable def specSummaryRefinementModel {h w : Nat} (params : SpecWeightParams) :
     SummaryRefinementModel (GrayImage h w) (Pixel h w) (Fin 4) :=
   summaryRefinementModelOfNeighborhood fourNeighborhood (specWeight params)
+
+def specGlobalSystemMatrix {h w : Nat} (params : SpecWeightParams) (alpha : GrayImage h w) :
+    Matrix (GlobalBlockIdx h w) (GlobalBlockIdx h w) ℝ :=
+  globalSystemMatrix fourNeighborhood (specWeight params) alpha
+
+def specGlobalRhs {h w : Nat} (image alpha : GrayImage h w) : GlobalBlockIdx h w → ℝ :=
+  globalRhs image alpha
+
+def specGlobalLinearResidual {h w : Nat} (params : SpecWeightParams)
+    (image alpha fg bg : GrayImage h w) : GlobalState h w :=
+  globalLinearResidual fourNeighborhood (specWeight params) image alpha (mkGlobalState fg bg)
+
+def specGlobalSystem {h w : Nat} (params : SpecWeightParams)
+    (image alpha fg bg : GrayImage h w) : Prop :=
+  globalSystem fourNeighborhood (specWeight params) image alpha (mkGlobalState fg bg)
 
 @[simp] theorem fourNeighborhood_apply {h w : Nat} (px : Pixel h w) (t : Fin 4) :
     fourNeighborhood px t = fourOffsets t := rfl
@@ -130,6 +146,31 @@ theorem specLocalResidualInfNorm_eq_zero_iff_stationary {h w : Nat} (params : Sp
       (specLocalData params alpha fg bg px).stationary (alpha px) (image px) g := by
   exact (specLocalData params alpha fg bg px).localResidualInfNorm_eq_zero_iff_stationary
     (α := alpha px) (image := image px) (g := g)
+
+theorem specGlobalLinearResidual_eq_localResidual {h w : Nat} (params : SpecWeightParams)
+    (image alpha fg bg : GrayImage h w) (px : Pixel h w) :
+    specGlobalLinearResidual params image alpha fg bg px =
+      (specLocalData params alpha fg bg px).localResidual
+        (alpha px) (image px) (mkFBVec (fg px) (bg px)) := by
+  simpa [specGlobalLinearResidual, specLocalData] using
+    globalLinearResidual_eq_localResidual fourNeighborhood (specWeight params)
+      image alpha fg bg px
+
+theorem specGlobalSystem_iff_forall_stationary {h w : Nat} (params : SpecWeightParams)
+    (image alpha fg bg : GrayImage h w) :
+    specGlobalSystem params image alpha fg bg ↔
+      ∀ px, (specLocalData params alpha fg bg px).stationary
+        (alpha px) (image px) (mkFBVec (fg px) (bg px)) := by
+  simpa [specGlobalSystem, specLocalData] using
+    globalSystem_iff_forall_stationary fourNeighborhood (specWeight params) image alpha fg bg
+
+theorem specGlobalSystem_iff_forall_localSystem {h w : Nat} (params : SpecWeightParams)
+    (image alpha fg bg : GrayImage h w) :
+    specGlobalSystem params image alpha fg bg ↔
+      ∀ px, (specLocalData params alpha fg bg px).localSystem
+        (alpha px) (image px) (mkFBVec (fg px) (bg px)) := by
+  simpa [specGlobalSystem, specLocalData] using
+    globalSystem_iff_forall_localSystem fourNeighborhood (specWeight params) image alpha fg bg
 
 theorem specRedBlackFixedPoint_stationary {h w : Nat} (params : SpecWeightParams)
     (hparams : params.Valid) (isRed : Pixel h w → Bool)

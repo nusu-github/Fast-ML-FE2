@@ -56,6 +56,14 @@ private opaque referenceRefineImpl
     (iterations : UInt32) (epsR omega residualTol updateTol : Float) :
     IO (NativeGrayTriple × NativeGrayTriple)
 
+@[extern "lean_fastmlfe2_rgb_image_global_spd_vcycle"]
+private opaque globalSpdVcycleImpl
+    (imageRed imageGreen imageBlue alpha : @& NativeGrayImage)
+    (fgRed fgGreen fgBlue bgRed bgGreen bgBlue : @& NativeGrayImage)
+    (levelCount maxCycles preSmoothing postSmoothing coarseIterations : UInt32)
+    (epsR omega residualTol : Float) :
+    IO (NativeGrayTriple × NativeGrayTriple)
+
 private def maxDim : Nat := 2 ^ 32 - 1
 
 private def toDim32 (name : String) (n : Nat) : IO UInt32 := do
@@ -188,6 +196,27 @@ def referenceRefine
       bg.red bg.green bg.blue
       (← toDim32 "maxIterations" maxIterations)
       epsR omega residualTol updateTol
+  pure
+    ({ red := fgR, green := fgG, blue := fgB },
+     { red := bgR, green := bgG, blue := bgB })
+
+def globalSpdVcycle
+    (levelCount maxCycles preSmoothing postSmoothing coarseIterations : Nat)
+    (image : NativeRgbImage) (alpha : NativeGrayImage)
+    (fg bg : NativeRgbImage) (epsR omega residualTol : Float) :
+    IO (NativeRgbImage × NativeRgbImage) := do
+  assertCompatibleRefineInputs image alpha fg bg
+  let ((fgR, (fgG, fgB)), (bgR, (bgG, bgB))) ←
+    globalSpdVcycleImpl
+      image.red image.green image.blue alpha
+      fg.red fg.green fg.blue
+      bg.red bg.green bg.blue
+      (← toDim32 "levelCount" levelCount)
+      (← toDim32 "maxCycles" maxCycles)
+      (← toDim32 "preSmoothing" preSmoothing)
+      (← toDim32 "postSmoothing" postSmoothing)
+      (← toDim32 "coarseIterations" coarseIterations)
+      epsR omega residualTol
   pure
     ({ red := fgR, green := fgG, blue := fgB },
      { red := bgR, green := bgG, blue := bgB })
