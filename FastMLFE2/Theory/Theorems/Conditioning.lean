@@ -136,6 +136,64 @@ theorem totalWeight_add_alphaQuadratic_is_local_eigenvalue
   refine ⟨uVec ctx.alphaCenter, uVec_ne_zero ctx, ?_⟩
   simpa using normalMatrix_mulVec_uVec ctx
 
+noncomputable def localConditionNumber (ctx : LocalContext ι) : ℝ :=
+  (ctx.totalWeight + alphaQuadratic ctx) / ctx.totalWeight
+
+theorem localConditionNumber_eq_one_add_alphaQuadratic_div_totalWeight
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
+    localConditionNumber ctx =
+      1 + alphaQuadratic ctx / ctx.totalWeight := by
+  have htw : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
+  rw [localConditionNumber]
+  field_simp [htw]
+
+theorem localConditionNumber_lower_bound
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
+    1 + ((1 : ℝ) / 2) / ctx.totalWeight ≤ localConditionNumber ctx := by
+  have hformula := localConditionNumber_eq_one_add_alphaQuadratic_div_totalWeight ctx
+  have hα : (1 : ℝ) / 2 ≤ alphaQuadratic ctx := one_half_le_alphaQuadratic ctx
+  have htw : 0 < ctx.totalWeight := totalWeight_pos ctx
+  have hdiv : ((1 : ℝ) / 2) / ctx.totalWeight ≤ alphaQuadratic ctx / ctx.totalWeight := by
+    exact (div_le_div_iff_of_pos_right htw).2 hα
+  nlinarith [hformula, hdiv]
+
+theorem localConditionNumber_upper_bound
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
+    localConditionNumber ctx ≤ 1 + 1 / ctx.totalWeight := by
+  have hformula := localConditionNumber_eq_one_add_alphaQuadratic_div_totalWeight ctx
+  have hα : alphaQuadratic ctx ≤ 1 := alphaQuadratic_le_one ctx
+  have htw : 0 < ctx.totalWeight := totalWeight_pos ctx
+  have hdiv : alphaQuadratic ctx / ctx.totalWeight ≤ 1 / ctx.totalWeight := by
+    exact (div_le_div_iff_of_pos_right htw).2 hα
+  nlinarith [hformula, hdiv]
+
+theorem localConditionNumber_eq_best_case_of_alpha_half
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx]
+    (hα : ctx.alphaCenter = (1 : ℝ) / 2) :
+    localConditionNumber ctx = 1 + ((1 : ℝ) / 2) / ctx.totalWeight := by
+  rw [localConditionNumber_eq_one_add_alphaQuadratic_div_totalWeight]
+  rw [alphaQuadratic_eq_one_half_of_alpha_half ctx hα]
+
+theorem localConditionNumber_eq_worst_case_of_alpha_zero
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx]
+    (hα : ctx.alphaCenter = 0) :
+    localConditionNumber ctx = 1 + 1 / ctx.totalWeight := by
+  rw [localConditionNumber_eq_one_add_alphaQuadratic_div_totalWeight]
+  rw [alphaQuadratic_eq_one_of_alpha_zero ctx hα]
+
+theorem localConditionNumber_eq_worst_case_of_alpha_one
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx]
+    (hα : ctx.alphaCenter = 1) :
+    localConditionNumber ctx = 1 + 1 / ctx.totalWeight := by
+  rw [localConditionNumber_eq_one_add_alphaQuadratic_div_totalWeight]
+  rw [alphaQuadratic_eq_one_of_alpha_one ctx hα]
+
+theorem localConditionNumber_bounds
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
+    1 + ((1 : ℝ) / 2) / ctx.totalWeight ≤ localConditionNumber ctx ∧
+      localConditionNumber ctx ≤ 1 + 1 / ctx.totalWeight := by
+  exact ⟨localConditionNumber_lower_bound ctx, localConditionNumber_upper_bound ctx⟩
+
 end LocalContext
 
 end FastMLFE2.Theory.Theorems
