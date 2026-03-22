@@ -92,8 +92,7 @@ target ffiRunner pkg : FilePath := do
     compileExe (pkg.binDir / "ffi-runner")
       (#[deps[0]!.toString, deps[1]!.toString] ++ libs) "g++"
 
-@[default_target] lean_lib FastMLFE2 where
-  extraDepTargets := #[`fastmlfe2ffi]
+@[default_target] lean_lib FastMLFE2
 
 lean_exe ffiLeanSmoke where
   root := `FFILeanSmoke

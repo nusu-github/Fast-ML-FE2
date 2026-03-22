@@ -2,8 +2,14 @@
 
 This repository has two intentionally separate layers:
 
-- `spec`: Lean models and proofs for the simultaneous-update local refinement specification.
-- `reference`: the executable foreground estimator, aligned with the pymatting-style multi-level solver.
+- `theory`: the new Lean source of truth for the refounded Fast Multi-Level Foreground
+  Estimation kernel.
+- `legacy`: the older runtime, CLI, and native comparison infrastructure.
 
-The executable `reference` solver is the supported runtime path. The Lean `spec` layer is a proof target and
-does not claim identical step semantics with the native iterative solver.
+`FastMLFE2.Theory` is the primary library surface. It formalizes the raw local equation,
+canonical authored commitments, explicit assumption bundles, and the first local theorem
+kernel without letting native dependencies or backend scheduling choices define correctness.
+
+The runtime, CLI, and native code remain available through `FastMLFE2.Legacy`, but they are
+legacy comparison artifacts rather than the source of truth. Correctness is now defined by
+the theory theorems, not by smoke tests or by matching a particular backend iteration order.
