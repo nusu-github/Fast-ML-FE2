@@ -71,6 +71,15 @@ namespace LocalContext
 
 variable {ι : Type*} [Fintype ι]
 
+def withAlphaCenter (ctx : LocalContext ι) (alphaCenter : ℝ) : LocalContext ι where
+  alphaCenter := alphaCenter
+  imageValue := ctx.imageValue
+  alphaNeighbor := ctx.alphaNeighbor
+  fgNeighbor := ctx.fgNeighbor
+  bgNeighbor := ctx.bgNeighbor
+  epsilonR := ctx.epsilonR
+  omega := ctx.omega
+
 def neighborWeight (ctx : LocalContext ι) (j : ι) : ℝ :=
   ctx.epsilonR + ctx.omega * |ctx.alphaCenter - ctx.alphaNeighbor j|
 
@@ -122,6 +131,34 @@ def rhs (ctx : LocalContext ι) : LocalUnknown :=
     ctx.alphaCenter * ctx.imageValue + ctx.foregroundSum,
     (1 - ctx.alphaCenter) * ctx.imageValue + ctx.backgroundSum
   ]
+
+omit [Fintype ι] in
+@[simp] theorem alphaCenter_withAlphaCenter (ctx : LocalContext ι) (a : ℝ) :
+    (ctx.withAlphaCenter a).alphaCenter = a := rfl
+
+omit [Fintype ι] in
+@[simp] theorem imageValue_withAlphaCenter (ctx : LocalContext ι) (a : ℝ) :
+    (ctx.withAlphaCenter a).imageValue = ctx.imageValue := rfl
+
+omit [Fintype ι] in
+@[simp] theorem alphaNeighbor_withAlphaCenter (ctx : LocalContext ι) (a : ℝ) :
+    (ctx.withAlphaCenter a).alphaNeighbor = ctx.alphaNeighbor := rfl
+
+omit [Fintype ι] in
+@[simp] theorem fgNeighbor_withAlphaCenter (ctx : LocalContext ι) (a : ℝ) :
+    (ctx.withAlphaCenter a).fgNeighbor = ctx.fgNeighbor := rfl
+
+omit [Fintype ι] in
+@[simp] theorem bgNeighbor_withAlphaCenter (ctx : LocalContext ι) (a : ℝ) :
+    (ctx.withAlphaCenter a).bgNeighbor = ctx.bgNeighbor := rfl
+
+omit [Fintype ι] in
+@[simp] theorem epsilonR_withAlphaCenter (ctx : LocalContext ι) (a : ℝ) :
+    (ctx.withAlphaCenter a).epsilonR = ctx.epsilonR := rfl
+
+omit [Fintype ι] in
+@[simp] theorem omega_withAlphaCenter (ctx : LocalContext ι) (a : ℝ) :
+    (ctx.withAlphaCenter a).omega = ctx.omega := rfl
 
 omit [Fintype ι] in
 @[simp] theorem compositingValue_eq (ctx : LocalContext ι) (g : LocalUnknown) :
