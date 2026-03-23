@@ -16,6 +16,7 @@ import FastMLFE2.Theory.Theorems.CostToNormalEquation
 import FastMLFE2.Theory.Theorems.Conditioning
 import FastMLFE2.Theory.Theorems.BinaryAlpha
 import FastMLFE2.Theory.Theorems.BinaryAlphaCost
+import FastMLFE2.Theory.Theorems.ChannelReuse
 import FastMLFE2.Theory.Theorems.CompositingError
 import FastMLFE2.Theory.Theorems.Jacobi
 import FastMLFE2.Theory.Theorems.Locality
