@@ -52,14 +52,19 @@ principle.
 │  ┌────────────────────────────────────────────────┐ │
 │  │  Theorems                                      │ │
 │  │  Invertibility · ClosedForm · CostBridge       │ │
-│  │  Conditioning · CompositingError               │ │
+│  │  Conditioning · CompositingError · Jacobi      │ │
+│  │  Locality · CanonicalBuilder · Grid*           │ │
 │  ├────────────────────────────────────────────────┤ │
 │  │  Assumptions                                   │ │
-│  │  CoreMathAssumptions · Variant/Channel bundles │ │
+│  │  CoreMathAssumptions · GridMathAssumptions     │ │
+│  │  Variant/Channel bundles                       │ │
+│  ├────────────────────────────────────────────────┤ │
+│  │  Level                                         │ │
+│  │  Jacobi · Locality                             │ │
 │  ├────────────────────────────────────────────────┤ │
 │  │  Canonical Semantics                           │ │
-│  │  Builder · Grid · LocalCommitments             │ │
-│  │  MultilevelSchedule                            │ │
+│  │  Builder · Grid · GridContext                  │ │
+│  │  LocalCommitments · MultilevelSchedule         │ │
 │  ├────────────────────────────────────────────────┤ │
 │  │  Compositing                                   │ │
 │  │  OneChannel: α·F + (1-α)·B                     │ │
@@ -104,6 +109,9 @@ agree.
 - **Grid** — faithful `Fin h × Fin w` geometry for boundary-aware four-connected
   neighborhoods. Each pixel gets its own valid-direction subtype, so missing boundary
   directions are omitted rather than padded.
+- **GridContext** — thin aliases from `GridPixelData` into the canonical local-context
+  surface. Provides `GridPixelData.localCtx` as the authored one-pixel context on faithful
+  grid geometry.
 - **LocalCommitments** — Enumerates shared commitments: four-connected neighborhood,
   nearest-neighbor resize, projection inside iteration, deterministic simultaneous update.
 - **MultilevelSchedule** — `levelSizes` computing the coarse-to-fine pyramid using
@@ -116,6 +124,18 @@ Explicit assumption bundles that parameterize what varies across backends and us
 - **Bundles** — `CoreMathAssumptions` typeclass (ε_r > 0, ω ≥ 0, alpha bounded, neighbors
   nonempty). Additional structures for channel mode, backend schedule variant
   (canonical/CPU-async/GPU-Jacobi), initialization policy, projection, and hardware.
+- **Grid** — `GridMathAssumptions` bundle for authored grid data. Carries the global
+  hypotheses needed to recover `CoreMathAssumptions` pointwise on faithful grid contexts.
+
+### Level (`FastMLFE2.Theory.Level`)
+
+Abstract one-level update semantics above the local solver kernel.
+
+- **Jacobi** — simultaneous pointwise update on a finite pixel index set. Defines
+  `PixelState`, `LocalContextBuilder`, `jacobiUpdateAt`, and `jacobiStep`.
+- **Locality** — abstract neighborhood-sensitive dependence laws for builders and Jacobi
+  updates. States when a pointwise update depends only on a designated neighborhood of the
+  old state.
 
 ### Theorems (`FastMLFE2.Theory.Theorems`)
 
@@ -133,9 +153,20 @@ Machine-checked results under explicit assumptions.
   bounds.
 - **CompositingError** — Triangle-inequality bound on compositing difference in terms of
   component errors; tighter authored form when `0 ≤ α ≤ 1`.
+- **Jacobi** — pointwise lifting theorems showing each simultaneous Jacobi-updated pixel is
+  a closed-form local solution, solves the local normal equation, and is cost-stationary.
+- **Locality** — proves that builder locality lifts to `jacobiUpdateAt` and `jacobiStep`.
+- **CanonicalBuilder** — field-correctness theorems for authored canonical builders and the
+  proof that they satisfy the abstract builder-locality law.
 - **Grid** — faithful two-dimensional four-neighbor geometry; proves the canonical grid
   neighborhood agrees with the authored builder neighborhood, plus the exact `4/3/2`
   valid-direction counts for interior, edge, and corner pixels under the stated hypotheses.
+- **GridNonempty** — constructive witness theorems supplying `Nonempty (ValidDir p)` for
+  interior, edge, and corner cases.
+- **GridAssumptions** — bridge from `GridMathAssumptions` plus local neighbor nonemptiness
+  to `CoreMathAssumptions` on authored grid contexts.
+- **GridLocal** — thin wrapper theorems exposing existing local closed-form theorems on
+  `GridPixelData.localCtx`.
 
 ## Legacy Layer
 
@@ -169,12 +200,16 @@ FastMLFE2  (default target)
         ├── Core.LocalEquation
         ├── Core.LocalSemantics ──► Core.LocalEquation
         ├── Compositing.OneChannel
+        ├── Level.Jacobi
+        ├── Level.Locality
         ├── Canonical.Builder
         ├── Canonical.Grid
+        ├── Canonical.GridContext
         ├── Canonical.LocalCommitments
         ├── Canonical.MultilevelSchedule
         ├── Assumptions.Bundles ──► Core.LocalEquation
-        └── Theorems.*  ──► Core.*, Compositing.*, Assumptions.*
+        ├── Assumptions.Grid ──► Canonical.Grid, Assumptions.Bundles
+        └── Theorems.*  ──► Core.*, Compositing.*, Level.*, Canonical.*, Assumptions.*
 
 FastMLFE2.Legacy
   ├── Runtime  (Config, CliArgs, Solver ──► NativeFFI)
