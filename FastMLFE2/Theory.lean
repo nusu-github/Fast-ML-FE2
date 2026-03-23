@@ -8,6 +8,7 @@ import FastMLFE2.Theory.Canonical.Grid
 import FastMLFE2.Theory.Canonical.LocalCommitments
 import FastMLFE2.Theory.Canonical.MultilevelSchedule
 import FastMLFE2.Theory.Assumptions.Bundles
+import FastMLFE2.Theory.Assumptions.Grid
 import FastMLFE2.Theory.Theorems.Invertibility
 import FastMLFE2.Theory.Theorems.ClosedForm
 import FastMLFE2.Theory.Theorems.CostToNormalEquation
