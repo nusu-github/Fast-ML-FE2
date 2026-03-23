@@ -9,21 +9,21 @@ Canonical authored builder data and construction for fixed-level Jacobi semantic
 open FastMLFE2.Theory.Core
 open FastMLFE2.Theory.Level
 
-structure CanonicalPixelData (κ ι : Type*) where
+structure CanonicalPixelData (κ : Type*) (η : κ → Type*) [∀ p, Fintype (η p)] where
   alpha : κ → ℝ
   image : κ → ℝ
-  neighborPixel : κ → ι → κ
+  neighborPixel : (p : κ) → η p → κ
   epsilonR : ℝ
   omega : ℝ
 
 namespace CanonicalPixelData
 
-variable {κ ι : Type*} [Fintype ι]
+variable {κ : Type*} {η : κ → Type*} [∀ p, Fintype (η p)]
 
 def toLocalContext
-    (data : CanonicalPixelData κ ι)
+    (data : CanonicalPixelData κ η)
     (p : κ)
-    (state : PixelState κ) : LocalContext ι :=
+    (state : PixelState κ) : LocalContext (η p) :=
   { alphaCenter := data.alpha p
     imageValue := data.image p
     alphaNeighbor := fun j => data.alpha (data.neighborPixel p j)
@@ -33,19 +33,19 @@ def toLocalContext
     omega := data.omega }
 
 def canonicalBuilder
-    (data : CanonicalPixelData κ ι) : LocalContextBuilder κ ι where
+    (data : CanonicalPixelData κ η) : LocalContextBuilder κ η where
   build := data.toLocalContext
 
 variable [DecidableEq κ]
 
 def canonicalNeighborhood
-    (data : CanonicalPixelData κ ι) : Neighborhood κ :=
-  fun p => (Finset.univ : Finset ι).image (data.neighborPixel p)
+    (data : CanonicalPixelData κ η) : Neighborhood κ :=
+  fun p => (Finset.univ : Finset (η p)).image (data.neighborPixel p)
 
 theorem mem_canonicalNeighborhood
-    (data : CanonicalPixelData κ ι)
+    (data : CanonicalPixelData κ η)
     (p : κ)
-    (j : ι) :
+    (j : η p) :
     data.neighborPixel p j ∈ data.canonicalNeighborhood p := by
   refine Finset.mem_image.mpr ?_
   exact ⟨j, Finset.mem_univ j, rfl⟩

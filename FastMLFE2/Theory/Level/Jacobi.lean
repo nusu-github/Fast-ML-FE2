@@ -10,33 +10,33 @@ open FastMLFE2.Theory.Core
 
 abbrev PixelState (κ : Type*) := κ → LocalUnknown
 
-structure LocalContextBuilder (κ ι : Type*) [Fintype ι] where
-  build : κ → PixelState κ → LocalContext ι
+structure LocalContextBuilder (κ : Type*) (η : κ → Type*) [∀ p, Fintype (η p)] where
+  build : (p : κ) → PixelState κ → LocalContext (η p)
 
 namespace LocalContextBuilder
 
-variable {κ ι : Type*} [Fintype ι]
+variable {κ : Type*} {η : κ → Type*} [∀ p, Fintype (η p)]
 
 noncomputable def jacobiUpdateAt
-    (builder : LocalContextBuilder κ ι)
+    (builder : LocalContextBuilder κ η)
     (state : PixelState κ)
     (p : κ) : LocalUnknown :=
   FastMLFE2.Theory.Theorems.LocalContext.closedFormSolution (builder.build p state)
 
 noncomputable def jacobiStep
-    (builder : LocalContextBuilder κ ι)
+    (builder : LocalContextBuilder κ η)
     (state : PixelState κ) : PixelState κ :=
   fun p => jacobiUpdateAt builder state p
 
 @[simp] theorem jacobiUpdateAt_eq
-    (builder : LocalContextBuilder κ ι)
+    (builder : LocalContextBuilder κ η)
     (state : PixelState κ)
     (p : κ) :
     builder.jacobiUpdateAt state p =
       FastMLFE2.Theory.Theorems.LocalContext.closedFormSolution (builder.build p state) := rfl
 
 @[simp] theorem jacobiStep_apply
-    (builder : LocalContextBuilder κ ι)
+    (builder : LocalContextBuilder κ η)
     (state : PixelState κ)
     (p : κ) :
     builder.jacobiStep state p = builder.jacobiUpdateAt state p := rfl

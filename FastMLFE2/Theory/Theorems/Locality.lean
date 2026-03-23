@@ -6,10 +6,10 @@ open FastMLFE2.Theory.Level
 
 namespace LocalContextBuilder
 
-variable {κ ι : Type*} [Fintype ι]
+variable {κ : Type*} {η : κ → Type*} [∀ p, Fintype (η p)]
 
 theorem build_eq_of_StateEqOn
-    {builder : LocalContextBuilder κ ι}
+    {builder : LocalContextBuilder κ η}
     {N : Neighborhood κ}
     (hlocal : BuilderLocal builder N)
     (p : κ)
@@ -19,7 +19,7 @@ theorem build_eq_of_StateEqOn
   exact BuilderLocal.apply hlocal p hEq
 
 theorem jacobiUpdateAt_eq_of_StateEqOn
-    {builder : LocalContextBuilder κ ι}
+    {builder : LocalContextBuilder κ η}
     {N : Neighborhood κ}
     (hlocal : BuilderLocal builder N)
     (p : κ)
@@ -31,7 +31,7 @@ theorem jacobiUpdateAt_eq_of_StateEqOn
   simp only [LocalContextBuilder.jacobiUpdateAt_eq, hbuild]
 
 theorem jacobiStep_eq_of_StateEqOn
-    {builder : LocalContextBuilder κ ι}
+    {builder : LocalContextBuilder κ η}
     {N : Neighborhood κ}
     (hlocal : BuilderLocal builder N)
     (p : κ)

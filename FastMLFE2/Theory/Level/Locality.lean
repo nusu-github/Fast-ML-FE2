@@ -15,8 +15,8 @@ def StateEqOn
   ∀ q, q ∈ S → state₁ q = state₂ q
 
 def BuilderLocal
-    {κ ι : Type*} [Fintype ι]
-    (builder : LocalContextBuilder κ ι)
+    {κ : Type*} {η : κ → Type*} [∀ p, Fintype (η p)]
+    (builder : LocalContextBuilder κ η)
     (N : Neighborhood κ) : Prop :=
   ∀ p state₁ state₂,
     StateEqOn (N p) state₁ state₂ →
@@ -31,8 +31,8 @@ theorem StateEqOn.refl
   rfl
 
 theorem BuilderLocal.apply
-    {κ ι : Type*} [Fintype ι]
-    {builder : LocalContextBuilder κ ι}
+    {κ : Type*} {η : κ → Type*} [∀ p, Fintype (η p)]
+    {builder : LocalContextBuilder κ η}
     {N : Neighborhood κ}
     (hlocal : BuilderLocal builder N)
     (p : κ)

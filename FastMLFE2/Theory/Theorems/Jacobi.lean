@@ -8,10 +8,10 @@ open FastMLFE2.Theory.Assumptions
 
 namespace LocalContextBuilder
 
-variable {κ ι : Type*} [Fintype ι]
+variable {κ : Type*} {η : κ → Type*} [∀ p, Fintype (η p)]
 
 theorem jacobiStep_eq_closedForm
-    (builder : LocalContextBuilder κ ι)
+    (builder : LocalContextBuilder κ η)
     (state : PixelState κ)
     (p : κ) :
     builder.jacobiStep state p =
@@ -19,7 +19,7 @@ theorem jacobiStep_eq_closedForm
   rfl
 
 theorem jacobiStep_solvesNormalEquation
-    (builder : LocalContextBuilder κ ι)
+    (builder : LocalContextBuilder κ η)
     (state : PixelState κ)
     (p : κ)
     [CoreMathAssumptions (builder.build p state)] :
@@ -28,7 +28,7 @@ theorem jacobiStep_solvesNormalEquation
     FastMLFE2.Theory.Theorems.LocalContext.closedForm_solvesNormalEquation (builder.build p state)
 
 theorem jacobiStep_isCostStationary
-    (builder : LocalContextBuilder κ ι)
+    (builder : LocalContextBuilder κ η)
     (state : PixelState κ)
     (p : κ)
     [CoreMathAssumptions (builder.build p state)] :
