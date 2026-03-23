@@ -58,7 +58,8 @@ principle.
 │  │  CoreMathAssumptions · Variant/Channel bundles │ │
 │  ├────────────────────────────────────────────────┤ │
 │  │  Canonical Semantics                           │ │
-│  │  LocalCommitments · MultilevelSchedule         │ │
+│  │  Builder · Grid · LocalCommitments             │ │
+│  │  MultilevelSchedule                            │ │
 │  ├────────────────────────────────────────────────┤ │
 │  │  Compositing                                   │ │
 │  │  OneChannel: α·F + (1-α)·B                     │ │
@@ -98,6 +99,11 @@ without any algorithmic or backend commitments.
 Fixes the algorithmic choices where the Germer paper and PyMatting reference implementation
 agree.
 
+- **Builder** — dependent-neighbor canonical builder data. Connects authored pixel data to
+  the abstract `LocalContextBuilder`/`Neighborhood` layer.
+- **Grid** — faithful `Fin h × Fin w` geometry for boundary-aware four-connected
+  neighborhoods. Each pixel gets its own valid-direction subtype, so missing boundary
+  directions are omitted rather than padded.
 - **LocalCommitments** — Enumerates shared commitments: four-connected neighborhood,
   nearest-neighbor resize, projection inside iteration, deterministic simultaneous update.
 - **MultilevelSchedule** — `levelSizes` computing the coarse-to-fine pyramid using
@@ -127,6 +133,9 @@ Machine-checked results under explicit assumptions.
   bounds.
 - **CompositingError** — Triangle-inequality bound on compositing difference in terms of
   component errors; tighter authored form when `0 ≤ α ≤ 1`.
+- **Grid** — faithful two-dimensional four-neighbor geometry; proves the canonical grid
+  neighborhood agrees with the authored builder neighborhood, plus the exact `4/3/2`
+  valid-direction counts for interior, edge, and corner pixels under the stated hypotheses.
 
 ## Legacy Layer
 
@@ -160,6 +169,8 @@ FastMLFE2  (default target)
         ├── Core.LocalEquation
         ├── Core.LocalSemantics ──► Core.LocalEquation
         ├── Compositing.OneChannel
+        ├── Canonical.Builder
+        ├── Canonical.Grid
         ├── Canonical.LocalCommitments
         ├── Canonical.MultilevelSchedule
         ├── Assumptions.Bundles ──► Core.LocalEquation
