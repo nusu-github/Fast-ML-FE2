@@ -36,14 +36,10 @@ Use Lake for all routine work:
 
 This repository links against OpenCV through `pkg-config`, so ensure `opencv4` headers and libs are installed before building.
 
-## Worktree Workflow
-When creating a new git worktree (e.g. `git worktree add .worktrees/<name> -b <branch>`), **always run `lake exe cache get` inside the new worktree before `lake build`**. Mathlib compilation from source can take hours; the cache fetch takes seconds. The full baseline sequence is:
+## Workspace Policy
+Do **not** use git worktrees in this repository. Lean LSP and worktrees interact badly here, so all development should happen in the main checkout.
 
-```sh
-cd .worktrees/<name>
-lake exe cache get
-lake build
-```
+Before starting implementation work, check that the repository is clean with `git status --short`. If the working tree is not clean, stop and ask the user how to proceed instead of creating a worktree or working around the dirty state automatically.
 
 ## Coding Style & Naming Conventions
 Follow existing Lean 4 style: two-space indentation in pattern matches and record literals, `CamelCase` for structures and inductives, and `lowerCamelCase` for definitions and helper functions. Keep module names aligned with file names, for example `FastMLFE2/CLI.lean` defines `namespace FastMLFE2.CLI`. In C++, keep includes grouped at the top, prefer small helper functions in anonymous namespaces, and stay with the current standard library style.
