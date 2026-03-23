@@ -5,6 +5,7 @@ import FastMLFE2.Theory.Level.Jacobi
 import FastMLFE2.Theory.Level.Locality
 import FastMLFE2.Theory.Canonical.Builder
 import FastMLFE2.Theory.Canonical.Grid
+import FastMLFE2.Theory.Canonical.GridContext
 import FastMLFE2.Theory.Canonical.LocalCommitments
 import FastMLFE2.Theory.Canonical.MultilevelSchedule
 import FastMLFE2.Theory.Assumptions.Bundles
@@ -19,6 +20,7 @@ import FastMLFE2.Theory.Theorems.Locality
 import FastMLFE2.Theory.Theorems.Grid
 import FastMLFE2.Theory.Theorems.GridNonempty
 import FastMLFE2.Theory.Theorems.GridAssumptions
+import FastMLFE2.Theory.Theorems.GridLocal
 import FastMLFE2.Theory.Theorems.CanonicalBuilder
 
 namespace FastMLFE2
