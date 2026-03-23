@@ -1,5 +1,6 @@
 import FastMLFE2.Theory.Core.LocalEquation
 import FastMLFE2.Theory.Core.LocalSemantics
+import FastMLFE2.Theory.Compositing.OneChannel
 import FastMLFE2.Theory.Canonical.LocalCommitments
 import FastMLFE2.Theory.Canonical.MultilevelSchedule
 import FastMLFE2.Theory.Assumptions.Bundles
