@@ -20,6 +20,13 @@ def background (g : LocalUnknown) : ℝ := g 1
 /-- The compositing weights `[alpha_i, 1 - alpha_i]`. -/
 def uVec (alphaCenter : ℝ) : LocalUnknown := ![alphaCenter, 1 - alphaCenter]
 
+/-- Clamp a real scalar into the authored physical color range `[0, 1]`. -/
+def clamp01Scalar (x : ℝ) : ℝ := max 0 (min 1 x)
+
+/-- Clamp both local unknown components into `[0, 1]`. -/
+def clamp01 (g : LocalUnknown) : LocalUnknown :=
+  mkLocalUnknown (clamp01Scalar (foreground g)) (clamp01Scalar (background g))
+
 @[simp] theorem foreground_mkLocalUnknown (f b : ℝ) :
     foreground (mkLocalUnknown f b) = f := by
   simp [foreground, mkLocalUnknown]
@@ -35,6 +42,14 @@ def uVec (alphaCenter : ℝ) : LocalUnknown := ![alphaCenter, 1 - alphaCenter]
 @[simp] theorem background_uVec (alphaCenter : ℝ) :
     background (uVec alphaCenter) = 1 - alphaCenter := by
   simp [background, uVec]
+
+@[simp] theorem foreground_clamp01 (g : LocalUnknown) :
+    foreground (clamp01 g) = clamp01Scalar (foreground g) := by
+  simp [foreground, clamp01, mkLocalUnknown]
+
+@[simp] theorem background_clamp01 (g : LocalUnknown) :
+    background (clamp01 g) = clamp01Scalar (background g) := by
+  simp [background, clamp01, mkLocalUnknown]
 
 /--
 Raw local inputs for one pixel and one channel.
