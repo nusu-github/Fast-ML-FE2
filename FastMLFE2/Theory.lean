@@ -17,6 +17,7 @@ import FastMLFE2.Theory.Theorems.CompositingError
 import FastMLFE2.Theory.Theorems.Jacobi
 import FastMLFE2.Theory.Theorems.Locality
 import FastMLFE2.Theory.Theorems.Grid
+import FastMLFE2.Theory.Theorems.GridNonempty
 import FastMLFE2.Theory.Theorems.GridAssumptions
 import FastMLFE2.Theory.Theorems.CanonicalBuilder
 
