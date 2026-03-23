@@ -8,6 +8,7 @@ import FastMLFE2.Theory.Theorems.Invertibility
 import FastMLFE2.Theory.Theorems.ClosedForm
 import FastMLFE2.Theory.Theorems.CostToNormalEquation
 import FastMLFE2.Theory.Theorems.Conditioning
+import FastMLFE2.Theory.Theorems.CompositingError
 
 namespace FastMLFE2
 
