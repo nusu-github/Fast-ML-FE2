@@ -7,6 +7,7 @@ import FastMLFE2.Theory.Canonical.Builder
 import FastMLFE2.Theory.Canonical.Grid
 import FastMLFE2.Theory.Canonical.GridContext
 import FastMLFE2.Theory.Canonical.InteriorKernel
+import FastMLFE2.Theory.Canonical.ClampPlacement
 import FastMLFE2.Theory.Canonical.LocalCommitments
 import FastMLFE2.Theory.Canonical.MultilevelSchedule
 import FastMLFE2.Theory.Assumptions.Bundles
@@ -25,6 +26,8 @@ import FastMLFE2.Theory.Theorems.CompositingError
 import FastMLFE2.Theory.Theorems.JacobiContraction
 import FastMLFE2.Theory.Theorems.NearBinary
 import FastMLFE2.Theory.Theorems.NearBinaryCounterexample
+import FastMLFE2.Theory.Theorems.ClampPlacement
+import FastMLFE2.Theory.Theorems.ClampPlacementCounterexample
 import FastMLFE2.Theory.Theorems.Jacobi
 import FastMLFE2.Theory.Theorems.Locality
 import FastMLFE2.Theory.Theorems.Grid
