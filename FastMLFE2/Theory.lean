@@ -10,6 +10,7 @@ import FastMLFE2.Theory.Canonical.InteriorKernel
 import FastMLFE2.Theory.Canonical.ClampPlacement
 import FastMLFE2.Theory.Canonical.LocalCommitments
 import FastMLFE2.Theory.Canonical.MultilevelSchedule
+import FastMLFE2.Theory.Approximation.BlurFusion
 import FastMLFE2.Theory.Assumptions.Bundles
 import FastMLFE2.Theory.Assumptions.Grid
 import FastMLFE2.Theory.Theorems.Invertibility
@@ -24,6 +25,9 @@ import FastMLFE2.Theory.Theorems.ChannelReuse
 import FastMLFE2.Theory.Theorems.ClampLocal
 import FastMLFE2.Theory.Theorems.CompositingError
 import FastMLFE2.Theory.Theorems.JacobiContraction
+import FastMLFE2.Theory.Theorems.BlurFusionGap
+import FastMLFE2.Theory.Theorems.BlurFusionFixedPoint
+import FastMLFE2.Theory.Theorems.PropagationRadius
 import FastMLFE2.Theory.Theorems.NearBinary
 import FastMLFE2.Theory.Theorems.NearBinaryCounterexample
 import FastMLFE2.Theory.Theorems.ClampPlacement

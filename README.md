@@ -47,12 +47,15 @@ FastMLFE2/
 │   ├── Canonical/
 │   │   ├── LocalCommitments.lean       ← stencil, resize rule, iteration semantics
 │   │   └── MultilevelSchedule.lean     ← level-size computation
+│   ├── Approximation/
+│   │   └── BlurFusion.lean             ← idealized PhotoRoom Blur-Fusion surrogate
 │   ├── Assumptions/
 │   │   └── Bundles.lean                ← CoreMathAssumptions, variant bundles
 │   └── Theorems/
 │       ├── Invertibility.lean          ← det > 0, IsUnit det
 │       ├── ClosedForm.lean             ← explicit 2×2 inverse, uniqueness
 │       ├── CostToNormalEquation.lean   ← ∂cost/∂t = 0 ↔ normal equation
+│       ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
 │       ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
 │       └── CompositingError.lean       ← |Δcompose| ≤ α|ΔF| + (1-α)|ΔB|
 ├── Legacy.lean                         ← legacy umbrella (Runtime + CLI)
@@ -82,6 +85,7 @@ pipeline stages:
 - Solution / stationarity relations (`Theory.Core.LocalSemantics`)
 - Canonical commitments: 4-connected stencil, nearest-neighbor resize, deterministic
   simultaneous update (`Theory.Canonical`)
+- Idealized Blur-Fusion approximation semantics (`Theory.Approximation.BlurFusion`)
 
 **Stage 2 (Design-Space Exploration):**
 
@@ -99,6 +103,8 @@ pipeline stages:
   proof); solution is unique; equals matrix-inverse form.
 - **Cost–Normal-Equation Bridge** — Local cost expands as a quadratic in perturbation `t`;
   genuine `HasDerivAt` derivatives; `IsCostStationary ↔ SolvesNormalEquation`.
+- **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend
+  only on the recursively expanded `k`-hop neighborhood induced by the builder locality law.
 
 ## Prerequisites
 

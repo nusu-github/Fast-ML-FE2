@@ -66,6 +66,9 @@ principle.
 │  │  Builder · Grid · GridContext                  │ │
 │  │  LocalCommitments · MultilevelSchedule         │ │
 │  ├────────────────────────────────────────────────┤ │
+│  │  Approximation                                 │ │
+│  │  BlurFusion surrogate semantics                │ │
+│  ├────────────────────────────────────────────────┤ │
 │  │  Compositing                                   │ │
 │  │  OneChannel: α·F + (1-α)·B                     │ │
 │  ├────────────────────────────────────────────────┤ │
@@ -117,6 +120,15 @@ agree.
 - **MultilevelSchedule** — `levelSizes` computing the coarse-to-fine pyramid using
   `size^(level/levelCount)` interpolation.
 
+### Approximation (`FastMLFE2.Theory.Approximation`)
+
+Explicit surrogate semantics for approximation families derived from, but not identified with,
+the canonical Germer objective.
+
+- **BlurFusion** — Idealized real-valued PhotoRoom-style Blur-Fusion semantics: masked weighted
+  means, separated surrogate costs, the sequential foreground correction, and induced
+  builder-level `x1`/`x2`/`xk` update maps.
+
 ### Assumptions (`FastMLFE2.Theory.Assumptions`)
 
 Explicit assumption bundles that parameterize what varies across backends and usage scenarios.
@@ -156,6 +168,8 @@ Machine-checked results under explicit assumptions.
 - **Jacobi** — pointwise lifting theorems showing each simultaneous Jacobi-updated pixel is
   a closed-form local solution, solves the local normal equation, and is cost-stationary.
 - **Locality** — proves that builder locality lifts to `jacobiUpdateAt` and `jacobiStep`.
+- **PropagationRadius** — lifts builder locality through repeated Jacobi / Blur-Fusion passes,
+  yielding recursive `k`-hop support bounds for fixed-level propagation.
 - **CanonicalBuilder** — field-correctness theorems for authored canonical builders and the
   proof that they satisfy the abstract builder-locality law.
 - **Grid** — faithful two-dimensional four-neighbor geometry; proves the canonical grid
@@ -207,6 +221,7 @@ FastMLFE2  (default target)
         ├── Canonical.GridContext
         ├── Canonical.LocalCommitments
         ├── Canonical.MultilevelSchedule
+        ├── Approximation.BlurFusion
         ├── Assumptions.Bundles ──► Core.LocalEquation
         ├── Assumptions.Grid ──► Canonical.Grid, Assumptions.Bundles
         └── Theorems.*  ──► Core.*, Compositing.*, Level.*, Canonical.*, Assumptions.*
