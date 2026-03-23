@@ -1,7 +1,11 @@
 # Repository Guidelines
 
 ## Project Goal
-The long-term goal of this project is to formalize Germer et al.'s Fast Multi-Level Foreground Estimation in Lean 4 as a theory-first system for proof-directed optimal implementation derivation, not to preserve the current runtime/FFI stack as the architectural center.
+Formalize Germer et al.'s Fast Multi-Level Foreground Estimation on Lean 4's Dependent Type Theory as a shallow/deep embedding, and perform **proof-directed optimal implementation derivation** through a three-stage pipeline:
+
+1. **Formal Specification** — Express the algorithm's mathematical skeleton (cost function $\mathcal{L}_{\text{local}}$, normal equation, multilevel pyramid) as denotational semantics in Lean. Hardware constraints (FP precision, SIMD width, warp size, etc.) are parameterized axiom bundles (typeclasses), forming a switchable parametric theory.
+2. **Formal Design-Space Exploration** — State and prove/disprove conditional equational theorems for each axiom instantiation (e.g. binary α ⇒ diagonal degeneration; channel independence ⇒ shared matrix reuse; ε_r > 0 ⇒ positive definiteness). Exhaustive verification over the assumption lattice.
+3. **Deductive Synthesis via Stepwise Refinement** — Use proved equalities as rewrite rules to transform the abstract spec into efficient implementations: closed-form 2×2 inverse (with det ≠ 0 proof), loop fusion (semantic equivalence of fused neighbor scan), Jacobi-parallel pixel independence (→ GPU correctness). Each step is a certified refinement (Correct-by-Construction).
 
 Prioritize work that strengthens:
 
@@ -13,7 +17,14 @@ Prioritize work that strengthens:
 When a trade-off appears between preserving legacy executable behavior and improving the theory architecture, prefer the theory architecture unless the task explicitly says otherwise.
 
 ## Project Structure & Module Organization
-`FastMLFE2/` holds the main Lean modules. The repository currently still contains older proof-oriented modules such as `MultilevelSpec.lean` and `LocalModel.lean`, along with legacy executable-reference paths exposed through `NativeFFI.lean` and `CLI.lean`. `FastMLFE2.lean` is the umbrella import. Top-level entrypoints `FFILeanSmoke.lean`, `FFICliSmoke.lean`, and `FastMLFECli.lean` build runnable executables. Native C++ FFI sources live in `native/`. During the refoundation, treat runtime/native code as legacy comparison artifacts rather than as the architectural source of truth.
+`FastMLFE2/` holds the main Lean modules organized into two layers:
+
+- **Theory** (`FastMLFE2/Theory/`): the formal mathematical core — local equation, compositing, canonical semantics, assumption bundles, and proved theorems. This is the default library target and the architectural source of truth.
+- **Legacy** (`FastMLFE2/Legacy.lean`, `Runtime/`, `CLI.lean`, `NativeFFI.lean`): the executable comparison stack — CLI, multilevel solver, and C++ FFI bindings. Treat these as legacy comparison artifacts, not as the source of truth.
+
+`FastMLFE2.lean` is the umbrella import (imports Theory only). Top-level entrypoints `FFILeanSmoke.lean`, `FFICliSmoke.lean`, and `FastMLFECli.lean` build runnable executables. Native C++ FFI sources live in `native/`.
+
+See `docs/architecture.md` for the full layered design and `README.md` for the complete module map.
 
 ## Build, Test, and Development Commands
 Use Lake for all routine work:
