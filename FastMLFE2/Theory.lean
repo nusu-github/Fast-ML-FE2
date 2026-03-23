@@ -12,6 +12,7 @@ import FastMLFE2.Theory.Theorems.CostToNormalEquation
 import FastMLFE2.Theory.Theorems.Conditioning
 import FastMLFE2.Theory.Theorems.CompositingError
 import FastMLFE2.Theory.Theorems.Jacobi
+import FastMLFE2.Theory.Theorems.Locality
 
 namespace FastMLFE2
 
