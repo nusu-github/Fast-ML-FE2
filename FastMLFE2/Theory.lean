@@ -22,6 +22,7 @@ import FastMLFE2.Theory.Theorems.BinaryAlphaCost
 import FastMLFE2.Theory.Theorems.ChannelReuse
 import FastMLFE2.Theory.Theorems.ClampLocal
 import FastMLFE2.Theory.Theorems.CompositingError
+import FastMLFE2.Theory.Theorems.JacobiContraction
 import FastMLFE2.Theory.Theorems.NearBinary
 import FastMLFE2.Theory.Theorems.NearBinaryCounterexample
 import FastMLFE2.Theory.Theorems.Jacobi
