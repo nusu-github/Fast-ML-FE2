@@ -10,6 +10,7 @@ import FastMLFE2.Theory.Theorems.ClosedForm
 import FastMLFE2.Theory.Theorems.CostToNormalEquation
 import FastMLFE2.Theory.Theorems.Conditioning
 import FastMLFE2.Theory.Theorems.CompositingError
+import FastMLFE2.Theory.Theorems.Jacobi
 
 namespace FastMLFE2
 
