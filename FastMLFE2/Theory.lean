@@ -14,6 +14,7 @@ import FastMLFE2.Theory.Theorems.Conditioning
 import FastMLFE2.Theory.Theorems.CompositingError
 import FastMLFE2.Theory.Theorems.Jacobi
 import FastMLFE2.Theory.Theorems.Locality
+import FastMLFE2.Theory.Theorems.CanonicalBuilder
 
 namespace FastMLFE2
 
