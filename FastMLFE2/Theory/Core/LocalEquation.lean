@@ -83,6 +83,12 @@ def foregroundSum (ctx : LocalContext ι) : ℝ :=
 def backgroundSum (ctx : LocalContext ι) : ℝ :=
   ∑ j, ctx.neighborWeight j * ctx.bgNeighbor j
 
+noncomputable def foregroundMean (ctx : LocalContext ι) : ℝ :=
+  ctx.foregroundSum / ctx.totalWeight
+
+noncomputable def backgroundMean (ctx : LocalContext ι) : ℝ :=
+  ctx.backgroundSum / ctx.totalWeight
+
 def compositingValue (ctx : LocalContext ι) (g : LocalUnknown) : ℝ :=
   dotProduct (uVec ctx.alphaCenter) g
 
