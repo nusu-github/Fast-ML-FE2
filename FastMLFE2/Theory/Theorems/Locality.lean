@@ -15,8 +15,8 @@ theorem build_eq_of_StateEqOn
     (p : κ)
     {state₁ state₂ : PixelState κ}
     (hEq : StateEqOn (N p) state₁ state₂) :
-    builder.build p state₁ = builder.build p state₂ := by
-  exact BuilderLocal.apply hlocal p hEq
+    builder.build p state₁ = builder.build p state₂ :=
+  BuilderLocal.apply hlocal p hEq
 
 theorem jacobiUpdateAt_eq_of_StateEqOn
     {builder : LocalContextBuilder κ η}
@@ -26,9 +26,7 @@ theorem jacobiUpdateAt_eq_of_StateEqOn
     {state₁ state₂ : PixelState κ}
     (hEq : StateEqOn (N p) state₁ state₂) :
     builder.jacobiUpdateAt state₁ p = builder.jacobiUpdateAt state₂ p := by
-  have hbuild : builder.build p state₁ = builder.build p state₂ :=
-    build_eq_of_StateEqOn hlocal p hEq
-  simp only [LocalContextBuilder.jacobiUpdateAt_eq, hbuild]
+  simp only [LocalContextBuilder.jacobiUpdateAt_eq, build_eq_of_StateEqOn hlocal p hEq]
 
 theorem jacobiStep_eq_of_StateEqOn
     {builder : LocalContextBuilder κ η}
@@ -39,8 +37,7 @@ theorem jacobiStep_eq_of_StateEqOn
     (hEq : StateEqOn (N p) state₁ state₂) :
     builder.jacobiStep state₁ p = builder.jacobiStep state₂ p := by
   simp only [LocalContextBuilder.jacobiStep_apply]
-  exact
-    jacobiUpdateAt_eq_of_StateEqOn hlocal p hEq
+  exact jacobiUpdateAt_eq_of_StateEqOn hlocal p hEq
 
 end LocalContextBuilder
 

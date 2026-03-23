@@ -17,23 +17,17 @@ variable {ι : Type*} [Fintype ι]
 
 private theorem solve2x2_foreground
     {a00 a01 a11 b0 b1 det : ℝ}
-    (hdet : det = a00 * a11 - a01 * a01)
-    (hdet0 : det ≠ 0) :
+    (hdet : det = a00 * a11 - a01 * a01) (hdet0 : det ≠ 0) :
     a00 * ((a11 * b0 - a01 * b1) / det) +
         a01 * ((a00 * b1 - a01 * b0) / det) = b0 := by
-  field_simp [hdet0]
-  rw [hdet]
-  ring
+  field_simp [hdet0]; rw [hdet]; ring
 
 private theorem solve2x2_background
     {a00 a01 a11 b0 b1 det : ℝ}
-    (hdet : det = a00 * a11 - a01 * a01)
-    (hdet0 : det ≠ 0) :
+    (hdet : det = a00 * a11 - a01 * a01) (hdet0 : det ≠ 0) :
     a01 * ((a11 * b0 - a01 * b1) / det) +
         a11 * ((a00 * b1 - a01 * b0) / det) = b1 := by
-  field_simp [hdet0]
-  rw [hdet]
-  ring
+  field_simp [hdet0]; rw [hdet]; ring
 
 def closedFormDenom (ctx : LocalContext ι) : ℝ :=
   ctx.totalWeight * (ctx.totalWeight + ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2)
@@ -75,91 +69,57 @@ theorem closedFormDenom_eq_det (ctx : LocalContext ι) :
 
 theorem closedFormDenom_pos (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     0 < closedFormDenom ctx := by
-  rw [closedFormDenom_eq_det]
-  exact normalMatrix_det_pos ctx
+  rw [closedFormDenom_eq_det]; exact normalMatrix_det_pos ctx
 
 theorem inverseSolution_solvesNormalEquation (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     ctx.SolvesNormalEquation (inverseSolution ctx) := by
-  have hunit : IsUnit ctx.normalMatrix.det := normalMatrix_det_isUnit ctx
-  dsimp [FastMLFE2.Theory.Core.LocalContext.SolvesNormalEquation, inverseSolution]
+  dsimp [LocalContext.SolvesNormalEquation, inverseSolution]
   rw [Matrix.mulVec_mulVec]
   simpa [Matrix.one_mulVec] using
-    congrArg (fun M : Matrix LocalIdx LocalIdx ℝ => M.mulVec ctx.rhs)
-      (Matrix.mul_nonsing_inv ctx.normalMatrix hunit)
+    congrArg (·.mulVec ctx.rhs) (Matrix.mul_nonsing_inv _ (normalMatrix_det_isUnit ctx))
 
 private theorem closedFormDenom_eq_minor (ctx : LocalContext ι) :
     closedFormDenom ctx =
       (ctx.alphaCenter ^ 2 + ctx.totalWeight) * ((1 - ctx.alphaCenter) ^ 2 + ctx.totalWeight) -
         (ctx.alphaCenter * (1 - ctx.alphaCenter)) ^ 2 := by
-  simp [closedFormDenom]
-  ring
+  simp [closedFormDenom]; ring
 
 theorem closedForm_foreground_solves (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     ctx.normalMatrix.mulVec (closedFormSolution ctx) 0 = ctx.rhs 0 := by
-  have hdet0 : closedFormDenom ctx ≠ 0 := (closedFormDenom_pos ctx).ne'
-  simpa [closedFormSolution, foreground, background]
-    using
-      solve2x2_foreground
-        (a00 := ctx.alphaCenter ^ 2 + ctx.totalWeight)
-        (a01 := ctx.alphaCenter * (1 - ctx.alphaCenter))
-        (a11 := (1 - ctx.alphaCenter) ^ 2 + ctx.totalWeight)
-        (b0 := ctx.rhs 0)
-        (b1 := ctx.rhs 1)
-        (det := closedFormDenom ctx)
-        (by simpa [pow_two] using closedFormDenom_eq_minor ctx)
-        hdet0
+  simpa [closedFormSolution, foreground, background] using
+    solve2x2_foreground
+      (by simpa [pow_two] using closedFormDenom_eq_minor ctx)
+      (closedFormDenom_pos ctx).ne'
 
 theorem closedForm_background_solves (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     ctx.normalMatrix.mulVec (closedFormSolution ctx) 1 = ctx.rhs 1 := by
-  have hdet0 : closedFormDenom ctx ≠ 0 := (closedFormDenom_pos ctx).ne'
-  simpa [closedFormSolution, foreground, background]
-    using
-      solve2x2_background
-        (a00 := ctx.alphaCenter ^ 2 + ctx.totalWeight)
-        (a01 := ctx.alphaCenter * (1 - ctx.alphaCenter))
-        (a11 := (1 - ctx.alphaCenter) ^ 2 + ctx.totalWeight)
-        (b0 := ctx.rhs 0)
-        (b1 := ctx.rhs 1)
-        (det := closedFormDenom ctx)
-        (by simpa [pow_two] using closedFormDenom_eq_minor ctx)
-        hdet0
+  simpa [closedFormSolution, foreground, background] using
+    solve2x2_background
+      (by simpa [pow_two] using closedFormDenom_eq_minor ctx)
+      (closedFormDenom_pos ctx).ne'
 
 theorem eq_inverseSolution_of_solves (ctx : LocalContext ι) [CoreMathAssumptions ctx]
-    {g : LocalUnknown}
-    (hg : ctx.SolvesNormalEquation g) :
+    {g : LocalUnknown} (hg : ctx.SolvesNormalEquation g) :
     g = inverseSolution ctx := by
-  have hunit : IsUnit ctx.normalMatrix.det := normalMatrix_det_isUnit ctx
-  have hleft :
-      (ctx.normalMatrix⁻¹ * ctx.normalMatrix).mulVec g = inverseSolution ctx := by
-    simpa [inverseSolution,
-      FastMLFE2.Theory.Core.LocalContext.SolvesNormalEquation,
-      Matrix.mulVec_mulVec] using
-      congrArg (fun v => ctx.normalMatrix⁻¹.mulVec v) hg
-  have hone :
-      (ctx.normalMatrix⁻¹ * ctx.normalMatrix).mulVec g =
-        (1 : Matrix LocalIdx LocalIdx ℝ).mulVec g := by
-    simpa [Matrix.one_mulVec] using
-      congrArg (fun M : Matrix LocalIdx LocalIdx ℝ => M.mulVec g)
-        (Matrix.nonsing_inv_mul ctx.normalMatrix hunit)
-  have hvec : (1 : Matrix LocalIdx LocalIdx ℝ).mulVec g = inverseSolution ctx := by
-    exact hone.symm.trans hleft
-  simpa [Matrix.one_mulVec] using hvec
+  have hunit := normalMatrix_det_isUnit ctx
+  have : (ctx.normalMatrix⁻¹ * ctx.normalMatrix).mulVec g = inverseSolution ctx := by
+    simpa [inverseSolution, LocalContext.SolvesNormalEquation, Matrix.mulVec_mulVec] using
+      congrArg ctx.normalMatrix⁻¹.mulVec hg
+  rwa [Matrix.nonsing_inv_mul _ hunit, Matrix.one_mulVec] at this
 
 theorem closedForm_solvesNormalEquation (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     ctx.SolvesNormalEquation (closedFormSolution ctx) := by
-  funext i
-  fin_cases i
+  funext i; fin_cases i
   · exact closedForm_foreground_solves ctx
   · exact closedForm_background_solves ctx
 
 theorem closedForm_eq_inverseSolution (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
-    closedFormSolution ctx = inverseSolution ctx := by
-  exact eq_inverseSolution_of_solves ctx (closedForm_solvesNormalEquation ctx)
+    closedFormSolution ctx = inverseSolution ctx :=
+  eq_inverseSolution_of_solves ctx (closedForm_solvesNormalEquation ctx)
 
 theorem closedForm_isCostStationary (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
-    ctx.IsCostStationary (closedFormSolution ctx) := by
-  exact (isCostStationary_iff_solvesNormalEquation ctx (closedFormSolution ctx)).2
-    (closedForm_solvesNormalEquation ctx)
+    ctx.IsCostStationary (closedFormSolution ctx) :=
+  (isCostStationary_iff_solvesNormalEquation ctx _).2 (closedForm_solvesNormalEquation ctx)
 
 end LocalContext
 

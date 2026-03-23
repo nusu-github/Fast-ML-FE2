@@ -78,7 +78,7 @@ noncomputable def endClampedIterate
     (k : Nat)
     (state : PixelState κ) :
     data.rawIterate (k + 1) state = data.rawIterate k (data.rawStep state) := by
-  simpa [rawIterate] using Function.iterate_succ_apply data.rawStep k state
+  simp [rawIterate, Function.iterate_succ_apply]
 
 @[simp] theorem insideClampedIterate_succ
     (data : CanonicalPixelData κ η)
@@ -86,7 +86,7 @@ noncomputable def endClampedIterate
     (state : PixelState κ) :
     data.insideClampedIterate (k + 1) state =
       data.insideClampedIterate k (data.insideClampedStep state) := by
-  simpa [insideClampedIterate] using Function.iterate_succ_apply data.insideClampedStep k state
+  simp [insideClampedIterate, Function.iterate_succ_apply]
 
 end CanonicalPixelData
 

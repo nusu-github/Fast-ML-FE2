@@ -22,7 +22,6 @@ theorem compose_sub_compose
     (alpha foreground background foreground' background' : ℝ) :
     compose alpha foreground background - compose alpha foreground' background' =
       alpha * (foreground - foreground') + (1 - alpha) * (background - background') := by
-  simp [compose]
-  ring
+  unfold compose; ring
 
 end FastMLFE2.Theory.Compositing

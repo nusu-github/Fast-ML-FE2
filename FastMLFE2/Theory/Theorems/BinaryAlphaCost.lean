@@ -123,22 +123,22 @@ example (ctx : LocalContext ι) (g : LocalUnknown) (hα : ctx.alphaCenter = 0) :
     ctx.localCost g =
       (background g - ctx.imageValue) ^ 2 +
         ∑ j, ctx.neighborWeight j *
-          ((foreground g - ctx.fgNeighbor j) ^ 2 + (background g - ctx.bgNeighbor j) ^ 2) := by
-  simpa using localCost_eq_of_alpha_zero (ctx := ctx) g hα
+          ((foreground g - ctx.fgNeighbor j) ^ 2 + (background g - ctx.bgNeighbor j) ^ 2) :=
+  localCost_eq_of_alpha_zero ctx g hα
 
 example (ctx : LocalContext ι) (g : LocalUnknown) (hα : ctx.alphaCenter = 1) :
     ctx.localCost g =
       (foreground g - ctx.imageValue) ^ 2 +
         ∑ j, ctx.neighborWeight j *
-          ((foreground g - ctx.fgNeighbor j) ^ 2 + (background g - ctx.bgNeighbor j) ^ 2) := by
-  simpa using localCost_eq_of_alpha_one (ctx := ctx) g hα
+          ((foreground g - ctx.fgNeighbor j) ^ 2 + (background g - ctx.bgNeighbor j) ^ 2) :=
+  localCost_eq_of_alpha_one ctx g hα
 
 example (ctx : LocalContext ι) [CoreMathAssumptions ctx]
     (g : LocalUnknown) (hα : ctx.alphaCenter = 0) :
     ctx.IsCostStationary g ↔
       ctx.totalWeight * foreground g = ctx.foregroundSum ∧
-        (1 + ctx.totalWeight) * background g = ctx.imageValue + ctx.backgroundSum := by
-  simpa using isCostStationary_iff_of_alpha_zero (ctx := ctx) g hα
+        (1 + ctx.totalWeight) * background g = ctx.imageValue + ctx.backgroundSum :=
+  isCostStationary_iff_of_alpha_zero ctx g hα
 
 end LocalContext
 

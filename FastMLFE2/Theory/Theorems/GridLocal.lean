@@ -13,43 +13,37 @@ open FastMLFE2.Theory.Level
 namespace GridPixelData
 
 theorem localCtx_closedForm_solvesNormalEquation
-    {h w : Nat}
-    (data : GridPixelData h w)
-    (p : Pixel h w)
+    {h w : Nat} (data : GridPixelData h w) (p : Pixel h w)
     (state : PixelState (Pixel h w))
-    [GridMathAssumptions data]
-    (hN : Nonempty (ValidDir p)) :
+    [GridMathAssumptions data] (hN : Nonempty (ValidDir p)) :
     (data.localCtx p state).SolvesNormalEquation
       (LocalContext.closedFormSolution (data.localCtx p state)) := by
   letI : Fact (Nonempty (ValidDir p)) := ⟨hN⟩
   simpa [GridPixelData.localCtx] using
-    (LocalContext.closedForm_solvesNormalEquation
-      ((data.toCanonicalPixelData).canonicalBuilder.build p state))
+    LocalContext.closedForm_solvesNormalEquation
+      (data.toCanonicalPixelData.canonicalBuilder.build
+        p state)
 
 theorem localCtx_closedForm_isCostStationary
-    {h w : Nat}
-    (data : GridPixelData h w)
-    (p : Pixel h w)
+    {h w : Nat} (data : GridPixelData h w) (p : Pixel h w)
     (state : PixelState (Pixel h w))
-    [GridMathAssumptions data]
-    (hN : Nonempty (ValidDir p)) :
+    [GridMathAssumptions data] (hN : Nonempty (ValidDir p)) :
     (data.localCtx p state).IsCostStationary
       (LocalContext.closedFormSolution (data.localCtx p state)) := by
   letI : Fact (Nonempty (ValidDir p)) := ⟨hN⟩
   simpa [GridPixelData.localCtx] using
-    (LocalContext.closedForm_isCostStationary
-      ((data.toCanonicalPixelData).canonicalBuilder.build p state))
+    LocalContext.closedForm_isCostStationary
+      (data.toCanonicalPixelData.canonicalBuilder.build
+        p state)
 
 private example
-    {h w : Nat}
-    (data : GridPixelData h w)
-    (p : Pixel h w)
+    {h w : Nat} (data : GridPixelData h w) (p : Pixel h w)
     (state : PixelState (Pixel h w))
-    [GridMathAssumptions data]
-    (hInterior : IsInterior p) :
+    [GridMathAssumptions data] (hInterior : IsInterior p) :
     (data.localCtx p state).SolvesNormalEquation
-      (LocalContext.closedFormSolution (data.localCtx p state)) := by
-  exact localCtx_closedForm_solvesNormalEquation data p state
+      (LocalContext.closedFormSolution (data.localCtx p state)) :=
+  localCtx_closedForm_solvesNormalEquation
+    data p state
     (nonempty_validDir_of_isInterior p hInterior)
 
 end GridPixelData

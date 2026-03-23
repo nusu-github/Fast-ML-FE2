@@ -29,11 +29,9 @@ instance : CoreMathAssumptions nearBinaryClampCounterexampleCtx where
 
 instance : CoreMathAssumptions nearBinaryClampCounterexampleBinaryCtx where
   epsilonPos := by
-    simpa [nearBinaryClampCounterexampleBinaryCtx, nearBinaryClampCounterexampleCtx]
-      using (CoreMathAssumptions.epsilonPos (ctx := nearBinaryClampCounterexampleCtx))
+    simp [nearBinaryClampCounterexampleBinaryCtx, nearBinaryClampCounterexampleCtx]
   omegaNonneg := by
-    simpa [nearBinaryClampCounterexampleBinaryCtx, nearBinaryClampCounterexampleCtx]
-      using (CoreMathAssumptions.omegaNonneg (ctx := nearBinaryClampCounterexampleCtx))
+    simp [nearBinaryClampCounterexampleBinaryCtx, nearBinaryClampCounterexampleCtx]
   alphaCenterBounded := by
     constructor <;>
       norm_num [nearBinaryClampCounterexampleBinaryCtx, nearBinaryClampCounterexampleCtx]

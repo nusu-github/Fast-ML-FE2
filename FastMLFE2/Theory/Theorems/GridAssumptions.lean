@@ -19,12 +19,9 @@ instance coreMathAssumptions_of_gridMathAssumptions
     [GridMathAssumptions data]
     [Fact (Nonempty (ValidDir p))] :
     CoreMathAssumptions ((data.toCanonicalPixelData).canonicalBuilder.build p state) where
-  epsilonPos := by
-    simpa using (GridMathAssumptions.epsilonPos (data := data))
-  omegaNonneg := by
-    simpa using (GridMathAssumptions.omegaNonneg (data := data))
-  alphaCenterBounded := by
-    simpa using (GridMathAssumptions.alphaBounded (data := data) p)
+  epsilonPos := by simpa using GridMathAssumptions.epsilonPos (data := data)
+  omegaNonneg := by simpa using GridMathAssumptions.omegaNonneg (data := data)
+  alphaCenterBounded := by simpa using GridMathAssumptions.alphaBounded (data := data) p
   neighborNonempty := Fact.out
 
 end GridPixelData
