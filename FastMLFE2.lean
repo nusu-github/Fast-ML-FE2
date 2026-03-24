@@ -30,6 +30,7 @@ import FastMLFE2.Theorems.BlurFusionGap
 import FastMLFE2.Theorems.BlurFusionFixedPoint
 import FastMLFE2.Theorems.PropagationRadius
 import FastMLFE2.Theorems.NearBinary
+import FastMLFE2.Theorems.IterationInvariance
 import FastMLFE2.Theorems.ClosedFormMeanResidual
 import FastMLFE2.Theorems.NearBinaryCounterexample
 import FastMLFE2.Theorems.ClampPlacement

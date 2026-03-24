@@ -1,4 +1,5 @@
 import FastMLFE2.Canonical.Builder
+import FastMLFE2.Theorems.ChannelReuse
 
 namespace FastMLFE2.Theorems
 
@@ -58,6 +59,15 @@ theorem canonicalBuilder_local
           (fun j => background (state₂ (neighborPixel p j))) :=
         funext fun j => congrArg background (hEq _ (hmem j))
       simp [CanonicalPixelData.canonicalBuilder, CanonicalPixelData.toLocalContext, hfg, hbg]
+
+omit [DecidableEq κ] in theorem canonicalBuilder_sameWeightData
+    (data : CanonicalPixelData κ η) (p : κ)
+    (state₁ state₂ : PixelState κ) :
+    FastMLFE2.Theorems.LocalContext.SameWeightData
+      (data.canonicalBuilder.build p state₁)
+      (data.canonicalBuilder.build p state₂) := by
+  constructor <;>
+    simp [CanonicalPixelData.canonicalBuilder, CanonicalPixelData.toLocalContext]
 
 end CanonicalPixelData
 
