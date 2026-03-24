@@ -95,6 +95,9 @@ pipeline stages:
 - **Local Conditioning** — Normal matrix decomposes as `s·I + u·uᵀ` (rank-1 update);
   exact eigenvalues `s` and `s + q(α)` where `q(α) = α² + (1−α)²`; condition number
   `κ = 1 + q(α)/s` with bounds `1 + 1/(2s) ≤ κ ≤ 1 + 1/s`.
+- **Normalized-Weight Means** — With `λ_j = w_j / W`, the existing weighted means admit the
+  equivalent forms `foregroundMean = ∑ j, λ_j F_j` and `backgroundMean = ∑ j, λ_j B_j`, and
+  the normalized weights sum to `1`.
 - **Compositing Error** — `|compose α F B − compose α F' B'| ≤ |α|·|F−F'| + |1−α|·|B−B'|`;
   authored corollary with simplified weights when `0 ≤ α ≤ 1`.
 

@@ -17,6 +17,7 @@ import FastMLFE2.Theory.Theorems.Invertibility
 import FastMLFE2.Theory.Theorems.ClosedForm
 import FastMLFE2.Theory.Theorems.ClosedFormBox
 import FastMLFE2.Theory.Theorems.ClosedFormBoxInput
+import FastMLFE2.Theory.Theorems.NormalizedWeights
 import FastMLFE2.Theory.Theorems.CostToNormalEquation
 import FastMLFE2.Theory.Theorems.Conditioning
 import FastMLFE2.Theory.Theorems.BinaryAlpha
