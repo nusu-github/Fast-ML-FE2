@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from fastmlfe2_eval.estimator._types import (
     EstimatorParams,

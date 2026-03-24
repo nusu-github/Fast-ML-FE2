@@ -50,13 +50,11 @@ def compute_initial_means(
 ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
     fg_mask = alpha > 0.9
     bg_mask = alpha < 0.1
-    fg_count = int(fg_mask.sum())
-    bg_count = int(bg_mask.sum())
-    if fg_count > 0:
+    if fg_mask.any():
         fg_mean = image[fg_mask].mean(axis=0).astype(np.float32)
     else:
         fg_mean = np.zeros(3, dtype=np.float32)
-    if bg_count > 0:
+    if bg_mask.any():
         bg_mean = image[bg_mask].mean(axis=0).astype(np.float32)
     else:
         bg_mean = np.zeros(3, dtype=np.float32)
