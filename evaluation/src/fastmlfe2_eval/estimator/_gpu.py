@@ -123,181 +123,6 @@ void ml_iterate(
     "ml_iterate",
 )
 
-_ml_iterate_tiled_kernel = cp.RawKernel(
-    r"""
-extern "C" __global__
-void ml_iterate_tiled(
-    float *F,
-    float *B,
-    const float *F_prev,
-    const float *B_prev,
-    const float *image,
-    const float *alpha,
-    int w,
-    int h,
-    float regularization,
-    float gradient_weight
-){
-    const int TILE = 32;
-    const int HT = 34;  /* TILE + 2 halo */
-
-    __shared__ float s_Fp[HT * HT * 3];
-    __shared__ float s_Bp[HT * HT * 3];
-    __shared__ float s_a[HT * HT];
-
-    int tx = threadIdx.x;
-    int ty = threadIdx.y;
-    int gx = blockIdx.x * TILE + tx;
-    int gy = blockIdx.y * TILE + ty;
-
-    /* shared-memory coords: center at (tx+1, ty+1) */
-    int sx = tx + 1;
-    int sy = ty + 1;
-    int si = sy * HT + sx;
-
-    /* --- Load center tile (clamp out-of-bounds to nearest edge pixel) --- */
-    {
-        int cx = min(w - 1, max(0, gx));
-        int cy = min(h - 1, max(0, gy));
-        int gi = cy * w + cx;
-        s_a[si] = alpha[gi];
-        for (int c = 0; c < 3; c++){
-            s_Fp[si * 3 + c] = F_prev[gi * 3 + c];
-            s_Bp[si * 3 + c] = B_prev[gi * 3 + c];
-        }
-    }
-
-    /* --- Load halo --- */
-    /* Left column */
-    if (tx == 0){
-        int hx = max(0, (int)(blockIdx.x * TILE) - 1);
-        int hy = min(h - 1, max(0, gy));
-        int gi = hy * w + hx;
-        int hi = sy * HT;
-        s_a[hi] = alpha[gi];
-        for (int c = 0; c < 3; c++){ s_Fp[hi*3+c] = F_prev[gi*3+c]; s_Bp[hi*3+c] = B_prev[gi*3+c]; }
-    }
-    /* Right column */
-    if (tx == TILE - 1){
-        int hx = min(w - 1, (int)(blockIdx.x * TILE) + TILE);
-        int hy = min(h - 1, max(0, gy));
-        int gi = hy * w + hx;
-        int hi = sy * HT + TILE + 1;
-        s_a[hi] = alpha[gi];
-        for (int c = 0; c < 3; c++){ s_Fp[hi*3+c] = F_prev[gi*3+c]; s_Bp[hi*3+c] = B_prev[gi*3+c]; }
-    }
-    /* Top row */
-    if (ty == 0){
-        int hx = min(w - 1, max(0, gx));
-        int hy = max(0, (int)(blockIdx.y * TILE) - 1);
-        int gi = hy * w + hx;
-        int hi = sx;  /* row 0 */
-        s_a[hi] = alpha[gi];
-        for (int c = 0; c < 3; c++){ s_Fp[hi*3+c] = F_prev[gi*3+c]; s_Bp[hi*3+c] = B_prev[gi*3+c]; }
-    }
-    /* Bottom row */
-    if (ty == TILE - 1){
-        int hx = min(w - 1, max(0, gx));
-        int hy = min(h - 1, (int)(blockIdx.y * TILE) + TILE);
-        int gi = hy * w + hx;
-        int hi = (TILE + 1) * HT + sx;
-        s_a[hi] = alpha[gi];
-        for (int c = 0; c < 3; c++){ s_Fp[hi*3+c] = F_prev[gi*3+c]; s_Bp[hi*3+c] = B_prev[gi*3+c]; }
-    }
-    /* Corners */
-    if (tx == 0 && ty == 0){
-        int hx = max(0, (int)(blockIdx.x * TILE) - 1);
-        int hy = max(0, (int)(blockIdx.y * TILE) - 1);
-        int gi = hy * w + hx;
-        s_a[0] = alpha[gi];
-        for (int c = 0; c < 3; c++){ s_Fp[c] = F_prev[gi*3+c]; s_Bp[c] = B_prev[gi*3+c]; }
-    }
-    if (tx == TILE - 1 && ty == 0){
-        int hx = min(w - 1, (int)(blockIdx.x * TILE) + TILE);
-        int hy = max(0, (int)(blockIdx.y * TILE) - 1);
-        int gi = hy * w + hx;
-        int hi = TILE + 1;
-        s_a[hi] = alpha[gi];
-        for (int c = 0; c < 3; c++){ s_Fp[hi*3+c] = F_prev[gi*3+c]; s_Bp[hi*3+c] = B_prev[gi*3+c]; }
-    }
-    if (tx == 0 && ty == TILE - 1){
-        int hx = max(0, (int)(blockIdx.x * TILE) - 1);
-        int hy = min(h - 1, (int)(blockIdx.y * TILE) + TILE);
-        int gi = hy * w + hx;
-        int hi = (TILE + 1) * HT;
-        s_a[hi] = alpha[gi];
-        for (int c = 0; c < 3; c++){ s_Fp[hi*3+c] = F_prev[gi*3+c]; s_Bp[hi*3+c] = B_prev[gi*3+c]; }
-    }
-    if (tx == TILE - 1 && ty == TILE - 1){
-        int hx = min(w - 1, (int)(blockIdx.x * TILE) + TILE);
-        int hy = min(h - 1, (int)(blockIdx.y * TILE) + TILE);
-        int gi = hy * w + hx;
-        int hi = (TILE + 1) * HT + TILE + 1;
-        s_a[hi] = alpha[gi];
-        for (int c = 0; c < 3; c++){ s_Fp[hi*3+c] = F_prev[gi*3+c]; s_Bp[hi*3+c] = B_prev[gi*3+c]; }
-    }
-
-    __syncthreads();
-
-    if (gx >= w || gy >= h) return;
-
-    int gi = gy * w + gx;
-    float a0 = s_a[si];
-    float a1 = 1.0f - a0;
-
-    /* Neighbor accumulation from shared memory */
-    int nb[4] = {si - 1, si + 1, si - HT, si + HT};
-
-    float W = 0.0f;
-    float sum_wF[3] = {0.0f, 0.0f, 0.0f};
-    float sum_wB[3] = {0.0f, 0.0f, 0.0f};
-
-    for (int d = 0; d < 4; d++){
-        int sj = nb[d];
-        float wj = regularization + gradient_weight * fabsf(a0 - s_a[sj]);
-        W += wj;
-        for (int c = 0; c < 3; c++){
-            sum_wF[c] += wj * s_Fp[sj * 3 + c];
-            sum_wB[c] += wj * s_Bp[sj * 3 + c];
-        }
-    }
-
-    float inv_W = 1.0f / W;
-
-    if (a0 < 0.01f || a0 > 0.99f){
-        float inv_Wp1 = 1.0f / (W + 1.0f);
-        for (int c = 0; c < 3; c++){
-            float mu_F = sum_wF[c] * inv_W;
-            float mu_B = sum_wB[c] * inv_W;
-            float r = image[gi * 3 + c] - a0 * mu_F - a1 * mu_B;
-            if (a0 < 0.01f){
-                F[gi*3+c] = fmaxf(0.0f, fminf(1.0f, mu_F));
-                B[gi*3+c] = fmaxf(0.0f, fminf(1.0f, mu_B + r * inv_Wp1));
-            } else {
-                F[gi*3+c] = fmaxf(0.0f, fminf(1.0f, mu_F + r * inv_Wp1));
-                B[gi*3+c] = fmaxf(0.0f, fminf(1.0f, mu_B));
-            }
-        }
-        return;
-    }
-
-    float D = W + a0 * a0 + a1 * a1;
-    float inv_D = 1.0f / D;
-    float a0_inv_D = a0 * inv_D;
-    float a1_inv_D = a1 * inv_D;
-
-    for (int c = 0; c < 3; c++){
-        float mu_F = sum_wF[c] * inv_W;
-        float mu_B = sum_wB[c] * inv_W;
-        float r = image[gi * 3 + c] - a0 * mu_F - a1 * mu_B;
-        F[gi*3+c] = fmaxf(0.0f, fminf(1.0f, mu_F + a0_inv_D * r));
-        B[gi*3+c] = fmaxf(0.0f, fminf(1.0f, mu_B + a1_inv_D * r));
-    }
-}
-""",
-    "ml_iterate_tiled",
-)
-
 _ml_fused_resize_iterate_kernel = cp.RawKernel(
     r"""
 extern "C" __global__
@@ -445,20 +270,13 @@ def estimate_fb_ml(
         d_F_prev, d_F = d_F, d_F_prev
         d_B_prev, d_B = d_B, d_B_prev
 
-        # Remaining iterations: tiled or basic kernel (current level buffers)
-        for _i_iter in range(n_iter - 1):
-            if w >= 32 and h >= 32:
-                _ml_iterate_tiled_kernel(
-                    grid, _BLOCK,
-                    (d_F, d_B, d_F_prev, d_B_prev, d_image_level, d_alpha_level,
-                     w, h, eps, omega),
-                )
-            else:
-                _ml_iterate_kernel(
-                    grid, _BLOCK,
-                    (d_F, d_B, d_F_prev, d_B_prev, d_image_level, d_alpha_level,
-                     w, h, eps, omega),
-                )
+        # Remaining iterations: global-memory Jacobi
+        for _ in range(n_iter - 1):
+            _ml_iterate_kernel(
+                grid, _BLOCK,
+                (d_F, d_B, d_F_prev, d_B_prev, d_image_level, d_alpha_level,
+                 w, h, eps, omega),
+            )
             d_F_prev, d_F = d_F, d_F_prev
             d_B_prev, d_B = d_B, d_B_prev
 
