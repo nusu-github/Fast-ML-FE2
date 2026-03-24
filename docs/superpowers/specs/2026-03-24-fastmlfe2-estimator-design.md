@@ -50,37 +50,49 @@ Identical structure to pymatting/Germer et al. 2020:
 - Initialize F/B at 1×1 with weighted mean foreground/background color (vectorized over all pixels; pymatting CuPy reference instead resizes the image to 1×1 — we follow the CPU reference which is more principled)
 - 10 iterations at levels where `w <= small_size and h <= small_size`, 2 iterations otherwise (follows pymatting CPU semantics; the CuPy reference uses `min(w,h) <= small_size` which is a bug)
 
-### Per-pixel 2×2 system
+### Per-pixel solve: mean-residual correction form
 
-From Lean theorems `closedFormSolution` and `closedForm_solvesNormalEquation`:
+From Lean theorem `meanResidualSolution_eq_closedFormSolution` (H5), which proves equivalence to the Cramer-form closed-form solution while requiring fewer operations per channel:
 
 ```
-w_j = ε + ω|α_i - α_j|    (neighbor weight, proven positive: neighborWeight_pos)
-W = Σ_j w_j                (total weight, proven positive: totalWeight_pos)
+w_j = ε + ω|α_i - α_j|              (neighbor weight, proven positive: neighborWeight_pos)
+W = Σ_j w_j                          (total weight, proven positive: totalWeight_pos)
 
-A = [α² + W,    α(1-α) ]    b = [α·I + Σ w_j·F_j]
-    [α(1-α), (1-α)² + W]        [(1-α)·I + Σ w_j·B_j]
+λ_j = w_j / W                        (normalized weight, sum = 1: sum_normalizedWeight_eq_one)
+μ_F^c = Σ_j λ_j · F_j^c             (weighted foreground mean)
+μ_B^c = Σ_j λ_j · B_j^c             (weighted background mean)
+D = W + α² + (1-α)²                  (weightedMeanDenom, proven > 0: weightedMeanDenom_pos)
+r^c = I^c - α·μ_F^c - (1-α)·μ_B^c   (mean residual, proven |r| ≤ 1: abs_meanResidual_le_one_of_boxed_inputs)
+inv_D = 1 / D                        (shared across 3 channels)
 
-det = (α² + W)·((1-α)² + W) - α²(1-α)²   (proven > 0: normalMatrix_det_pos)
-
-F = (((1-α)² + W)·b_F - α(1-α)·b_B) / det
-B = (((α² + W)·b_B - α(1-α)·b_F) / det
-clamp to [0,1]
+F^c = clamp(μ_F^c + α · r^c · inv_D, 0, 1)       (per channel)
+B^c = clamp(μ_B^c + (1-α) · r^c · inv_D, 0, 1)   (per channel)
 ```
 
-Matrix A is identical for all 3 RGB channels — compute det and inverse coefficients once, apply to all channels.
+**Why mean-residual over Cramer form:**
+- Neighbor accumulation computes `μ_F`, `μ_B` (weighted means) instead of raw sums, naturally normalized
+- `D = W + α² + (1-α)²` is 2 additions vs Cramer's `det = (α²+W)·((1-α)²+W) - α²(1-α)²` (2 mul + 1 sub)
+- `r` is a single scalar per channel; correction `α·r/D` reuses `α/D` across channels
+- On GPU, `r` fits in a register per channel — no need to store intermediate 2×2 inverse coefficients
+- Directly exposes the structure: solution = mean + small correction (proven bounded by H10)
+
+**Binary-α special cases** (from `meanResidualSolution_*_of_alpha_zero/one`):
+- α = 0: F = μ_F, B = μ_B + r/(W+1)
+- α = 1: F = μ_F + r/(W+1), B = μ_B
 
 ## Optimizations
 
 ### 1. Binary pixel skip
 
-**Lean basis:** `jacobiSpectralRadius_eq_zero_of_alpha_zero`, `jacobiSpectralRadius_eq_zero_of_alpha_one`
+**Lean basis (strict):** `jacobiSpectralRadius_eq_zero_of_alpha_zero`, `jacobiSpectralRadius_eq_zero_of_alpha_one` — at α ∈ {0,1} the spectral radius is exactly 0, so the solution is exact in one step.
 
-When α < 0.01 or α > 0.99, spectral radius is ≈0, so the solution is (near-)exact in one step:
-- α ≈ 0: F = weighted neighbor mean, B = image pixel
-- α ≈ 1: F = image pixel, B = weighted neighbor mean
+**Lean basis (soft threshold):** `abs_foreground_correction_le` (H10) proves |α·r/D| ≤ 2α. For α < 0.01, the correction term is at most 0.02, which is below 1/255 (uint8 quantization threshold) and thus invisible in the final output. Symmetrically, |(1-α)·r/D| ≤ 2(1-α) for the background correction near α = 1.
 
-Both CPU and GPU kernels check this condition and skip the 2×2 solve.
+**Implementation:** When α < 0.01 or α > 0.99, use the binary-α special case from the mean-residual form:
+- α ≈ 0: F = μ_F, B = μ_B + r/(W+1)
+- α ≈ 1: F = μ_F + r/(W+1), B = μ_B
+
+Both CPU and GPU kernels check this condition and skip the full solve.
 
 ### 2. Red-black Gauss-Seidel (CPU only)
 
@@ -90,7 +102,7 @@ Each iteration consists of two half-sweeps:
 1. Update all red pixels (using current black neighbors)
 2. Update all black pixels (using freshly updated red neighbors)
 
-Within each color, pixels are independent → parallelizable with `prange`. Converges ~2× faster per iteration than pure Jacobi.
+Within each color, pixels are independent → parallelizable with `prange`. Empirically converges ~2× faster per iteration than pure Jacobi. Note: the current Lean theory layer formalizes only Jacobi contraction (H6); red-black Gauss-Seidel convergence is not formally verified. The speed advantage is well-established in numerical PDE literature but is not backed by a project-specific proof.
 
 ### 3. Double-buffered Jacobi (GPU)
 
@@ -106,6 +118,8 @@ Each CUDA thread block:
 
 Shared memory per block: 34×34 × (3+3+1) × 4 bytes = ~32 KB (within 48 KB limit).
 Reduces global memory bandwidth ~4× for the neighbor accumulation phase.
+
+With the mean-residual form, the per-thread computation accumulates `μ_F`, `μ_B` from shared memory neighbors, then computes `r` and the correction `α·r·inv_D` in registers. The intermediate quantities `r`, `inv_D`, `α/D` are scalars or per-channel registers — no shared-memory storage needed beyond F_prev, B_prev, alpha.
 
 ### 5. Fused resize + first iteration (GPU)
 
@@ -175,7 +189,8 @@ Property-based validation derived from Lean theorems:
 |------|-------------|-------|
 | Output in [0,1] | `closedForm_mem_box_of_exists_boxed_solution` | `(0 <= F).all() and (F <= 1).all()` |
 | Compositing bound | `abs_compose_sub_compose_le_authored` | `\|α·F+(1-α)·B - I\|` bounded |
-| Convergence monotone | `jacobiIterate_error_le` | Error decreases with more iterations |
+| Convergence monotone (GPU) | `jacobiIterate_error_le` | Error decreases with more iterations (Jacobi) |
+| Convergence monotone (CPU) | *(empirical, no formal proof)* | Error decreases with more iterations (red-black GS) |
 | Fixed-point stability | `jacobiStep_closedFormSolution` | Re-running on converged output ≈ identity |
 | Binary α exact | `jacobiSpectralRadius_eq_zero_of_alpha_*` | α∈{0,1} → F or B = image |
 | Determinant positive | `normalMatrix_det_pos` | No NaN/Inf in output for valid input |
