@@ -3,7 +3,8 @@
     "lean-lsp": {
       "command": "uvx",
       "args": ["lean-lsp-mcp", "--repl"],
-      "env": {}
+      "env": {},
+      "timeout": 600000
     }
   }
 }
