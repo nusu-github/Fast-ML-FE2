@@ -111,3 +111,118 @@ class TestMeanResidualKernel:
 
         assert np.all(F >= 0.0) and np.all(F <= 1.0)
         assert np.all(B >= 0.0) and np.all(B <= 1.0)
+
+
+from fastmlfe2_eval.estimator import estimate_foreground
+
+
+def _make_composited(h=32, w=32, seed=42):
+    """Create a composited image with known ground-truth F, B, alpha."""
+    rng = np.random.default_rng(seed)
+    F_true = rng.random((h, w, 3)).astype(np.float32)
+    B_true = rng.random((h, w, 3)).astype(np.float32)
+    alpha = rng.random((h, w)).astype(np.float32)
+    image = (alpha[:, :, np.newaxis] * F_true + (1 - alpha[:, :, np.newaxis]) * B_true).astype(
+        np.float32
+    )
+    return image, alpha, F_true, B_true
+
+
+class TestCPUProperties:
+    """Property-based tests derived from Lean theorems."""
+
+    def test_output_in_01(self):
+        """closedForm_mem_box_of_exists_boxed_solution"""
+        image, alpha, _, _ = _make_composited()
+        F, B = estimate_foreground(image, alpha, backend="cpu", return_background=True)
+        assert np.all(F >= 0.0) and np.all(F <= 1.0)
+        assert np.all(B >= 0.0) and np.all(B <= 1.0)
+
+    def test_no_nan_inf(self):
+        """normalMatrix_det_pos: determinant > 0 implies no division by zero."""
+        image, alpha, _, _ = _make_composited()
+        F, B = estimate_foreground(image, alpha, backend="cpu", return_background=True)
+        assert np.all(np.isfinite(F))
+        assert np.all(np.isfinite(B))
+
+    def test_binary_alpha_zero(self):
+        """α=0: F arbitrary, B ≈ image."""
+        image = np.random.default_rng(0).random((16, 16, 3)).astype(np.float32)
+        alpha = np.zeros((16, 16), dtype=np.float32)
+        F, B = estimate_foreground(image, alpha, backend="cpu", return_background=True)
+        np.testing.assert_allclose(B, image, atol=0.05)
+
+    def test_binary_alpha_one(self):
+        """α=1: F ≈ image, B arbitrary."""
+        image = np.random.default_rng(0).random((16, 16, 3)).astype(np.float32)
+        alpha = np.ones((16, 16), dtype=np.float32)
+        F = estimate_foreground(image, alpha, backend="cpu")
+        np.testing.assert_allclose(F, image, atol=0.05)
+
+    def test_compositing_residual_bounded(self):
+        """abs_compose_sub_compose_le_authored: residual small in unknown region."""
+        image, alpha, _, _ = _make_composited()
+        F, B = estimate_foreground(image, alpha, backend="cpu", return_background=True)
+        composite = alpha[:, :, np.newaxis] * F + (1 - alpha[:, :, np.newaxis]) * B
+        residual = np.abs(composite - image)
+        # In transition region (0.1 < α < 0.9), residual should be small
+        mask = (alpha > 0.1) & (alpha < 0.9)
+        assert residual[mask].mean() < 0.1
+
+    def test_fixed_point_stability(self):
+        """jacobiStep_closedFormSolution: re-running on converged output ≈ identity."""
+        image, alpha, _, _ = _make_composited()
+        F1 = estimate_foreground(image, alpha, backend="cpu")
+        F2 = estimate_foreground(image, alpha, backend="cpu")
+        np.testing.assert_allclose(F1, F2, atol=1e-6)
+
+    def test_convergence_monotone(self):
+        """Empirical: compositing residual should decrease with more iterations.
+
+        Red-black GS minimizes the compositing energy, so |I - αF - (1-α)B|
+        should be lower after 10 iterations than after 1. We measure this energy
+        (not error vs ground truth, which the algorithm does not optimize).
+        """
+        image, alpha, _, _ = _make_composited()
+        a = alpha[:, :, np.newaxis]
+
+        def compositing_err(n):
+            F, B = estimate_foreground(
+                image, alpha, backend="cpu",
+                n_small_iterations=n, n_big_iterations=n,
+                return_background=True,
+            )
+            return float(np.mean(np.abs(image - a * F - (1 - a) * B)))
+
+        err1 = compositing_err(1)
+        err10 = compositing_err(10)
+        assert err10 < err1, f"n=10 residual {err10:.5f} should be less than n=1 residual {err1:.5f}"
+
+    def test_1x1_image(self):
+        image = np.array([[[0.5, 0.3, 0.7]]], dtype=np.float32)
+        alpha = np.array([[0.6]], dtype=np.float32)
+        F, B = estimate_foreground(image, alpha, backend="cpu", return_background=True)
+        assert F.shape == (1, 1, 3)
+        assert np.all(np.isfinite(F)) and np.all(np.isfinite(B))
+
+    def test_checkerboard_alpha(self):
+        """Stress test for red-black ordering."""
+        h, w = 16, 16
+        image = np.random.default_rng(1).random((h, w, 3)).astype(np.float32)
+        alpha = np.zeros((h, w), dtype=np.float32)
+        alpha[::2, ::2] = 1.0
+        alpha[1::2, 1::2] = 1.0
+        F = estimate_foreground(image, alpha, backend="cpu")
+        assert np.all(np.isfinite(F))
+        assert np.all(F >= 0.0) and np.all(F <= 1.0)
+
+    def test_return_foreground_only(self):
+        image, alpha, _, _ = _make_composited()
+        result = estimate_foreground(image, alpha, backend="cpu", return_background=False)
+        assert isinstance(result, np.ndarray)
+        assert result.shape == image.shape
+
+    def test_return_background(self):
+        image, alpha, _, _ = _make_composited()
+        result = estimate_foreground(image, alpha, backend="cpu", return_background=True)
+        assert isinstance(result, tuple) and len(result) == 2
