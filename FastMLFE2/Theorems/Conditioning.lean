@@ -2,10 +2,6 @@ import FastMLFE2.Theorems.Invertibility
 
 namespace FastMLFE2.Theorems
 
-/-!
-H12 local conditioning structure for the single-pixel normal matrix.
--/
-
 open FastMLFE2.Core
 open FastMLFE2.Assumptions
 
@@ -59,8 +55,7 @@ theorem alphaQuadratic_eq_one_of_alpha_one
 omit [Fintype ι] in
 theorem alphaQuadratic_eq_one_half_of_alpha_half
     (ctx : LocalContext ι) (hα : ctx.alphaCenter = (1 : ℝ) / 2) :
-    alphaQuadratic ctx = (1 : ℝ) / 2 := by
-  unfold alphaQuadratic; rw [hα]; norm_num
+    alphaQuadratic ctx = (1 : ℝ) / 2 := by unfold alphaQuadratic; rw [hα]; norm_num
 
 theorem normalMatrix_mulVec_uVec
     (ctx : LocalContext ι) :

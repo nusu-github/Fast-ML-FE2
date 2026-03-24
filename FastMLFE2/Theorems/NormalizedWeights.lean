@@ -14,54 +14,31 @@ noncomputable def normalizedWeight (ctx : LocalContext ι) (j : ι) : ℝ :=
   ctx.neighborWeight j / ctx.totalWeight
 
 private theorem weightedSum_div_totalWeight_eq_sum_normalizedWeight_mul
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx]
-    (x : ι → ℝ) :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] (x : ι → ℝ) :
     (∑ j, ctx.neighborWeight j * x j) / ctx.totalWeight =
       ∑ j, normalizedWeight ctx j * x j := by
   have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
-  calc
-    (∑ j, ctx.neighborWeight j * x j) / ctx.totalWeight
-        = ∑ j, (ctx.neighborWeight j * x j) / ctx.totalWeight := by
-            simpa using
-              (Finset.sum_div Finset.univ (fun j => ctx.neighborWeight j * x j) ctx.totalWeight)
-    _ = ∑ j, normalizedWeight ctx j * x j := by
-      refine Finset.sum_congr rfl ?_
-      intro j hj
-      rw [normalizedWeight]
-      field_simp [htw0]
+  simp_rw [normalizedWeight, div_mul_eq_mul_div]
+  rw [← Finset.sum_div]
 
 theorem foregroundMean_eq_sum_normalizedWeight_mul
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     ctx.foregroundMean = ∑ j, normalizedWeight ctx j * ctx.fgNeighbor j := by
-  rw [FastMLFE2.Core.LocalContext.foregroundMean,
-    FastMLFE2.Core.LocalContext.foregroundSum_eq_sum_neighborWeight_mul]
-  exact weightedSum_div_totalWeight_eq_sum_normalizedWeight_mul (ctx := ctx) ctx.fgNeighbor
+  rw [LocalContext.foregroundMean, LocalContext.foregroundSum_eq_sum_neighborWeight_mul]
+  exact weightedSum_div_totalWeight_eq_sum_normalizedWeight_mul ctx ctx.fgNeighbor
 
 theorem backgroundMean_eq_sum_normalizedWeight_mul
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     ctx.backgroundMean = ∑ j, normalizedWeight ctx j * ctx.bgNeighbor j := by
-  rw [FastMLFE2.Core.LocalContext.backgroundMean,
-    FastMLFE2.Core.LocalContext.backgroundSum_eq_sum_neighborWeight_mul]
-  exact weightedSum_div_totalWeight_eq_sum_normalizedWeight_mul (ctx := ctx) ctx.bgNeighbor
+  rw [LocalContext.backgroundMean, LocalContext.backgroundSum_eq_sum_neighborWeight_mul]
+  exact weightedSum_div_totalWeight_eq_sum_normalizedWeight_mul ctx ctx.bgNeighbor
 
 theorem sum_normalizedWeight_eq_one
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     ∑ j, normalizedWeight ctx j = 1 := by
-  have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
-  calc
-    ∑ j, normalizedWeight ctx j
-        = (∑ j, ctx.neighborWeight j) / ctx.totalWeight := by
-            symm
-            simpa [normalizedWeight] using
-              (Finset.sum_div Finset.univ (fun j => ctx.neighborWeight j) ctx.totalWeight)
-    _ = ctx.totalWeight / ctx.totalWeight := by
-      rw [← FastMLFE2.Core.LocalContext.totalWeight_eq_sum_neighborWeight (ctx := ctx)]
-    _ = 1 := by
-      exact div_self htw0
+  simp_rw [normalizedWeight, ← Finset.sum_div,
+    LocalContext.totalWeight_eq_sum_neighborWeight]
+  exact div_self (totalWeight_pos ctx).ne'
 
 end LocalContext
 

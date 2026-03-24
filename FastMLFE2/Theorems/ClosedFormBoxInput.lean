@@ -45,29 +45,20 @@ theorem naiveBoxInputCounterexample_has_boxed_inputs :
   · norm_num [naiveBoxInputCounterexampleCtx]
   constructor
   · norm_num [naiveBoxInputCounterexampleCtx]
-  constructor
-  · intro j
-    have : naiveBoxInputCounterexampleCtx.fgNeighbor j = 0 := by
-      simp [naiveBoxInputCounterexampleCtx]
-    constructor <;> linarith
-  · intro j
-    have : naiveBoxInputCounterexampleCtx.bgNeighbor j = (1 : ℝ) / 8 := by
-      simp [naiveBoxInputCounterexampleCtx]
-    constructor <;> linarith
+  exact ⟨fun j => ⟨by simp [naiveBoxInputCounterexampleCtx],
+                     by simp [naiveBoxInputCounterexampleCtx]⟩,
+         fun j => ⟨by norm_num [naiveBoxInputCounterexampleCtx],
+                   by norm_num [naiveBoxInputCounterexampleCtx]⟩⟩
 
 theorem closedFormForegroundNumerator_naiveBoxInputCounterexample :
     closedFormForegroundNumerator naiveBoxInputCounterexampleCtx = -((7 : ℝ) / 1024) := by
   norm_num [naiveBoxInputCounterexampleCtx, closedFormForegroundNumerator,
-    FastMLFE2.Core.LocalContext.rhs,
-    FastMLFE2.Core.LocalContext.foregroundSum,
-    FastMLFE2.Core.LocalContext.backgroundSum,
-    FastMLFE2.Core.LocalContext.totalWeight,
-    FastMLFE2.Core.LocalContext.neighborWeight, foreground, background, mkLocalUnknown]
+    LocalContext.rhs, LocalContext.foregroundSum, LocalContext.backgroundSum,
+    LocalContext.totalWeight, LocalContext.neighborWeight, foreground, background, mkLocalUnknown]
 
 theorem closedFormForegroundNumerator_naiveBoxInputCounterexample_neg :
     closedFormForegroundNumerator naiveBoxInputCounterexampleCtx < 0 := by
-  rw [closedFormForegroundNumerator_naiveBoxInputCounterexample]
-  norm_num
+  rw [closedFormForegroundNumerator_naiveBoxInputCounterexample]; norm_num
 
 theorem not_naive_boxed_input_implies_foregroundNumerator_nonneg :
     ¬ ∀ {κ : Type*} [Fintype κ] (ctx : LocalContext κ),
@@ -78,110 +69,72 @@ theorem not_naive_boxed_input_implies_foregroundNumerator_nonneg :
         0 ≤ closedFormForegroundNumerator ctx := by
   intro h
   rcases naiveBoxInputCounterexample_has_boxed_inputs with ⟨hI, hα, hfg, hbg⟩
-  have hnum :
-      0 ≤ closedFormForegroundNumerator naiveBoxInputCounterexampleCtx := by
-    exact h naiveBoxInputCounterexampleCtx hI hα hfg hbg
-  linarith [closedFormForegroundNumerator_naiveBoxInputCounterexample_neg]
+  linarith [h naiveBoxInputCounterexampleCtx hI hα hfg hbg,
+    closedFormForegroundNumerator_naiveBoxInputCounterexample_neg]
 
 theorem closedFormDenom_eq_totalWeight_mul_weightedMeanDenom (ctx : LocalContext ι) :
     closedFormDenom ctx = ctx.totalWeight * ctx.weightedMeanDenom := by
   simp [closedFormDenom, LocalContext.weightedMeanDenom]
 
 theorem totalWeight_mul_foregroundMean
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
-    ctx.totalWeight * FastMLFE2.Core.LocalContext.foregroundMean ctx =
-      ctx.foregroundSum := by
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
+    ctx.totalWeight * FastMLFE2.Core.LocalContext.foregroundMean ctx = ctx.foregroundSum := by
   have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
-  rw [FastMLFE2.Core.LocalContext.foregroundMean]
-  field_simp [htw0]
+  rw [FastMLFE2.Core.LocalContext.foregroundMean]; field_simp [htw0]
 
 theorem totalWeight_mul_backgroundMean
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
-    ctx.totalWeight * FastMLFE2.Core.LocalContext.backgroundMean ctx =
-      ctx.backgroundSum := by
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
+    ctx.totalWeight * FastMLFE2.Core.LocalContext.backgroundMean ctx = ctx.backgroundSum := by
   have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
-  rw [FastMLFE2.Core.LocalContext.backgroundMean]
-  field_simp [htw0]
+  rw [FastMLFE2.Core.LocalContext.backgroundMean]; field_simp [htw0]
 
 theorem closedFormForegroundNumerator_eq_totalWeight_mul_meanAffine
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     closedFormForegroundNumerator ctx =
       ctx.totalWeight * closedFormForegroundMeanAffine ctx := by
-  rw [closedFormForegroundNumerator,
-    FastMLFE2.Core.LocalContext.rhs_foreground,
-    FastMLFE2.Core.LocalContext.rhs_background]
-  rw [← totalWeight_mul_foregroundMean (ctx := ctx),
-    ← totalWeight_mul_backgroundMean (ctx := ctx)]
-  simp [closedFormForegroundMeanAffine]
-  ring
+  rw [closedFormForegroundNumerator, LocalContext.rhs_foreground, LocalContext.rhs_background,
+    ← totalWeight_mul_foregroundMean ctx, ← totalWeight_mul_backgroundMean ctx]
+  simp [closedFormForegroundMeanAffine]; ring
 
 theorem closedFormBackgroundNumerator_eq_totalWeight_mul_meanAffine
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     closedFormBackgroundNumerator ctx =
       ctx.totalWeight * closedFormBackgroundMeanAffine ctx := by
-  rw [closedFormBackgroundNumerator,
-    FastMLFE2.Core.LocalContext.rhs_foreground,
-    FastMLFE2.Core.LocalContext.rhs_background]
-  rw [← totalWeight_mul_foregroundMean (ctx := ctx),
-    ← totalWeight_mul_backgroundMean (ctx := ctx)]
-  simp [closedFormBackgroundMeanAffine]
-  ring
+  rw [closedFormBackgroundNumerator, LocalContext.rhs_foreground, LocalContext.rhs_background,
+    ← totalWeight_mul_foregroundMean ctx, ← totalWeight_mul_backgroundMean ctx]
+  simp [closedFormBackgroundMeanAffine]; ring
 
 theorem foreground_closedFormSolution_eq_weightedMeanForm
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     foreground (closedFormSolution ctx) =
       closedFormForegroundMeanAffine ctx / ctx.weightedMeanDenom := by
   have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
   have hred0 : ctx.weightedMeanDenom ≠ 0 := (weightedMeanDenom_pos ctx).ne'
-  rw [foreground_closedFormSolution,
-    closedFormForegroundNumerator_eq_totalWeight_mul_meanAffine,
+  rw [foreground_closedFormSolution, closedFormForegroundNumerator_eq_totalWeight_mul_meanAffine,
     closedFormDenom_eq_totalWeight_mul_weightedMeanDenom]
   field_simp [htw0, hred0]
 
 theorem background_closedFormSolution_eq_weightedMeanForm
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     background (closedFormSolution ctx) =
       closedFormBackgroundMeanAffine ctx / ctx.weightedMeanDenom := by
   have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
   have hred0 : ctx.weightedMeanDenom ≠ 0 := (weightedMeanDenom_pos ctx).ne'
-  rw [background_closedFormSolution,
-    closedFormBackgroundNumerator_eq_totalWeight_mul_meanAffine,
+  rw [background_closedFormSolution, closedFormBackgroundNumerator_eq_totalWeight_mul_meanAffine,
     closedFormDenom_eq_totalWeight_mul_weightedMeanDenom]
   field_simp [htw0, hred0]
 
-private theorem div_mem_unitInterval_iff
-    {x d : ℝ}
-    (hd : 0 < d) :
+private theorem div_mem_unitInterval_iff {x d : ℝ} (hd : 0 < d) :
     (0 ≤ x / d ∧ x / d ≤ 1) ↔ (0 ≤ x ∧ x ≤ d) := by
-  constructor
+  rw [div_nonneg_iff]; constructor
+  · rintro ⟨hx0 | hx0, hx1⟩
+    · exact ⟨hx0.1, (div_le_one hd).1 hx1⟩
+    · linarith [hx0.2]
   · rintro ⟨hx0, hx1⟩
-    constructor
-    · by_contra hxneg
-      have : x / d < 0 := by
-        exact div_neg_of_neg_of_pos (lt_of_not_ge hxneg) hd
-      linarith
-    · by_contra hxd
-      have : 1 < x / d := by
-        have : d / d < x / d := by
-          exact (div_lt_div_of_pos_right (lt_of_not_ge hxd) hd)
-        simpa [hd.ne'] using this
-      linarith
-  · rintro ⟨hx0, hx1⟩
-    constructor
-    · exact div_nonneg hx0 hd.le
-    · have hdiv : x / d ≤ d / d := by
-        exact div_le_div_of_nonneg_right hx1 hd.le
-      simpa [hd.ne'] using hdiv
+    exact ⟨Or.inl ⟨hx0, hd.le⟩, (div_le_one hd).2 hx1⟩
 
 theorem closedForm_foreground_mem_Icc_iff_weightedMeanBounds
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     (0 ≤ foreground (closedFormSolution ctx) ∧
         foreground (closedFormSolution ctx) ≤ 1) ↔
       (0 ≤ closedFormForegroundMeanAffine ctx ∧
@@ -190,8 +143,7 @@ theorem closedForm_foreground_mem_Icc_iff_weightedMeanBounds
   exact div_mem_unitInterval_iff (weightedMeanDenom_pos ctx)
 
 theorem closedForm_background_mem_Icc_iff_weightedMeanBounds
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     (0 ≤ background (closedFormSolution ctx) ∧
         background (closedFormSolution ctx) ≤ 1) ↔
       (0 ≤ closedFormBackgroundMeanAffine ctx ∧
@@ -200,8 +152,7 @@ theorem closedForm_background_mem_Icc_iff_weightedMeanBounds
   exact div_mem_unitInterval_iff (weightedMeanDenom_pos ctx)
 
 theorem closedForm_mem_box_iff_weightedMeanBounds
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     (0 ≤ foreground (closedFormSolution ctx) ∧
         foreground (closedFormSolution ctx) ≤ 1) ∧
       (0 ≤ background (closedFormSolution ctx) ∧
@@ -209,47 +160,36 @@ theorem closedForm_mem_box_iff_weightedMeanBounds
       (0 ≤ closedFormForegroundMeanAffine ctx ∧
         closedFormForegroundMeanAffine ctx ≤ ctx.weightedMeanDenom) ∧
       (0 ≤ closedFormBackgroundMeanAffine ctx ∧
-        closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) := by
-  constructor <;> intro h
-  · exact ⟨
-      (closedForm_foreground_mem_Icc_iff_weightedMeanBounds (ctx := ctx)).1 h.1,
-      (closedForm_background_mem_Icc_iff_weightedMeanBounds (ctx := ctx)).1 h.2⟩
-  · exact ⟨
-      (closedForm_foreground_mem_Icc_iff_weightedMeanBounds (ctx := ctx)).2 h.1,
-      (closedForm_background_mem_Icc_iff_weightedMeanBounds (ctx := ctx)).2 h.2⟩
+        closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) :=
+  and_congr (closedForm_foreground_mem_Icc_iff_weightedMeanBounds ctx)
+    (closedForm_background_mem_Icc_iff_weightedMeanBounds ctx)
 
 theorem closedForm_clamp01_eq_self_iff_weightedMeanBounds
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx] :
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     clamp01 (closedFormSolution ctx) = closedFormSolution ctx ↔
       (0 ≤ closedFormForegroundMeanAffine ctx ∧
         closedFormForegroundMeanAffine ctx ≤ ctx.weightedMeanDenom) ∧
       (0 ≤ closedFormBackgroundMeanAffine ctx ∧
-        closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) := by
-  exact (clamp01_eq_self_iff (g := closedFormSolution ctx)).trans
-    (closedForm_mem_box_iff_weightedMeanBounds (ctx := ctx))
+        closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) :=
+  (clamp01_eq_self_iff (g := closedFormSolution ctx)).trans
+    (closedForm_mem_box_iff_weightedMeanBounds ctx)
 
 theorem closedForm_clamp01_eq_self_of_weightedMeanBounds
-    (ctx : LocalContext ι)
-    [CoreMathAssumptions ctx]
-    (hfg :
-      0 ≤ closedFormForegroundMeanAffine ctx ∧
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx]
+    (hfg : 0 ≤ closedFormForegroundMeanAffine ctx ∧
         closedFormForegroundMeanAffine ctx ≤ ctx.weightedMeanDenom)
-    (hbg :
-      0 ≤ closedFormBackgroundMeanAffine ctx ∧
+    (hbg : 0 ≤ closedFormBackgroundMeanAffine ctx ∧
         closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) :
-    clamp01 (closedFormSolution ctx) = closedFormSolution ctx := by
-  exact (closedForm_clamp01_eq_self_iff_weightedMeanBounds (ctx := ctx)).2 ⟨hfg, hbg⟩
+    clamp01 (closedFormSolution ctx) = closedFormSolution ctx :=
+  (closedForm_clamp01_eq_self_iff_weightedMeanBounds ctx).2 ⟨hfg, hbg⟩
 
 example (ctx : LocalContext ι) [CoreMathAssumptions ctx]
-    (hfg :
-      0 ≤ closedFormForegroundMeanAffine ctx ∧
+    (hfg : 0 ≤ closedFormForegroundMeanAffine ctx ∧
         closedFormForegroundMeanAffine ctx ≤ ctx.weightedMeanDenom)
-    (hbg :
-      0 ≤ closedFormBackgroundMeanAffine ctx ∧
+    (hbg : 0 ≤ closedFormBackgroundMeanAffine ctx ∧
         closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) :
     clamp01 (closedFormSolution ctx) = closedFormSolution ctx := by
-  simpa using closedForm_clamp01_eq_self_of_weightedMeanBounds (ctx := ctx) hfg hbg
+  simpa using closedForm_clamp01_eq_self_of_weightedMeanBounds ctx hfg hbg
 
 end LocalContext
 

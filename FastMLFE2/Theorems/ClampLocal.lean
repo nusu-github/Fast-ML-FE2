@@ -7,10 +7,8 @@ open FastMLFE2.Core
 
 namespace LocalContext
 
-theorem clamp01Scalar_eq_self_of_mem_Icc
-    {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) :
-    clamp01Scalar x = x := by
-  simp [clamp01Scalar, hx0, hx1]
+theorem clamp01Scalar_eq_self_of_mem_Icc {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) :
+    clamp01Scalar x = x := by simp [clamp01Scalar, hx0, hx1]
 
 theorem clamp01_eq_self_of_bounds
     (g : LocalUnknown)
@@ -18,10 +16,8 @@ theorem clamp01_eq_self_of_bounds
     (hbg0 : 0 ≤ background g) (hbg1 : background g ≤ 1) :
     clamp01 g = g := by
   ext i; fin_cases i
-  · simpa [clamp01, foreground, mkLocalUnknown] using
-      clamp01Scalar_eq_self_of_mem_Icc hfg0 hfg1
-  · simpa [clamp01, background, mkLocalUnknown] using
-      clamp01Scalar_eq_self_of_mem_Icc hbg0 hbg1
+  · simpa [clamp01, foreground, mkLocalUnknown] using clamp01Scalar_eq_self_of_mem_Icc hfg0 hfg1
+  · simpa [clamp01, background, mkLocalUnknown] using clamp01Scalar_eq_self_of_mem_Icc hbg0 hbg1
 
 private theorem bounds_of_clamp01Scalar_eq_self {x : ℝ} (h : clamp01Scalar x = x) :
     0 ≤ x ∧ x ≤ 1 := by
@@ -40,18 +36,14 @@ theorem clamp01_eq_self_iff (g : LocalUnknown) :
         (0 ≤ background g ∧ background g ≤ 1) := by
   constructor
   · intro h
-    have hfg : clamp01Scalar (foreground g) = foreground g := by
-      simpa [foreground_clamp01] using congrFun h 0
-    have hbg : clamp01Scalar (background g) = background g := by
-      simpa [background_clamp01] using congrFun h 1
-    exact ⟨bounds_of_clamp01Scalar_eq_self hfg, bounds_of_clamp01Scalar_eq_self hbg⟩
+    exact ⟨bounds_of_clamp01Scalar_eq_self (by simpa [foreground_clamp01] using congrFun h 0),
+           bounds_of_clamp01Scalar_eq_self (by simpa [background_clamp01] using congrFun h 1)⟩
   · rintro ⟨⟨hfg0, hfg1⟩, ⟨hbg0, hbg1⟩⟩
     exact clamp01_eq_self_of_bounds g hfg0 hfg1 hbg0 hbg1
 
 theorem closedForm_clamp01_eq_self_of_component_bounds
     {ι : Type*} [Fintype ι]
-    (ctx : LocalContext ι)
-    [Assumptions.CoreMathAssumptions ctx]
+    (ctx : LocalContext ι) [Assumptions.CoreMathAssumptions ctx]
     (hfg0 : 0 ≤ foreground (closedFormSolution ctx))
     (hfg1 : foreground (closedFormSolution ctx) ≤ 1)
     (hbg0 : 0 ≤ background (closedFormSolution ctx))

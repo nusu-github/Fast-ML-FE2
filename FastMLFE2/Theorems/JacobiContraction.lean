@@ -223,15 +223,15 @@ theorem jacobiDifferenceMap_infty_bound
         = jacobiForegroundCoeff ctx * |background g| := by
           rw [jacobiDifferenceMap_foreground]
           simp [abs_mul, abs_of_nonneg (jacobiForegroundCoeff_nonneg ctx)]
-      _ ≤ jacobiOneStepGain ctx * localInfinityNorm g := by
-          exact mul_le_mul (le_max_left _ _) (background_abs_le_localInfinityNorm g)
+      _ ≤ jacobiOneStepGain ctx * localInfinityNorm g :=
+          mul_le_mul (le_max_left _ _) (background_abs_le_localInfinityNorm g)
             (abs_nonneg _) (jacobiOneStepGain_nonneg ctx)
   · calc |background (jacobiDifferenceMap ctx g)|
         = jacobiBackgroundCoeff ctx * |foreground g| := by
           rw [jacobiDifferenceMap_background]
           simp [abs_mul, abs_of_nonneg (jacobiBackgroundCoeff_nonneg ctx)]
-      _ ≤ jacobiOneStepGain ctx * localInfinityNorm g := by
-          exact mul_le_mul (le_max_right _ _) (foreground_abs_le_localInfinityNorm g)
+      _ ≤ jacobiOneStepGain ctx * localInfinityNorm g :=
+          mul_le_mul (le_max_right _ _) (foreground_abs_le_localInfinityNorm g)
             (abs_nonneg _) (jacobiOneStepGain_nonneg ctx)
 
 theorem jacobiOneStep_infty_bound
@@ -249,8 +249,7 @@ theorem jacobiOneStep_infty_bound
 
 theorem jacobiIterate_closedFormSolution
     (ctx : LocalContext ι) [CoreMathAssumptions ctx] (k : Nat) :
-    jacobiIterate ctx k (closedFormSolution ctx) =
-      closedFormSolution ctx := by
+    jacobiIterate ctx k (closedFormSolution ctx) = closedFormSolution ctx := by
   induction k with
   | zero => rfl
   | succ k ih => simp [jacobiStep_closedFormSolution, ih]
@@ -316,36 +315,28 @@ theorem jacobiIterate_error_le
   obtain ⟨m, rfl | rfl⟩ := Nat.even_or_odd' k
   · simpa [jacobiSpectralRadiusSq_pow ctx m, pow_mul] using
       jacobiIterate_two_mul_add_one_error_le ctx m x
-  · have hnorm :
-      0 ≤ localInfinityNorm (x - closedFormSolution ctx) := localInfinityNorm_nonneg _
-    have hpow :
-        0 ≤ jacobiSpectralRadius ctx ^ (2 * m + 1) := by
-      exact pow_nonneg (jacobiSpectralRadius_nonneg ctx) _
+  · have hnorm := localInfinityNorm_nonneg (x - closedFormSolution ctx)
+    have hpow := pow_nonneg (jacobiSpectralRadius_nonneg ctx) (2 * m + 1)
     calc
       localInfinityNorm (jacobiIterate ctx ((2 * m + 1) + 1) x - closedFormSolution ctx)
           = jacobiSpectralRadiusSq ctx ^ (m + 1) *
               localInfinityNorm (x - closedFormSolution ctx) := by
                 rw [show (2 * m + 1) + 1 = 2 * (m + 1) by omega]
-                simpa using
-                  jacobiIterate_two_mul_error_eq (ctx := ctx) (m + 1) x
+                simpa using jacobiIterate_two_mul_error_eq ctx (m + 1) x
       _ = jacobiSpectralRadius ctx ^ (2 * m + 2) *
             localInfinityNorm (x - closedFormSolution ctx) := by
-              rw [jacobiSpectralRadiusSq_pow (ctx := ctx) (m + 1)]
-              congr 1
+              rw [jacobiSpectralRadiusSq_pow ctx (m + 1)]; congr 1
       _ = jacobiSpectralRadius ctx *
             (jacobiSpectralRadius ctx ^ (2 * m + 1) *
               localInfinityNorm (x - closedFormSolution ctx)) := by
-                rw [show 2 * m + 2 = (2 * m + 1) + 1 by omega, pow_succ]
-                ring
+                rw [show 2 * m + 2 = (2 * m + 1) + 1 by omega, pow_succ]; ring
       _ ≤ jacobiOneStepGain ctx *
             (jacobiSpectralRadius ctx ^ (2 * m + 1) *
-              localInfinityNorm (x - closedFormSolution ctx)) := by
-                exact mul_le_mul_of_nonneg_right
-                  (jacobiSpectralRadius_le_jacobiOneStepGain ctx)
-                  (mul_nonneg hpow hnorm)
+              localInfinityNorm (x - closedFormSolution ctx)) :=
+                mul_le_mul_of_nonneg_right
+                  (jacobiSpectralRadius_le_jacobiOneStepGain ctx) (mul_nonneg hpow hnorm)
       _ = jacobiOneStepGain ctx * jacobiSpectralRadius ctx ^ (2 * m + 1) *
-            localInfinityNorm (x - closedFormSolution ctx) := by
-              ring
+            localInfinityNorm (x - closedFormSolution ctx) := by ring
 
 example (ctx : LocalContext ι) [CoreMathAssumptions ctx] (hα : ctx.alphaCenter = 0) :
     jacobiSpectralRadius ctx = 0 :=
