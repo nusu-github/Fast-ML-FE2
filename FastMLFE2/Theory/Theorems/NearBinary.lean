@@ -1,3 +1,4 @@
+import FastMLFE2.Theory.Theorems.ClosedForm
 import FastMLFE2.Theory.Theorems.ClosedFormBoxInput
 import FastMLFE2.Theory.Theorems.Invertibility
 import FastMLFE2.Theory.Theorems.Conditioning
@@ -161,6 +162,21 @@ theorem foreground_closedFormSolution_sub_foregroundMean_eq_meanResidualForm
   simp [FastMLFE2.Theory.Core.LocalContext.meanResidual]
   ring
 
+theorem foreground_correction_uses_meanResidual
+    (ctx : LocalContext ι)
+    [CoreMathAssumptions ctx] :
+    foreground (closedFormSolution ctx) =
+      ctx.foregroundMean +
+        ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx := by
+  calc
+    foreground (closedFormSolution ctx)
+        = ctx.foregroundMean +
+            (foreground (closedFormSolution ctx) - ctx.foregroundMean) := by
+              ring
+    _ = ctx.foregroundMean +
+          ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx := by
+            rw [foreground_closedFormSolution_sub_foregroundMean_eq_meanResidualForm]
+
 theorem background_closedFormSolution_sub_backgroundMean_eq
     (ctx : LocalContext ι)
     [CoreMathAssumptions ctx] :
@@ -181,6 +197,40 @@ theorem background_closedFormSolution_sub_backgroundMean_eq_meanResidualForm
       (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx := by
   rw [background_closedFormSolution_sub_backgroundMean_eq]
   simp [FastMLFE2.Theory.Core.LocalContext.meanResidual]
+
+theorem background_correction_uses_meanResidual
+    (ctx : LocalContext ι)
+    [CoreMathAssumptions ctx] :
+    background (closedFormSolution ctx) =
+      ctx.backgroundMean +
+        (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx := by
+  calc
+    background (closedFormSolution ctx)
+        = ctx.backgroundMean +
+            (background (closedFormSolution ctx) - ctx.backgroundMean) := by
+              ring
+    _ = ctx.backgroundMean +
+          (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx := by
+            rw [background_closedFormSolution_sub_backgroundMean_eq_meanResidualForm]
+
+theorem meanResidual_corrections_of_solvesNormalEquation
+    (ctx : LocalContext ι)
+    [CoreMathAssumptions ctx]
+    {g : LocalUnknown}
+    (hg : ctx.SolvesNormalEquation g) :
+    foreground g =
+        ctx.foregroundMean +
+          ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx ∧
+      background g =
+        ctx.backgroundMean +
+          (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx := by
+  have hclosed : g = closedFormSolution ctx :=
+    eq_closedFormSolution_of_solvesNormalEquation (ctx := ctx) hg
+  constructor
+  · rw [hclosed]
+    exact foreground_correction_uses_meanResidual ctx
+  · rw [hclosed]
+    exact background_correction_uses_meanResidual ctx
 
 theorem abs_foreground_closedFormSolution_sub_foregroundMean_le
     (ctx : LocalContext ι)

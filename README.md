@@ -57,6 +57,7 @@ FastMLFE2/
 │       ├── CostToNormalEquation.lean   ← ∂cost/∂t = 0 ↔ normal equation
 │       ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
 │       ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
+│       ├── NearBinary.lean             ← meanResidual correction around weighted means
 │       └── CompositingError.lean       ← |Δcompose| ≤ α|ΔF| + (1-α)|ΔB|
 ├── Legacy.lean                         ← legacy umbrella (Runtime + CLI)
 ├── Runtime.lean                        ← runtime umbrella
@@ -101,6 +102,9 @@ pipeline stages:
 
 - **Closed-Form Solution** — Explicit 2×2 inverse solves the normal equation (det ≠ 0
   proof); solution is unique; equals matrix-inverse form.
+- **Near-Binary Mean-Residual Correction** — The closed-form foreground/background updates are
+  exposed as weighted means plus a shared `meanResidual`; by uniqueness the same pair of
+  correction formulas characterizes any normal-equation solution.
 - **Cost–Normal-Equation Bridge** — Local cost expands as a quadratic in perturbation `t`;
   genuine `HasDerivAt` derivatives; `IsCostStationary ↔ SolvesNormalEquation`.
 - **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend

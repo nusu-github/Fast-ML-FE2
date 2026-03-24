@@ -117,6 +117,16 @@ theorem closedForm_eq_inverseSolution (ctx : LocalContext ι) [CoreMathAssumptio
     closedFormSolution ctx = inverseSolution ctx :=
   eq_inverseSolution_of_solves ctx (closedForm_solvesNormalEquation ctx)
 
+theorem eq_closedFormSolution_of_solvesNormalEquation
+    (ctx : LocalContext ι)
+    [CoreMathAssumptions ctx]
+    {g : LocalUnknown}
+    (hg : ctx.SolvesNormalEquation g) :
+    g = closedFormSolution ctx := by
+  calc
+    g = inverseSolution ctx := eq_inverseSolution_of_solves ctx hg
+    _ = closedFormSolution ctx := (closedForm_eq_inverseSolution ctx).symm
+
 theorem closedForm_isCostStationary (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     ctx.IsCostStationary (closedFormSolution ctx) :=
   (isCostStationary_iff_solvesNormalEquation ctx _).2 (closedForm_solvesNormalEquation ctx)
