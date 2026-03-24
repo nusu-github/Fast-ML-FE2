@@ -11,30 +11,30 @@ variable {ι : Type*} [Fintype ι]
 
 noncomputable def meanResidualSolution (ctx : LocalContext ι) : LocalUnknown :=
   mkLocalUnknown
-    (ctx.foregroundMean + ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx)
-    (ctx.backgroundMean + (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx)
+    (ctx.foregroundMean + ctx.alphaCenter * ctx.meanResidual / ctx.weightedMeanDenom)
+    (ctx.backgroundMean + (1 - ctx.alphaCenter) * ctx.meanResidual / ctx.weightedMeanDenom)
 
 @[simp] theorem foreground_meanResidualSolution (ctx : LocalContext ι) :
     foreground (meanResidualSolution ctx) =
-      ctx.foregroundMean + ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx := by
+      ctx.foregroundMean + ctx.alphaCenter * ctx.meanResidual / ctx.weightedMeanDenom := by
   simp [meanResidualSolution]
 
 @[simp] theorem background_meanResidualSolution (ctx : LocalContext ι) :
     background (meanResidualSolution ctx) =
-      ctx.backgroundMean + (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx := by
+      ctx.backgroundMean + (1 - ctx.alphaCenter) * ctx.meanResidual / ctx.weightedMeanDenom := by
   simp [meanResidualSolution]
 
 @[simp] theorem foreground_clamp01_meanResidualSolution (ctx : LocalContext ι) :
     foreground (clamp01 (meanResidualSolution ctx)) =
       clamp01Scalar
-        (ctx.foregroundMean + ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx) := by
+        (ctx.foregroundMean + ctx.alphaCenter * ctx.meanResidual / ctx.weightedMeanDenom) := by
   simp [meanResidualSolution]
 
 @[simp] theorem background_clamp01_meanResidualSolution (ctx : LocalContext ι) :
     background (clamp01 (meanResidualSolution ctx)) =
       clamp01Scalar
         (ctx.backgroundMean +
-          (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx) := by
+          (1 - ctx.alphaCenter) * ctx.meanResidual / ctx.weightedMeanDenom) := by
   simp [meanResidualSolution]
 
 theorem meanResidualSolution_eq_closedFormSolution

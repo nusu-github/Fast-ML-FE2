@@ -147,17 +147,17 @@ theorem foreground_closedFormSolution_sub_foregroundMean_eq
       ctx.alphaCenter *
         (ctx.imageValue + ctx.alphaCenter * ctx.backgroundMean -
           ctx.alphaCenter * ctx.foregroundMean - ctx.backgroundMean) /
-        weightedMeanDenom ctx := by
+        ctx.weightedMeanDenom := by
   rw [foreground_closedFormSolution_eq_weightedMeanForm]
-  field_simp [(weightedMeanDenom_pos ctx).ne']
-  simp [closedFormForegroundMeanAffine, weightedMeanDenom]
+  have hden : ctx.weightedMeanDenom ≠ 0 := (weightedMeanDenom_pos ctx).ne'; field_simp [hden]
+  simp [closedFormForegroundMeanAffine, LocalContext.weightedMeanDenom]
   ring
 
 theorem foreground_closedFormSolution_sub_foregroundMean_eq_meanResidualForm
     (ctx : LocalContext ι)
     [CoreMathAssumptions ctx] :
     foreground (closedFormSolution ctx) - ctx.foregroundMean =
-      ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx := by
+      ctx.alphaCenter * ctx.meanResidual / ctx.weightedMeanDenom := by
   rw [foreground_closedFormSolution_sub_foregroundMean_eq]
   simp [FastMLFE2.Theory.Core.LocalContext.meanResidual]
   ring
@@ -167,14 +167,14 @@ theorem foreground_correction_uses_meanResidual
     [CoreMathAssumptions ctx] :
     foreground (closedFormSolution ctx) =
       ctx.foregroundMean +
-        ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx := by
+        ctx.alphaCenter * ctx.meanResidual / ctx.weightedMeanDenom := by
   calc
     foreground (closedFormSolution ctx)
         = ctx.foregroundMean +
             (foreground (closedFormSolution ctx) - ctx.foregroundMean) := by
               ring
     _ = ctx.foregroundMean +
-          ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx := by
+          ctx.alphaCenter * ctx.meanResidual / ctx.weightedMeanDenom := by
             rw [foreground_closedFormSolution_sub_foregroundMean_eq_meanResidualForm]
 
 theorem background_closedFormSolution_sub_backgroundMean_eq
@@ -184,17 +184,17 @@ theorem background_closedFormSolution_sub_backgroundMean_eq
       (1 - ctx.alphaCenter) *
         (ctx.imageValue - ctx.alphaCenter * ctx.foregroundMean -
           (1 - ctx.alphaCenter) * ctx.backgroundMean) /
-        weightedMeanDenom ctx := by
+        ctx.weightedMeanDenom := by
   rw [background_closedFormSolution_eq_weightedMeanForm]
-  field_simp [(weightedMeanDenom_pos ctx).ne']
-  simp [closedFormBackgroundMeanAffine, weightedMeanDenom]
+  have hden : ctx.weightedMeanDenom ≠ 0 := (weightedMeanDenom_pos ctx).ne'; field_simp [hden]
+  simp [closedFormBackgroundMeanAffine, LocalContext.weightedMeanDenom]
   ring
 
 theorem background_closedFormSolution_sub_backgroundMean_eq_meanResidualForm
     (ctx : LocalContext ι)
     [CoreMathAssumptions ctx] :
     background (closedFormSolution ctx) - ctx.backgroundMean =
-      (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx := by
+      (1 - ctx.alphaCenter) * ctx.meanResidual / ctx.weightedMeanDenom := by
   rw [background_closedFormSolution_sub_backgroundMean_eq]
   simp [FastMLFE2.Theory.Core.LocalContext.meanResidual]
 
@@ -203,14 +203,14 @@ theorem background_correction_uses_meanResidual
     [CoreMathAssumptions ctx] :
     background (closedFormSolution ctx) =
       ctx.backgroundMean +
-        (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx := by
+        (1 - ctx.alphaCenter) * ctx.meanResidual / ctx.weightedMeanDenom := by
   calc
     background (closedFormSolution ctx)
         = ctx.backgroundMean +
             (background (closedFormSolution ctx) - ctx.backgroundMean) := by
               ring
     _ = ctx.backgroundMean +
-          (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx := by
+          (1 - ctx.alphaCenter) * ctx.meanResidual / ctx.weightedMeanDenom := by
             rw [background_closedFormSolution_sub_backgroundMean_eq_meanResidualForm]
 
 theorem meanResidual_corrections_of_solvesNormalEquation
@@ -220,10 +220,10 @@ theorem meanResidual_corrections_of_solvesNormalEquation
     (hg : ctx.SolvesNormalEquation g) :
     foreground g =
         ctx.foregroundMean +
-          ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx ∧
+          ctx.alphaCenter * ctx.meanResidual / ctx.weightedMeanDenom ∧
       background g =
         ctx.backgroundMean +
-          (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx := by
+          (1 - ctx.alphaCenter) * ctx.meanResidual / ctx.weightedMeanDenom := by
   have hclosed : g = closedFormSolution ctx :=
     eq_closedFormSolution_of_solvesNormalEquation (ctx := ctx) hg
   constructor
@@ -252,39 +252,39 @@ theorem abs_foreground_closedFormSolution_sub_foregroundMean_le
         ctx.alphaCenter * ctx.foregroundMean - ctx.backgroundMean ≤ 1 := by
       nlinarith [hI.1, hI.2, hα.1, hα.2, hμF.1, hμF.2, hμB.1, hμB.2]
     exact abs_le.2 ⟨hlow, hupp⟩
-  have hhalf : (1 : ℝ) / 2 ≤ weightedMeanDenom ctx := by
+  have hhalf : (1 : ℝ) / 2 ≤ ctx.weightedMeanDenom := by
     have htw : 0 ≤ ctx.totalWeight := le_of_lt (totalWeight_pos ctx)
     have hsq : (1 : ℝ) / 2 ≤ ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2 :=
       one_half_le_alphaQuadratic ctx
-    have hdef : weightedMeanDenom ctx =
+    have hdef : ctx.weightedMeanDenom =
         ctx.totalWeight + (ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2) := by
-      simp [weightedMeanDenom, add_assoc]
+      simp [LocalContext.weightedMeanDenom, add_assoc]
     nlinarith [hsq, htw, hdef]
   have hquot :
       |ctx.imageValue + ctx.alphaCenter * ctx.backgroundMean -
         ctx.alphaCenter * ctx.foregroundMean - ctx.backgroundMean| /
-      weightedMeanDenom ctx ≤ 2 := by
+      ctx.weightedMeanDenom ≤ 2 := by
     have hstep : |ctx.imageValue + ctx.alphaCenter * ctx.backgroundMean -
         ctx.alphaCenter * ctx.foregroundMean - ctx.backgroundMean|
-        ≤ 2 * weightedMeanDenom ctx := by
+        ≤ 2 * ctx.weightedMeanDenom := by
       nlinarith [hinner, hhalf]
-    have hden : 0 < weightedMeanDenom ctx := weightedMeanDenom_pos ctx
+    have hden : 0 < ctx.weightedMeanDenom := weightedMeanDenom_pos ctx
     calc
       |ctx.imageValue + ctx.alphaCenter * ctx.backgroundMean -
           ctx.alphaCenter * ctx.foregroundMean - ctx.backgroundMean| /
-          weightedMeanDenom ctx
-          ≤ (2 * weightedMeanDenom ctx) / weightedMeanDenom ctx := by
+          ctx.weightedMeanDenom
+          ≤ (2 * ctx.weightedMeanDenom) / ctx.weightedMeanDenom := by
               exact div_le_div_of_nonneg_right hstep hden.le
       _ = 2 := by field_simp [hden.ne']
   calc
     |ctx.alphaCenter *
         (ctx.imageValue + ctx.alphaCenter * ctx.backgroundMean -
           ctx.alphaCenter * ctx.foregroundMean - ctx.backgroundMean) /
-        weightedMeanDenom ctx|
+        ctx.weightedMeanDenom|
         = ctx.alphaCenter *
           (|ctx.imageValue + ctx.alphaCenter * ctx.backgroundMean -
             ctx.alphaCenter * ctx.foregroundMean - ctx.backgroundMean| /
-            weightedMeanDenom ctx) := by
+            ctx.weightedMeanDenom) := by
               rw [div_eq_mul_inv]
               rw [div_eq_mul_inv, abs_mul, abs_mul, abs_inv]
               simp only [abs_of_nonneg hα.1, abs_of_pos (weightedMeanDenom_pos ctx)]

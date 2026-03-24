@@ -31,18 +31,28 @@ theorem totalWeight_pos (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     (neighborWeight_pos ctx (Classical.choice (CoreMathAssumptions.neighborNonempty ctx)))
     (Finset.single_le_sum (fun k _ => neighborWeight_nonneg ctx k) (Finset.mem_univ _))
 
+theorem weightedMeanDenom_pos (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
+    0 < ctx.weightedMeanDenom := by
+  have htw : 0 < ctx.totalWeight := totalWeight_pos ctx
+  have hsq1 : 0 ≤ ctx.alphaCenter ^ 2 := by positivity
+  have hsq2 : 0 ≤ (1 - ctx.alphaCenter) ^ 2 := by positivity
+  have hsum : 0 ≤ ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2 := add_nonneg hsq1 hsq2
+  have : 0 < ctx.totalWeight + (ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2) :=
+    add_pos_of_pos_of_nonneg htw hsum
+  simpa [LocalContext.weightedMeanDenom, add_assoc] using this
+
 theorem normalMatrix_det (ctx : LocalContext ι) :
-    ctx.normalMatrix.det =
-      ctx.totalWeight * (ctx.totalWeight + ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2) := by
-  rw [Matrix.det_fin_two]; simp [LocalContext.normalMatrix]; ring
+    ctx.normalMatrix.det = ctx.totalWeight * ctx.weightedMeanDenom := by
+  rw [Matrix.det_fin_two]
+  simp [LocalContext.normalMatrix, LocalContext.weightedMeanDenom]
+  ring
 
 theorem normalMatrix_det_pos (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     0 < ctx.normalMatrix.det := by
   rw [normalMatrix_det]
   nlinarith [
     totalWeight_pos ctx,
-    sq_nonneg ctx.alphaCenter,
-    sq_nonneg (1 - ctx.alphaCenter)
+    weightedMeanDenom_pos ctx
   ]
 
 theorem normalMatrix_det_ne_zero (ctx : LocalContext ι) [CoreMathAssumptions ctx] :

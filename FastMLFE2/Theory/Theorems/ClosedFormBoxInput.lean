@@ -9,9 +9,6 @@ namespace LocalContext
 
 variable {ι : Type*} [Fintype ι]
 
-def weightedMeanDenom (ctx : LocalContext ι) : ℝ :=
-  ctx.totalWeight + ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2
-
 noncomputable def closedFormForegroundMeanAffine (ctx : LocalContext ι) : ℝ :=
   ctx.alphaCenter * ctx.imageValue +
     (((1 - ctx.alphaCenter) ^ 2 + ctx.totalWeight) *
@@ -86,19 +83,9 @@ theorem not_naive_boxed_input_implies_foregroundNumerator_nonneg :
     exact h naiveBoxInputCounterexampleCtx hI hα hfg hbg
   linarith [closedFormForegroundNumerator_naiveBoxInputCounterexample_neg]
 
-theorem weightedMeanDenom_pos (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
-    0 < weightedMeanDenom ctx := by
-  have htw : 0 < ctx.totalWeight := totalWeight_pos ctx
-  have hsq1 : 0 ≤ ctx.alphaCenter ^ 2 := by positivity
-  have hsq2 : 0 ≤ (1 - ctx.alphaCenter) ^ 2 := by positivity
-  have hsum : 0 ≤ ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2 := add_nonneg hsq1 hsq2
-  have : 0 < ctx.totalWeight + (ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2) :=
-    add_pos_of_pos_of_nonneg htw hsum
-  simpa [weightedMeanDenom, add_assoc] using this
-
 theorem closedFormDenom_eq_totalWeight_mul_weightedMeanDenom (ctx : LocalContext ι) :
-    closedFormDenom ctx = ctx.totalWeight * weightedMeanDenom ctx := by
-  simp [closedFormDenom, weightedMeanDenom]
+    closedFormDenom ctx = ctx.totalWeight * ctx.weightedMeanDenom := by
+  simp [closedFormDenom, LocalContext.weightedMeanDenom]
 
 theorem totalWeight_mul_foregroundMean
     (ctx : LocalContext ι)
@@ -148,9 +135,9 @@ theorem foreground_closedFormSolution_eq_weightedMeanForm
     (ctx : LocalContext ι)
     [CoreMathAssumptions ctx] :
     foreground (closedFormSolution ctx) =
-      closedFormForegroundMeanAffine ctx / weightedMeanDenom ctx := by
+      closedFormForegroundMeanAffine ctx / ctx.weightedMeanDenom := by
   have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
-  have hred0 : weightedMeanDenom ctx ≠ 0 := (weightedMeanDenom_pos ctx).ne'
+  have hred0 : ctx.weightedMeanDenom ≠ 0 := (weightedMeanDenom_pos ctx).ne'
   rw [foreground_closedFormSolution,
     closedFormForegroundNumerator_eq_totalWeight_mul_meanAffine,
     closedFormDenom_eq_totalWeight_mul_weightedMeanDenom]
@@ -160,9 +147,9 @@ theorem background_closedFormSolution_eq_weightedMeanForm
     (ctx : LocalContext ι)
     [CoreMathAssumptions ctx] :
     background (closedFormSolution ctx) =
-      closedFormBackgroundMeanAffine ctx / weightedMeanDenom ctx := by
+      closedFormBackgroundMeanAffine ctx / ctx.weightedMeanDenom := by
   have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
-  have hred0 : weightedMeanDenom ctx ≠ 0 := (weightedMeanDenom_pos ctx).ne'
+  have hred0 : ctx.weightedMeanDenom ≠ 0 := (weightedMeanDenom_pos ctx).ne'
   rw [background_closedFormSolution,
     closedFormBackgroundNumerator_eq_totalWeight_mul_meanAffine,
     closedFormDenom_eq_totalWeight_mul_weightedMeanDenom]
@@ -198,7 +185,7 @@ theorem closedForm_foreground_mem_Icc_iff_weightedMeanBounds
     (0 ≤ foreground (closedFormSolution ctx) ∧
         foreground (closedFormSolution ctx) ≤ 1) ↔
       (0 ≤ closedFormForegroundMeanAffine ctx ∧
-        closedFormForegroundMeanAffine ctx ≤ weightedMeanDenom ctx) := by
+        closedFormForegroundMeanAffine ctx ≤ ctx.weightedMeanDenom) := by
   rw [foreground_closedFormSolution_eq_weightedMeanForm]
   exact div_mem_unitInterval_iff (weightedMeanDenom_pos ctx)
 
@@ -208,7 +195,7 @@ theorem closedForm_background_mem_Icc_iff_weightedMeanBounds
     (0 ≤ background (closedFormSolution ctx) ∧
         background (closedFormSolution ctx) ≤ 1) ↔
       (0 ≤ closedFormBackgroundMeanAffine ctx ∧
-        closedFormBackgroundMeanAffine ctx ≤ weightedMeanDenom ctx) := by
+        closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) := by
   rw [background_closedFormSolution_eq_weightedMeanForm]
   exact div_mem_unitInterval_iff (weightedMeanDenom_pos ctx)
 
@@ -220,9 +207,9 @@ theorem closedForm_mem_box_iff_weightedMeanBounds
       (0 ≤ background (closedFormSolution ctx) ∧
         background (closedFormSolution ctx) ≤ 1) ↔
       (0 ≤ closedFormForegroundMeanAffine ctx ∧
-        closedFormForegroundMeanAffine ctx ≤ weightedMeanDenom ctx) ∧
+        closedFormForegroundMeanAffine ctx ≤ ctx.weightedMeanDenom) ∧
       (0 ≤ closedFormBackgroundMeanAffine ctx ∧
-        closedFormBackgroundMeanAffine ctx ≤ weightedMeanDenom ctx) := by
+        closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) := by
   constructor <;> intro h
   · exact ⟨
       (closedForm_foreground_mem_Icc_iff_weightedMeanBounds (ctx := ctx)).1 h.1,
@@ -236,9 +223,9 @@ theorem closedForm_clamp01_eq_self_iff_weightedMeanBounds
     [CoreMathAssumptions ctx] :
     clamp01 (closedFormSolution ctx) = closedFormSolution ctx ↔
       (0 ≤ closedFormForegroundMeanAffine ctx ∧
-        closedFormForegroundMeanAffine ctx ≤ weightedMeanDenom ctx) ∧
+        closedFormForegroundMeanAffine ctx ≤ ctx.weightedMeanDenom) ∧
       (0 ≤ closedFormBackgroundMeanAffine ctx ∧
-        closedFormBackgroundMeanAffine ctx ≤ weightedMeanDenom ctx) := by
+        closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) := by
   exact (clamp01_eq_self_iff (g := closedFormSolution ctx)).trans
     (closedForm_mem_box_iff_weightedMeanBounds (ctx := ctx))
 
@@ -247,20 +234,20 @@ theorem closedForm_clamp01_eq_self_of_weightedMeanBounds
     [CoreMathAssumptions ctx]
     (hfg :
       0 ≤ closedFormForegroundMeanAffine ctx ∧
-        closedFormForegroundMeanAffine ctx ≤ weightedMeanDenom ctx)
+        closedFormForegroundMeanAffine ctx ≤ ctx.weightedMeanDenom)
     (hbg :
       0 ≤ closedFormBackgroundMeanAffine ctx ∧
-        closedFormBackgroundMeanAffine ctx ≤ weightedMeanDenom ctx) :
+        closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) :
     clamp01 (closedFormSolution ctx) = closedFormSolution ctx := by
   exact (closedForm_clamp01_eq_self_iff_weightedMeanBounds (ctx := ctx)).2 ⟨hfg, hbg⟩
 
 example (ctx : LocalContext ι) [CoreMathAssumptions ctx]
     (hfg :
       0 ≤ closedFormForegroundMeanAffine ctx ∧
-        closedFormForegroundMeanAffine ctx ≤ weightedMeanDenom ctx)
+        closedFormForegroundMeanAffine ctx ≤ ctx.weightedMeanDenom)
     (hbg :
       0 ≤ closedFormBackgroundMeanAffine ctx ∧
-        closedFormBackgroundMeanAffine ctx ≤ weightedMeanDenom ctx) :
+        closedFormBackgroundMeanAffine ctx ≤ ctx.weightedMeanDenom) :
     clamp01 (closedFormSolution ctx) = closedFormSolution ctx := by
   simpa using closedForm_clamp01_eq_self_of_weightedMeanBounds (ctx := ctx) hfg hbg
 

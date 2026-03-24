@@ -84,8 +84,8 @@ private theorem blurStageTwoCtx_coreMathAssumptions
     FastMLFE2.Theory.Approximation.LocalContext.blurBackgroundMean]
 
 @[simp] theorem weightedMeanDenom_blurStageTwoCtx (ctx : Ctx ι) :
-    weightedMeanDenom (blurStageTwoCtx ctx) = blurStageTwoJointDenom ctx := by
-  simp [blurStageTwoJointDenom, weightedMeanDenom]
+    LocalContext.weightedMeanDenom (blurStageTwoCtx ctx) = blurStageTwoJointDenom ctx := by
+  simp [blurStageTwoJointDenom, LocalContext.weightedMeanDenom]
 
 theorem localCost_blurStageTwoCtx_eq_blurStageTwoCost
     (ctx : Ctx ι)

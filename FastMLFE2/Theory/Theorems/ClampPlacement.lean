@@ -34,10 +34,10 @@ theorem clamp01_nonexpansive (g h : LocalUnknown) :
 theorem rawStepGain_eq {ι : Type*} [Fintype ι] (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     rawStepGain ctx =
       (ctx.totalWeight + max ctx.alphaCenter (1 - ctx.alphaCenter)) /
-        (ctx.totalWeight + ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2) := by
+        ctx.weightedMeanDenom := by
   rw [rawStepGain, closedFormDenom]
   have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
-  field_simp [htw0]
+  field_simp [htw0, LocalContext.weightedMeanDenom]
 
 private theorem alphaQuadratic_le_max {ι : Type*} (ctx : LocalContext ι)
     (hα0 : 0 ≤ ctx.alphaCenter) (hα1 : ctx.alphaCenter ≤ 1) :
@@ -51,12 +51,10 @@ theorem rawStepGain_ge_one {ι : Type*} [Fintype ι]
     (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     1 ≤ rawStepGain ctx := by
   rw [rawStepGain_eq]
-  have htw := totalWeight_pos ctx
   have hα := CoreMathAssumptions.alphaCenterBounded (ctx := ctx)
-  have hden :
-      0 < ctx.totalWeight + (ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2) := by
-    nlinarith [sq_nonneg ctx.alphaCenter, sq_nonneg (1 - ctx.alphaCenter)]
-  rw [le_div_iff₀ (by linarith [hden])]
+  have hden : 0 < ctx.weightedMeanDenom := LocalContext.weightedMeanDenom_pos ctx
+  rw [le_div_iff₀ hden]
+  simp [LocalContext.weightedMeanDenom]
   linarith [alphaQuadratic_le_max ctx hα.1 hα.2]
 
 end LocalContext

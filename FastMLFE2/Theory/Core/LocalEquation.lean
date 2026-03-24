@@ -98,6 +98,9 @@ noncomputable def foregroundMean (ctx : LocalContext ι) : ℝ :=
 noncomputable def backgroundMean (ctx : LocalContext ι) : ℝ :=
   ctx.backgroundSum / ctx.totalWeight
 
+@[simp] def weightedMeanDenom (ctx : LocalContext ι) : ℝ :=
+  ctx.totalWeight + ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2
+
 /-- The image residual after subtracting the composited weighted-mean pair. -/
 noncomputable def meanResidual (ctx : LocalContext ι) : ℝ :=
   ctx.imageValue - ctx.alphaCenter * ctx.foregroundMean -

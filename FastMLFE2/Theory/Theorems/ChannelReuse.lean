@@ -53,6 +53,12 @@ theorem totalWeight_eq_of_sameWeightData
     ctx₁.totalWeight = ctx₂.totalWeight :=
   Finset.sum_congr rfl fun j _ => neighborWeight_eq_of_sameWeightData h j
 
+theorem weightedMeanDenom_eq_of_sameWeightData
+    {ctx₁ ctx₂ : LocalContext ι} (h : SameWeightData ctx₁ ctx₂) :
+    ctx₁.weightedMeanDenom = ctx₂.weightedMeanDenom := by
+  rw [LocalContext.weightedMeanDenom, LocalContext.weightedMeanDenom,
+    totalWeight_eq_of_sameWeightData h, h.alphaCenter_eq]
+
 theorem normalMatrix_eq_of_sameWeightData
     {ctx₁ ctx₂ : LocalContext ι} (h : SameWeightData ctx₁ ctx₂) :
     ctx₁.normalMatrix = ctx₂.normalMatrix := by

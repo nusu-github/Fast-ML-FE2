@@ -30,7 +30,7 @@ private theorem solve2x2_background
   field_simp [hdet0]; rw [hdet]; ring
 
 def closedFormDenom (ctx : LocalContext ι) : ℝ :=
-  ctx.totalWeight * (ctx.totalWeight + ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2)
+  ctx.totalWeight * ctx.weightedMeanDenom
 
 def closedFormForegroundNumerator (ctx : LocalContext ι) : ℝ :=
   ((1 - ctx.alphaCenter) ^ 2 + ctx.totalWeight) * foreground ctx.rhs -
