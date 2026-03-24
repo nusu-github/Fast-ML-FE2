@@ -19,7 +19,7 @@ When a trade-off appears between preserving legacy executable behavior and impro
 ## Project Structure & Module Organization
 `FastMLFE2/` holds the main Lean modules organized into two layers:
 
-- **Theory** (`FastMLFE2/Theory/`): the formal mathematical core — local equation, compositing, canonical semantics, assumption bundles, and proved theorems. This is the default library target and the architectural source of truth.
+- **Theory** (`FastMLFE2/`): the formal mathematical core — local equation, compositing, canonical semantics, assumption bundles, and proved theorems. This is the default library target and the architectural source of truth.
 - **Legacy** (`FastMLFE2/Legacy.lean`, `Runtime/`, `CLI.lean`, `NativeFFI.lean`): the executable comparison stack — CLI, multilevel solver, and C++ FFI bindings. Treat these as legacy comparison artifacts, not as the source of truth.
 
 `FastMLFE2.lean` is the umbrella import (imports Theory only). Top-level entrypoints `FFILeanSmoke.lean`, `FFICliSmoke.lean`, and `FastMLFECli.lean` build runnable executables. Native C++ FFI sources live in `native/`.

@@ -23,56 +23,36 @@ a switchable parametric theory.
 | **2** | **Formal Design-Space Exploration**           | Conditional equational theorems for each axiom instantiation — e.g. binary α ⇒ diagonal degeneration; channel independence ⇒ shared matrix reuse; ε_r > 0 ⇒ positive definiteness. Exhaustive verification over the assumption lattice.    |
 | **3** | **Deductive Synthesis (Stepwise Refinement)** | Proved equalities serve as rewrite rules to transform the abstract spec into efficient forms: closed-form 2×2 inverse, loop fusion, Jacobi-parallel pixel independence. Each step is a **certified refinement** (Correct-by-Construction). |
 
-### Two-Layer Architecture
+### Project Structure
 
-| Layer      | Import root        | Purpose                                                                                            |
-| ---------- | ------------------ | -------------------------------------------------------------------------------------------------- |
-| **Theory** | `FastMLFE2.Theory` | Formal mathematics: local equation, compositing, canonical semantics, assumption bundles, theorems |
-| **Legacy** | `FastMLFE2.Legacy` | Executable runtime: CLI, multilevel solver, native C++ FFI                                         |
-
-`FastMLFE2.Theory` is the default library target and the primary surface.
-See [docs/architecture.md](docs/architecture.md) for the full layered design.
+`FastMLFE2` is the main library target.
+See [docs/architecture.md](docs/architecture.md) for the layered design.
 
 ## Module Map
 
 ```txt
-FastMLFE2.lean                          ← umbrella (imports Theory only)
+FastMLFE2.lean                          ← umbrella import
 FastMLFE2/
-├── Theory.lean                         ← theory umbrella import
-│   ├── Core/
-│   │   ├── LocalEquation.lean          ← local context, cost, normal matrix, RHS
-│   │   └── LocalSemantics.lean         ← solution / stationarity relations
-│   ├── Compositing/
-│   │   └── OneChannel.lean             ← α·F + (1-α)·B semantics
-│   ├── Canonical/
-│   │   ├── LocalCommitments.lean       ← stencil, resize rule, iteration semantics
-│   │   └── MultilevelSchedule.lean     ← level-size computation
-│   ├── Approximation/
-│   │   └── BlurFusion.lean             ← idealized PhotoRoom Blur-Fusion surrogate
-│   ├── Assumptions/
-│   │   └── Bundles.lean                ← CoreMathAssumptions, variant bundles
-│   └── Theorems/
-│       ├── Invertibility.lean          ← det > 0, IsUnit det
-│       ├── ClosedForm.lean             ← explicit 2×2 inverse, uniqueness
-│       ├── CostToNormalEquation.lean   ← ∂cost/∂t = 0 ↔ normal equation
-│       ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
-│       ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
-│       ├── NearBinary.lean             ← meanResidual correction around weighted means
-│       └── CompositingError.lean       ← |Δcompose| ≤ α|ΔF| + (1-α)|ΔB|
-├── Legacy.lean                         ← legacy umbrella (Runtime + CLI)
-├── Runtime.lean                        ← runtime umbrella
-│   ├── Runtime/Config.lean             ← ExecutionConfig, level scheduling
-│   ├── Runtime/CliArgs.lean            ← CLI argument parsing
-│   └── Runtime/Solver.lean             ← multilevel solver orchestration
-├── CLI.lean                            ← CLI entry point
-└── NativeFFI.lean                      ← opaque FFI bindings to C++
-
-native/                                 ← C++ FFI sources (see native/README.md)
-├── fastmlfe2_ffi.h
-├── fastmlfe2_ffi.cpp
-├── lean_fastmlfe2_ffi.cpp
-├── smoke.cpp
-└── runner.cpp
+├── Core/
+│   ├── LocalEquation.lean          ← local context, cost, normal matrix, RHS
+│   └── LocalSemantics.lean         ← solution / stationarity relations
+├── Compositing/
+│   └── OneChannel.lean             ← α·F + (1-α)·B semantics
+├── Canonical/
+│   ├── LocalCommitments.lean       ← stencil, resize rule, iteration semantics
+│   └── MultilevelSchedule.lean     ← level-size computation
+├── Approximation/
+│   └── BlurFusion.lean             ← idealized PhotoRoom Blur-Fusion surrogate
+├── Assumptions/
+│   └── Bundles.lean                ← CoreMathAssumptions, variant bundles
+└── Theorems/
+    ├── Invertibility.lean          ← det > 0, IsUnit det
+    ├── ClosedForm.lean             ← explicit 2×2 inverse, uniqueness
+    ├── CostToNormalEquation.lean   ← ∂cost/∂t = 0 ↔ normal equation
+    ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
+    ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
+    ├── NearBinary.lean             ← meanResidual correction around weighted means
+    └── CompositingError.lean       ← |Δcompose| ≤ α|ΔF| + (1-α)|ΔB|
 ```
 
 ## Proved Theorems
@@ -82,11 +62,11 @@ pipeline stages:
 
 **Stage 1 (Formal Specification):**
 
-- Local cost function, 2×2 normal matrix, and RHS vector (`Theory.Core.LocalEquation`)
-- Solution / stationarity relations (`Theory.Core.LocalSemantics`)
+- Local cost function, 2×2 normal matrix, and RHS vector (`Core.LocalEquation`)
+- Solution / stationarity relations (`Core.LocalSemantics`)
 - Canonical commitments: 4-connected stencil, nearest-neighbor resize, deterministic
-  simultaneous update (`Theory.Canonical`)
-- Idealized Blur-Fusion approximation semantics (`Theory.Approximation.BlurFusion`)
+  simultaneous update (`Canonical`)
+- Idealized Blur-Fusion approximation semantics (`Approximation.BlurFusion`)
 
 **Stage 2 (Design-Space Exploration):**
 
@@ -117,35 +97,15 @@ pipeline stages:
 
 - **Lean 4** — version specified in `lean-toolchain` (currently `v4.28.0`)
 - **Mathlib** — fetched automatically by Lake (`v4.28.0`)
-- **OpenCV 4** — headers and libraries via `pkg-config opencv4` (required for native FFI)
-- **g++** with C++17 support
-
-On Ubuntu/Debian:
-
-```sh
-sudo apt install libopencv-dev pkg-config g++
-```
 
 ## Build
 
 ```sh
-# Build the default library (Theory layer)
+# Build the library
 lake build
 
-# Build the CLI executable
-lake build fastmlfeCli
-
-# Build smoke-test binaries
-lake build ffiLeanSmoke ffiCliSmoke ffiSmoke ffiRunner
-
 # Type-check a single file
-lake env lean FastMLFE2/CLI.lean
-```
-
-## CLI Usage
-
-```sh
-.lake/build/bin/fastmlfeCli [options] image.png alpha.png out_fg.png out_bg.png
+lake env lean FastMLFE2/Theorems/Invertibility.lean
 ```
 
 **Options:**

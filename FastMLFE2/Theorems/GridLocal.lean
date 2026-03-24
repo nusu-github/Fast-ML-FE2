@@ -1,0 +1,51 @@
+import FastMLFE2.Canonical.GridContext
+import FastMLFE2.Theorems.ClosedForm
+import FastMLFE2.Theorems.GridAssumptions
+import FastMLFE2.Theorems.GridNonempty
+
+namespace FastMLFE2.Theorems
+
+open FastMLFE2.Core
+open FastMLFE2.Assumptions
+open FastMLFE2.Canonical
+open FastMLFE2.Level
+
+namespace GridPixelData
+
+theorem localCtx_closedForm_solvesNormalEquation
+    {h w : Nat} (data : GridPixelData h w) (p : Pixel h w)
+    (state : PixelState (Pixel h w))
+    [GridMathAssumptions data] (hN : Nonempty (ValidDir p)) :
+    (data.localCtx p state).SolvesNormalEquation
+      (LocalContext.closedFormSolution (data.localCtx p state)) := by
+  letI : Fact (Nonempty (ValidDir p)) := ⟨hN⟩
+  simpa [GridPixelData.localCtx] using
+    LocalContext.closedForm_solvesNormalEquation
+      (data.toCanonicalPixelData.canonicalBuilder.build
+        p state)
+
+theorem localCtx_closedForm_isCostStationary
+    {h w : Nat} (data : GridPixelData h w) (p : Pixel h w)
+    (state : PixelState (Pixel h w))
+    [GridMathAssumptions data] (hN : Nonempty (ValidDir p)) :
+    (data.localCtx p state).IsCostStationary
+      (LocalContext.closedFormSolution (data.localCtx p state)) := by
+  letI : Fact (Nonempty (ValidDir p)) := ⟨hN⟩
+  simpa [GridPixelData.localCtx] using
+    LocalContext.closedForm_isCostStationary
+      (data.toCanonicalPixelData.canonicalBuilder.build
+        p state)
+
+private example
+    {h w : Nat} (data : GridPixelData h w) (p : Pixel h w)
+    (state : PixelState (Pixel h w))
+    [GridMathAssumptions data] (hInterior : IsInterior p) :
+    (data.localCtx p state).SolvesNormalEquation
+      (LocalContext.closedFormSolution (data.localCtx p state)) :=
+  localCtx_closedForm_solvesNormalEquation
+    data p state
+    (nonempty_validDir_of_isInterior p hInterior)
+
+end GridPixelData
+
+end FastMLFE2.Theorems

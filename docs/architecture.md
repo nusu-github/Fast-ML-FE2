@@ -48,7 +48,7 @@ principle.
 
 ```txt
 ┌─────────────────────────────────────────────────────┐
-│  Theory Layer (FastMLFE2.Theory)                    │
+│  Theory Layer (FastMLFE2)                    │
 │  ┌────────────────────────────────────────────────┐ │
 │  │  Theorems                                      │ │
 │  │  Invertibility · ClosedForm · CostBridge       │ │
@@ -86,7 +86,7 @@ principle.
 
 ## Theory Layer
 
-### Core (`FastMLFE2.Theory.Core`)
+### Core (`FastMLFE2.Core`)
 
 The mathematical foundation. Defines the raw local optimization problem for a single pixel
 without any algorithmic or backend commitments.
@@ -97,12 +97,12 @@ without any algorithmic or backend commitments.
 - **LocalSemantics** — `SolvesNormalEquation`, `IsLocalSolution`, and `IsCostStationary`
   relations. These are the denotational semantics that theorems target.
 
-### Compositing (`FastMLFE2.Theory.Compositing`)
+### Compositing (`FastMLFE2.Compositing`)
 
 - **OneChannel** — `compose α F B = α·F + (1-α)·B`. Provides simp lemmas for boundary
   cases (`α = 0`, `α = 1`) and algebraic difference identities.
 
-### Canonical Semantics (`FastMLFE2.Theory.Canonical`)
+### Canonical Semantics (`FastMLFE2.Canonical`)
 
 Fixes the algorithmic choices where the Germer paper and PyMatting reference implementation
 agree.
@@ -120,7 +120,7 @@ agree.
 - **MultilevelSchedule** — `levelSizes` computing the coarse-to-fine pyramid using
   `size^(level/levelCount)` interpolation.
 
-### Approximation (`FastMLFE2.Theory.Approximation`)
+### Approximation (`FastMLFE2.Approximation`)
 
 Explicit surrogate semantics for approximation families derived from, but not identified with,
 the canonical Germer objective.
@@ -129,7 +129,7 @@ the canonical Germer objective.
   means, separated surrogate costs, the sequential foreground correction, and induced
   builder-level `x1`/`x2`/`xk` update maps.
 
-### Assumptions (`FastMLFE2.Theory.Assumptions`)
+### Assumptions (`FastMLFE2.Assumptions`)
 
 Explicit assumption bundles that parameterize what varies across backends and usage scenarios.
 
@@ -139,7 +139,7 @@ Explicit assumption bundles that parameterize what varies across backends and us
 - **Grid** — `GridMathAssumptions` bundle for authored grid data. Carries the global
   hypotheses needed to recover `CoreMathAssumptions` pointwise on faithful grid contexts.
 
-### Level (`FastMLFE2.Theory.Level`)
+### Level (`FastMLFE2.Level`)
 
 Abstract one-level update semantics above the local solver kernel.
 
@@ -149,7 +149,7 @@ Abstract one-level update semantics above the local solver kernel.
   updates. States when a pointwise update depends only on a designated neighborhood of the
   old state.
 
-### Theorems (`FastMLFE2.Theory.Theorems`)
+### Theorems (`FastMLFE2.Theorems`)
 
 Machine-checked results under explicit assumptions.
 
