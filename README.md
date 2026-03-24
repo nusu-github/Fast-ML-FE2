@@ -79,6 +79,9 @@ native/                                 ← C++ FFI sources (see native/README.m
 The theory layer currently contains the following machine-checked results, mapped to the
 pipeline stages:
 
+For a more exhaustive module-by-module inventory, including the conditions under which each
+result is proved, see [docs/THEOREMS.md](docs/THEOREMS.md).
+
 **Stage 1 (Formal Specification):**
 
 - Local cost function, 2×2 normal matrix, and RHS vector (`Theory.Core.LocalEquation`)
