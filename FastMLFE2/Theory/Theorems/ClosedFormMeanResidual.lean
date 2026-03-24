@@ -1,9 +1,11 @@
 import FastMLFE2.Theory.Theorems.NearBinary
+import FastMLFE2.Theory.Theorems.BinaryAlpha
 
 namespace FastMLFE2.Theory.Theorems
 
 open FastMLFE2.Theory.Core
 open FastMLFE2.Theory.Assumptions
+open FastMLFE2.Theory.Core.LocalContext
 
 namespace LocalContext
 
@@ -53,6 +55,64 @@ theorem clamp01_meanResidualSolution_eq_clamp01_closedFormSolution
     [CoreMathAssumptions ctx] :
     clamp01 (meanResidualSolution ctx) = clamp01 (closedFormSolution ctx) := by
   simp [meanResidualSolution_eq_closedFormSolution (ctx := ctx)]
+
+theorem meanResidualSolution_foreground_of_alpha_zero
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx]
+    (hα : ctx.alphaCenter = 0) :
+    foreground (meanResidualSolution ctx) = ctx.foregroundMean := by
+  rw [meanResidualSolution_eq_closedFormSolution ctx]
+  rw [closedFormSolution_eq_of_alpha_zero ctx hα]
+  simp only [foregroundSum_eq_sum_neighborWeight_mul, totalWeight_eq_sum_neighborWeight,
+    backgroundSum_eq_sum_neighborWeight_mul, foreground_mkLocalUnknown, foregroundMean]
+
+theorem meanResidualSolution_background_of_alpha_zero
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx]
+    (hα : ctx.alphaCenter = 0) :
+    background (meanResidualSolution ctx) =
+      ctx.backgroundMean +
+        (ctx.imageValue - ctx.backgroundMean) / (ctx.totalWeight + 1) := by
+  rw [meanResidualSolution_eq_closedFormSolution ctx]
+  rw [closedFormSolution_eq_of_alpha_zero ctx hα]
+  have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
+  have htw1 : ctx.totalWeight + 1 ≠ 0 := by linarith [totalWeight_pos ctx]
+  simp only [foregroundSum_eq_sum_neighborWeight_mul, totalWeight_eq_sum_neighborWeight,
+    backgroundSum_eq_sum_neighborWeight_mul, background_mkLocalUnknown, backgroundMean]
+  set W := ∑ j, ctx.neighborWeight j
+  set BG := ∑ x, ctx.neighborWeight x * ctx.bgNeighbor x
+  have hW1 : W + 1 ≠ 0 := htw1
+  have hW0 : W ≠ 0 := htw0
+  have hW1' : 1 + W ≠ 0 := by rw [add_comm]; exact hW1
+  field_simp [hW0, hW1, hW1']
+  ring
+
+theorem meanResidualSolution_foreground_of_alpha_one
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx]
+    (hα : ctx.alphaCenter = 1) :
+    foreground (meanResidualSolution ctx) =
+      ctx.foregroundMean +
+        (ctx.imageValue - ctx.foregroundMean) / (ctx.totalWeight + 1) := by
+  rw [meanResidualSolution_eq_closedFormSolution ctx]
+  rw [closedFormSolution_eq_of_alpha_one ctx hα]
+  have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
+  have htw1 : ctx.totalWeight + 1 ≠ 0 := by linarith [totalWeight_pos ctx]
+  simp only [foregroundSum_eq_sum_neighborWeight_mul, totalWeight_eq_sum_neighborWeight,
+    backgroundSum_eq_sum_neighborWeight_mul, foreground_mkLocalUnknown, foregroundMean]
+  set W := ∑ j, ctx.neighborWeight j
+  set FG := ∑ x, ctx.neighborWeight x * ctx.fgNeighbor x
+  have hW1 : W + 1 ≠ 0 := htw1
+  have hW0 : W ≠ 0 := htw0
+  have hW1' : 1 + W ≠ 0 := by rw [add_comm]; exact hW1
+  field_simp [hW0, hW1, hW1']
+  ring
+
+theorem meanResidualSolution_background_of_alpha_one
+    (ctx : LocalContext ι) [CoreMathAssumptions ctx]
+    (hα : ctx.alphaCenter = 1) :
+    background (meanResidualSolution ctx) = ctx.backgroundMean := by
+  rw [meanResidualSolution_eq_closedFormSolution ctx]
+  rw [closedFormSolution_eq_of_alpha_one ctx hα]
+  simp only [foregroundSum_eq_sum_neighborWeight_mul, totalWeight_eq_sum_neighborWeight,
+    backgroundSum_eq_sum_neighborWeight_mul, background_mkLocalUnknown, backgroundMean]
 
 end LocalContext
 

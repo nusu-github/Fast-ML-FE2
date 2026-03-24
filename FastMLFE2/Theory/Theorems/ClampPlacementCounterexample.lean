@@ -158,4 +158,8 @@ theorem inside_iterate_two_ne_end_clamped_iterate_two :
   rw [clampPlacementCounterexampleInside2_value, clampPlacementCounterexampleEnd2_value] at this
   simp [background, mkLocalUnknown] at this
 
+theorem meanResidual_insideClamped_ne_endClamped :
+    clampPlacementCounterexampleInside2 ≠ clampPlacementCounterexampleEnd2 :=
+  inside_iterate_two_ne_end_clamped_iterate_two
+
 end FastMLFE2.Theory.Theorems
