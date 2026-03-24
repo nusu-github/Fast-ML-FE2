@@ -240,9 +240,9 @@ theorem abs_background_closedFormSolution_sub_backgroundMean_le
     (hbg : ∀ j, 0 ≤ ctx.bgNeighbor j ∧ ctx.bgNeighbor j ≤ 1) :
     |background (closedFormSolution ctx) - ctx.backgroundMean| ≤
       2 * (1 - ctx.alphaCenter) := by
-  rw [background_closedFormSolution_sub_backgroundMean_eq_meanResidualForm]
-  exact abs_background_correction_le ctx hI
+  have hbound := abs_background_correction_le ctx hI
     (CoreMathAssumptions.alphaCenterBounded (ctx := ctx)) hfg hbg
+  rwa [← background_closedFormSolution_sub_backgroundMean_eq_meanResidualForm] at hbound
 
 theorem abs_background_closedFormSolution_sub_backgroundMean_le_of_one_minus_alpha_le_tau
     (ctx : LocalContext ι) [CoreMathAssumptions ctx]
