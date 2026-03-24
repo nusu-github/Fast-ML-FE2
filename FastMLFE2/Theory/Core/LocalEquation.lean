@@ -98,6 +98,11 @@ noncomputable def foregroundMean (ctx : LocalContext ι) : ℝ :=
 noncomputable def backgroundMean (ctx : LocalContext ι) : ℝ :=
   ctx.backgroundSum / ctx.totalWeight
 
+/-- The image residual after subtracting the composited weighted-mean pair. -/
+noncomputable def meanResidual (ctx : LocalContext ι) : ℝ :=
+  ctx.imageValue - ctx.alphaCenter * ctx.foregroundMean -
+    (1 - ctx.alphaCenter) * ctx.backgroundMean
+
 def compositingValue (ctx : LocalContext ι) (g : LocalUnknown) : ℝ :=
   dotProduct (uVec ctx.alphaCenter) g
 
@@ -171,6 +176,12 @@ omit [Fintype ι] in
     ctx.compositingResidual g =
       ctx.alphaCenter * foreground g + (1 - ctx.alphaCenter) * background g - ctx.imageValue := by
   simp [compositingResidual, compositingValue_eq]
+
+theorem meanResidual_eq_neg_compositingResidual_at_means (ctx : LocalContext ι) :
+    ctx.meanResidual =
+      - ctx.compositingResidual (mkLocalUnknown ctx.foregroundMean ctx.backgroundMean) := by
+  simp [meanResidual, compositingResidual_eq]
+  ring
 
 @[simp] theorem rhs_foreground (ctx : LocalContext ι) :
     foreground ctx.rhs = ctx.alphaCenter * ctx.imageValue + ctx.foregroundSum := by

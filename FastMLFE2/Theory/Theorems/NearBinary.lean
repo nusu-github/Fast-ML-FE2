@@ -152,6 +152,36 @@ theorem foreground_closedFormSolution_sub_foregroundMean_eq
   simp [closedFormForegroundMeanAffine, weightedMeanDenom]
   ring
 
+theorem foreground_closedFormSolution_sub_foregroundMean_eq_meanResidualForm
+    (ctx : LocalContext ι)
+    [CoreMathAssumptions ctx] :
+    foreground (closedFormSolution ctx) - ctx.foregroundMean =
+      ctx.alphaCenter * ctx.meanResidual / weightedMeanDenom ctx := by
+  rw [foreground_closedFormSolution_sub_foregroundMean_eq]
+  simp [FastMLFE2.Theory.Core.LocalContext.meanResidual]
+  ring
+
+theorem background_closedFormSolution_sub_backgroundMean_eq
+    (ctx : LocalContext ι)
+    [CoreMathAssumptions ctx] :
+    background (closedFormSolution ctx) - ctx.backgroundMean =
+      (1 - ctx.alphaCenter) *
+        (ctx.imageValue - ctx.alphaCenter * ctx.foregroundMean -
+          (1 - ctx.alphaCenter) * ctx.backgroundMean) /
+        weightedMeanDenom ctx := by
+  rw [background_closedFormSolution_eq_weightedMeanForm]
+  field_simp [(weightedMeanDenom_pos ctx).ne']
+  simp [closedFormBackgroundMeanAffine, weightedMeanDenom]
+  ring
+
+theorem background_closedFormSolution_sub_backgroundMean_eq_meanResidualForm
+    (ctx : LocalContext ι)
+    [CoreMathAssumptions ctx] :
+    background (closedFormSolution ctx) - ctx.backgroundMean =
+      (1 - ctx.alphaCenter) * ctx.meanResidual / weightedMeanDenom ctx := by
+  rw [background_closedFormSolution_sub_backgroundMean_eq]
+  simp [FastMLFE2.Theory.Core.LocalContext.meanResidual]
+
 theorem abs_foreground_closedFormSolution_sub_foregroundMean_le
     (ctx : LocalContext ι)
     [CoreMathAssumptions ctx]
