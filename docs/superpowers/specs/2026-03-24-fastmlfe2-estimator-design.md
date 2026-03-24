@@ -36,6 +36,8 @@ def estimate_foreground(
 
 - `backend="auto"` detects CuPy availability; falls back to Numba.
 - Default parameters differ from pymatting (ε=1e-5, ω=1.0) based on the paper's Section 5.4 parameter study.
+- **Parameter mapping:** `gradient_weight` in the API corresponds to `omega` (ω) in the Lean formalization and the paper. `regularization` corresponds to `epsilonR` (ε).
+- Inputs are cast to `float32` and made contiguous (`np.ascontiguousarray`) before dispatching to backends.
 
 ## Core Algorithm
 
@@ -45,8 +47,8 @@ Identical structure to pymatting/Germer et al. 2020:
 
 - `n_levels = ceil(log2(max(w, h)))`
 - Level sizes: `round(w0^(l/n_levels)) × round(h0^(l/n_levels))` for l = 0..n_levels
-- Initialize F/B at 1×1 with weighted mean foreground/background color
-- 10 iterations at levels ≤ 32×32, 2 iterations at larger levels
+- Initialize F/B at 1×1 with weighted mean foreground/background color (vectorized over all pixels; pymatting CuPy reference instead resizes the image to 1×1 — we follow the CPU reference which is more principled)
+- 10 iterations at levels where `w <= small_size and h <= small_size`, 2 iterations otherwise (follows pymatting CPU semantics; the CuPy reference uses `min(w,h) <= small_size` which is a bug)
 
 ### Per-pixel 2×2 system
 
@@ -61,8 +63,8 @@ A = [α² + W,    α(1-α) ]    b = [α·I + Σ w_j·F_j]
 
 det = (α² + W)·((1-α)² + W) - α²(1-α)²   (proven > 0: normalMatrix_det_pos)
 
-F = ((1-α)² + W)·b_F - α(1-α)·b_B) / det
-B = ((α² + W)·b_B - α(1-α)·b_F) / det
+F = (((1-α)² + W)·b_F - α(1-α)·b_B) / det
+B = (((α² + W)·b_B - α(1-α)·b_F) / det
 clamp to [0,1]
 ```
 
@@ -102,6 +104,7 @@ Each CUDA thread block:
 3. Computes the 4-neighbor accumulation from shared memory
 4. Writes result to global F, B
 
+Shared memory per block: 34×34 × (3+3+1) × 4 bytes = ~32 KB (within 48 KB limit).
 Reduces global memory bandwidth ~4× for the neighbor accumulation phase.
 
 ### 5. Fused resize + first iteration (GPU)
@@ -157,10 +160,12 @@ estimate_foreground(image, alpha, backend="auto")
 - `RuntimeError` if backend="gpu" but CuPy unavailable
 - No silent fallback — explicit backend prevents surprising performance cliffs
 
-## Memory Budget (float32, worst case)
+## Memory Budget (float32, worst case at 4K = 3840×2160)
 
-- **CPU:** 2 × h × w × 3 × 4 bytes (F/B) + same for work buffers ≈ 96 MB at 4K
-- **GPU:** Same + image + alpha on device ≈ 120 MB at 4K
+- **CPU:** F + B + F_work + B_work = 4 × 3840 × 2160 × 3 × 4 ≈ 398 MB
+- **GPU:** F + B + F_prev + B_prev + image + alpha = (5 × 3 + 1) × 3840 × 2160 × 4 ≈ 530 MB
+
+Note: pymatting CuPy reference has similar budget. Levels below full resolution reuse the same buffers via slicing.
 
 ## Testing Strategy
 
@@ -184,6 +189,14 @@ Property-based validation derived from Lean theorems:
 - Single-pixel / 1×1 image (degenerate)
 - All-zero and all-one alpha (pure binary)
 - Known ground-truth composited image → SAD/MSE/GRAD regression
+
+## Pymatting Reference Divergences
+
+The following discrepancies in the pymatting CuPy reference (`estimate_foreground_ml_cupy.py`) are intentionally not carried forward:
+
+1. **Missing `gradient_weight`**: The CuPy kernel uses `fabsf(a0 - alpha[j])` without the ω multiplier. The CPU version correctly uses `regularization + gradient_weight * gradient`. Our implementation applies ω consistently in both backends.
+2. **Small-size threshold**: CuPy uses `min(w,h) <= small_size`, CPU uses `w <= small_size and h <= small_size`. We follow the CPU (both dimensions must be small).
+3. **Initialization**: CuPy resizes the full image to 1×1 for initial F/B. CPU computes weighted mean over α>0.9 / α<0.1 pixels. We follow the CPU approach.
 
 ## References
 
