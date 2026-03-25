@@ -165,11 +165,16 @@ Machine-checked results under explicit assumptions.
   bounds.
 - **CompositingError** — Triangle-inequality bound on compositing difference in terms of
   component errors; tighter authored form when `0 ≤ α ≤ 1`.
+- **MeanResidualBounds** — Boxed-input bound on `|meanResidual|` plus foreground/background
+  correction estimates.
+- **ResidualCompositeBounds** — Exact compositing error written as a scaled mean residual;
+  finite-family infinity-norm corollary.
 - **Jacobi** — pointwise lifting theorems showing each simultaneous Jacobi-updated pixel is
   a closed-form local solution, solves the local normal equation, and is cost-stationary.
 - **Locality** — proves that builder locality lifts to `jacobiUpdateAt` and `jacobiStep`.
 - **PropagationRadius** — lifts builder locality through repeated Jacobi / Blur-Fusion passes,
   yielding recursive `k`-hop support bounds for fixed-level propagation.
+- **SpatialDecay** — abstract exponential radius-decay and fixed-exterior halo envelopes.
 - **CanonicalBuilder** — field-correctness theorems for authored canonical builders and the
   proof that they satisfy the abstract builder-locality law.
 - **Grid** — faithful two-dimensional four-neighbor geometry; proves the canonical grid

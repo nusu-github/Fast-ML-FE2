@@ -49,7 +49,10 @@ FastMLFE2/
     ├── Invertibility.lean          ← det > 0, IsUnit det
     ├── ClosedForm.lean             ← explicit 2×2 inverse, uniqueness
     ├── CostToNormalEquation.lean   ← ∂cost/∂t = 0 ↔ normal equation
+    ├── MeanResidualBounds.lean     ← mean residual bounds and correction terms
+    ├── ResidualCompositeBounds.lean  ← closed-form composite error vs mean residual
     ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
+    ├── SpatialDecay.lean           ← abstract radius-decay and halo-width interfaces
     ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
     ├── ContractionBounds.lean      ← relaxed updates, λ_max, and iteration budgets
     ├── NearBinary.lean             ← meanResidual correction around weighted means
@@ -83,6 +86,10 @@ pipeline stages:
   the normalized weights sum to `1`.
 - **Compositing Error** — `|compose α F B − compose α F' B'| ≤ |α|·|F−F'| + |1−α|·|B−B'|`;
   authored corollary with simplified weights when `0 ≤ α ≤ 1`.
+- **MeanResidualBounds** — `|meanResidual| ≤ 1` under boxed inputs; foreground/background
+  correction bounds.
+- **ResidualCompositeBounds** — exact compositing error in terms of `meanResidual`; finite-family
+  infinity-norm corollary.
 
 **Stage 3 (Deductive Synthesis):**
 
@@ -95,6 +102,7 @@ pipeline stages:
   genuine `HasDerivAt` derivatives; `IsCostStationary ↔ SolvesNormalEquation`.
 - **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend
   only on the recursively expanded `k`-hop neighborhood induced by the builder locality law.
+- **SpatialDecay** — abstract exponential radius-decay and fixed-exterior halo envelopes.
 - **Iteration Budgets** — `E₀ q^k ≤ η` gives a sufficient early-termination threshold via a
   reusable log-based theorem.
 
