@@ -39,24 +39,64 @@ FastMLFE2/
 ├── Compositing/
 │   └── OneChannel.lean             ← α·F + (1-α)·B semantics
 ├── Canonical/
+│   ├── Builder.lean                ← CanonicalPixelData; canonical builder construction
+│   ├── Grid.lean                   ← Fin h × Fin w geometry, four-connected neighborhoods
+│   ├── GridContext.lean            ← GridPixelData.localCtx aliases
+│   ├── InteriorKernel.lean         ← interior-pixel specialized context and closed-form solver
+│   ├── ClampPlacement.lean         ← projection variants (raw / inside-clamped / end-clamped)
 │   ├── LocalCommitments.lean       ← stencil, resize rule, iteration semantics
 │   └── MultilevelSchedule.lean     ← level-size computation
 ├── Approximation/
 │   └── BlurFusion.lean             ← idealized PhotoRoom Blur-Fusion surrogate
 ├── Assumptions/
-│   └── Bundles.lean                ← CoreMathAssumptions, variant bundles
+│   ├── Bundles.lean                ← CoreMathAssumptions, variant bundles
+│   └── Grid.lean                   ← GridMathAssumptions, bridge to CoreMathAssumptions
 └── Theorems/
     ├── Invertibility.lean          ← det > 0, IsUnit det
     ├── ClosedForm.lean             ← explicit 2×2 inverse, uniqueness
+    ├── ClosedFormBox.lean          ← conditional [0,1] membership from numerator bounds
+    ├── ClosedFormBoxInput.lean     ← mean-affine form; counterexample for naive box-input
+    ├── ClosedFormMeanResidual.lean ← meanResidual-corrected solution characterization
+    ├── NormalizedWeights.lean      ← normalized weight form of fore-/backgroundMean
     ├── CostToNormalEquation.lean   ← ∂cost/∂t = 0 ↔ normal equation
+    ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
+    ├── BinaryAlpha.lean            ← normalMatrix / rhs degenerations for α ∈ {0, 1}
+    ├── BinaryAlphaCost.lean        ← localCost and stationarity for binary α
+    ├── ChannelReuse.lean           ← SameWeightData; matrix coefficient invariance across channels
+    ├── ClampLocal.lean             ← clamp01 self-identity and nonexpansiveness
+    ├── JacobiContraction.lean      ← jacobiStep, spectral radius, contraction bound
+    ├── ClampPlacement.lean         ← clamp ordering (inside vs end) and rawStepGain
+    ├── ClampPlacementCounterexample.lean ← inside-clamped ≠ end-clamped witness
     ├── MeanResidualBounds.lean     ← mean residual bounds and correction terms
     ├── ResidualCompositeBounds.lean  ← closed-form composite error vs mean residual
-    ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
-    ├── SpatialDecay.lean           ← abstract radius-decay and halo-width interfaces
-    ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
     ├── ContractionBounds.lean      ← relaxed updates, λ_max, and iteration budgets
     ├── NearBinary.lean             ← meanResidual correction around weighted means
-    └── CompositingError.lean       ← |Δcompose| ≤ α|ΔF| + (1-α)|ΔB|
+    ├── NearBinaryCounterexample.lean ← clamp-binary swap counterexample
+    ├── IterationInvariance.lean    ← weight/matrix coefficients state-independent in canonical builders
+    ├── BleedThrough.lean           ← component-wise Jacobi iterate error vs closed form
+    ├── BlurFusionGap.lean          ← synthetic Blur-Fusion stage-two context; joint vs sequential gap
+    ├── BlurFusionFixedPoint.lean   ← Blur-Fusion x1 fixed-point counterexample
+    ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
+    ├── SpatialDecay.lean           ← abstract radius-decay and halo-width interfaces
+    ├── CompositingError.lean       ← |Δcompose| ≤ α|ΔF| + (1-α)|ΔB|
+    ├── Jacobi.lean                 ← pointwise Jacobi lifting to closed-form solutions
+    ├── Locality.lean               ← builder locality lifts to jacobiUpdateAt / jacobiStep
+    ├── Grid.lean                   ← faithful 2D four-neighbor geometry theorems
+    ├── GridNonempty.lean           ← constructive ValidDir nonemptiness witnesses
+    ├── GridAssumptions.lean        ← GridMathAssumptions → CoreMathAssumptions bridge
+    ├── GridLocal.lean              ← closed-form theorems on GridPixelData.localCtx
+    ├── InteriorKernel.lean         ← closed-form theorems on interior-pixel context
+    └── CanonicalBuilder.lean       ← field-correctness for canonical builders
+```
+
+Experimental modules (not part of the default umbrella import):
+
+```txt
+FastMLFE2/
+├── GlobalSystem.lean               ← global block linear system; weighted Laplacian,
+│                                     globalLinearResidual, bridge to local residuals
+└── MultigridSpec.lean              ← abstract V-cycle skeleton (GridTransfer, VCycleOps)
+                                      and fixed-point theorem (work in progress)
 ```
 
 ## Proved Theorems
@@ -81,25 +121,57 @@ pipeline stages:
   `κ = 1 + q(α)/s` with bounds `1 + 1/(2s) ≤ κ ≤ 1 + 1/s`.
 - **Relaxation Bounds** — relaxed updates contract for `0 < λ < λ_max = 2/(1+q)`;
   a scalar sign-flip example shows the bound is sharp.
-- **Normalized-Weight Means** — With `λ_j = w_j / W`, the existing weighted means admit the
-  equivalent forms `foregroundMean = ∑ j, λ_j F_j` and `backgroundMean = ∑ j, λ_j B_j`, and
-  the normalized weights sum to `1`.
+- **Normalized-Weight Means** — With `λ_j = w_j / W`, the weighted means admit equivalent
+  forms `foregroundMean = ∑ j, λ_j F_j` and `backgroundMean = ∑ j, λ_j B_j`; normalized
+  weights sum to `1`.
+- **Binary-α Degenerations** — Normal matrix, RHS, and `closedFormDenom` simplifications
+  for `α = 0` and `α = 1`; corresponding cost-function forms and stationarity conditions.
+- **Channel Coefficient Invariance** — `SameWeightData` predicate captures shared α, ε_r, ω
+  across channels; proves normal matrix, `totalWeight`, and `weightedMeanDenom` are identical
+  across same-weight contexts. Formally guarantees shared-matrix reuse in RGB processing.
 - **Compositing Error** — `|compose α F B − compose α F' B'| ≤ |α|·|F−F'| + |1−α|·|B−B'|`;
   authored corollary with simplified weights when `0 ≤ α ≤ 1`.
 - **MeanResidualBounds** — `|meanResidual| ≤ 1` under boxed inputs; foreground/background
   correction bounds.
 - **ResidualCompositeBounds** — exact compositing error in terms of `meanResidual`; finite-family
   infinity-norm corollary.
+- **Blur-Fusion Stage-Two Gap** — Synthetic `blurStageTwoCtx` whose local cost equals the
+  Blur-Fusion stage-two surrogate; exact joint minimizer derived and compared with the
+  sequential stage-two output; gap between joint and sequential solutions quantified.
+- **Blur-Fusion Fixed-Point Counterexample** — Explicit one-pixel witness showing the
+  Blur-Fusion `x1` update is generally not a fixed point; update differs from the canonical
+  closed-form Jacobi step.
+- **Near-Binary Clamp Counterexample** — Numerical witness refuting a naive claim that
+  clamping and binary-α substitution can be swapped.
+- **Iteration Weight Invariance** — In a `CanonicalPixelData` builder, neighbor weights,
+  `totalWeight`, and `weightedMeanDenom` are independent of the current pixel state
+  (`totalWeight_eq_of_build`, `weightedMeanDenom_eq_of_build`).
 
 **Stage 3 (Deductive Synthesis):**
 
 - **Closed-Form Solution** — Explicit 2×2 inverse solves the normal equation (det ≠ 0
   proof); solution is unique; equals matrix-inverse form.
-- **Near-Binary Mean-Residual Correction** — The closed-form foreground/background updates are
-  exposed as weighted means plus a shared `meanResidual`; by uniqueness the same pair of
-  correction formulas characterizes any normal-equation solution.
+- **Conditional Solution Bounds** — Closed-form solution lies in `[0,1]` componentwise when
+  numerator bounds are satisfied; `clamp01` acts as identity on valid inputs.
+- **Mean-Affine Solution Form** — Closed-form solution expressed as
+  `foregroundMean + α·meanResidual / denom`; counterexample showing the naive box-input
+  `[0,1]` claim fails without additional hypotheses.
+- **Closed-Form Mean-Residual Characterization** — `meanResidualSolution` exposes the shared
+  `meanResidual` correction; by uniqueness this form characterizes any normal-equation solution
+  (`ClosedFormMeanResidual`).
+- **Near-Binary Mean-Residual Correction** — The closed-form updates are weighted means plus
+  a shared `meanResidual`; by uniqueness the same correction characterizes any solution.
 - **Cost–Normal-Equation Bridge** — Local cost expands as a quadratic in perturbation `t`;
   genuine `HasDerivAt` derivatives; `IsCostStationary ↔ SolvesNormalEquation`.
+- **clamp01 Nonexpansiveness** — `clamp01Scalar` and component-wise `clamp01` are
+  non-expanding under the infinity norm (`ClampLocal`).
+- **Jacobi Contraction** — Local Jacobi step has spectral radius
+  `ρ = jacobiCrossTerm / √(diagFg · diagBg) < 1` under `CoreMathAssumptions`; error
+  contracts geometrically with each step.
+- **Clamp Placement Ordering** — `rawStepGain < 1` under `CoreMathAssumptions`; inside-clamped
+  and end-clamped iterates are provably distinct (explicit counterexample).
+- **Jacobi Bleed-Through Bounds** — Component-wise error bound
+  `|fg_k − fg*| ≤ jacobiOneStepGain × ρ^(k−1) × ‖x₀ − x*‖∞` (`BleedThrough`).
 - **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend
   only on the recursively expanded `k`-hop neighborhood induced by the builder locality law.
 - **SpatialDecay** — abstract exponential radius-decay and fixed-exterior halo envelopes.
@@ -121,46 +193,15 @@ lake build
 lake env lean FastMLFE2/Theorems/Invertibility.lean
 ```
 
-**Options:**
-
-| Flag                   | Values        | Default     | Description                               |
-| ---------------------- | ------------- | ----------- | ----------------------------------------- |
-| `--mode`               | `reference`   | `reference` | Solver mode                               |
-| `--levels`             | `auto` \| _N_ | `auto`      | Level count (`auto` = `⌈log₂(max(w,h))⌉`) |
-| `--small-size`         | _N_           | `32`        | Threshold for small-level iteration count |
-| `--n-small-iterations` | _N_           | `10`        | Iterations at small levels                |
-| `--n-big-iterations`   | _N_           | `2`         | Iterations at large levels                |
-| `--eps-r`              | _X_           | `0.00001`   | Regularization ε_r                        |
-| `--omega`              | _X_           | `1.0`       | Neighbor weight ω                         |
-
-## Testing
-
-There is no separate test suite. Smoke executables serve as regression checks:
-
-- `ffiLeanSmoke` — exercises the Lean FFI bindings (NativeGrayImage, refine, clamp, resize)
-- `ffiCliSmoke` — end-to-end CLI invocation with synthetic images
-- `ffiSmoke` — pure C++ unit tests for the FFI functions
-- `ffiRunner` — command-line PGM-based refinement runner
-
-```sh
-lake build ffiLeanSmoke && .lake/build/bin/ffiLeanSmoke
-lake build ffiCliSmoke && .lake/build/bin/ffiCliSmoke
-lake build ffiSmoke && .lake/build/bin/ffi-smoke
-```
-
 ## Project Structure
 
-| Path                | Role                                                        |
-| ------------------- | ----------------------------------------------------------- |
-| `FastMLFE2/`        | Main Lean source modules                                    |
-| `native/`           | C++ FFI implementation ([README](native/README.md))         |
-| `docs/`             | Architecture and design documents ([index](docs/README.md)) |
-| `lakefile.lean`     | Lake build configuration                                    |
-| `lean-toolchain`    | Lean version pin                                            |
-| `main.tex`          | Companion LaTeX paper source                                |
-| `FFILeanSmoke.lean` | Lean-side FFI smoke test                                    |
-| `FFICliSmoke.lean`  | CLI integration smoke test                                  |
-| `FastMLFECli.lean`  | CLI executable entry point                                  |
+| Path              | Role                                                        |
+| ----------------- | ----------------------------------------------------------- |
+| `FastMLFE2/`      | Main Lean source modules                                    |
+| `docs/`           | Architecture and design documents ([index](docs/README.md)) |
+| `evaluation/`     | Evaluation scripts                                          |
+| `lakefile.toml`   | Lake build configuration                                    |
+| `lean-toolchain`  | Lean version pin                                            |
 
 ## Dependencies
 
@@ -168,7 +209,6 @@ lake build ffiSmoke && .lake/build/bin/ffi-smoke
 | ----------------------------------------------------------- | ------- | --------------------------------------------- |
 | [Mathlib](https://github.com/leanprover-community/mathlib4) | v4.28.0 | Linear algebra, analysis, real number library |
 | [REPL](https://github.com/leanprover-community/repl)        | v4.28.0 | Interactive Lean REPL support                 |
-| OpenCV 4                                                    | system  | Image I/O and resize (native FFI only)        |
 
 ## License
 

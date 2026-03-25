@@ -51,9 +51,16 @@ principle.
 │  Theory Layer (FastMLFE2)                    │
 │  ┌────────────────────────────────────────────────┐ │
 │  │  Theorems                                      │ │
-│  │  Invertibility · ClosedForm · CostBridge       │ │
-│  │  Conditioning · CompositingError · Jacobi      │ │
-│  │  Locality · CanonicalBuilder · Grid*           │ │
+│  │  Invertibility · ClosedForm* · CostBridge      │ │
+│  │  Conditioning · BinaryAlpha* · ChannelReuse    │ │
+│  │  NormalizedWeights · ClampLocal                │ │
+│  │  JacobiContraction · ClampPlacement*           │ │
+│  │  BlurFusion* · BleedThrough · MeanResidual*    │ │
+│  │  ContractionBounds · NearBinary*               │ │
+│  │  PropagationRadius · SpatialDecay              │ │
+│  │  CompositingError · Jacobi · Locality          │ │
+│  │  IterationInvariance · CanonicalBuilder        │ │
+│  │  Grid* · InteriorKernel                        │ │
 │  ├────────────────────────────────────────────────┤ │
 │  │  Assumptions                                   │ │
 │  │  CoreMathAssumptions · GridMathAssumptions     │ │
@@ -64,6 +71,7 @@ principle.
 │  ├────────────────────────────────────────────────┤ │
 │  │  Canonical Semantics                           │ │
 │  │  Builder · Grid · GridContext                  │ │
+│  │  InteriorKernel · ClampPlacement               │ │
 │  │  LocalCommitments · MultilevelSchedule         │ │
 │  ├────────────────────────────────────────────────┤ │
 │  │  Approximation                                 │ │
@@ -74,12 +82,6 @@ principle.
 │  ├────────────────────────────────────────────────┤ │
 │  │  Core                                          │ │
 │  │  LocalEquation · LocalSemantics                │ │
-│  └────────────────────────────────────────────────┘ │
-├─────────────────────────────────────────────────────┤
-│  Legacy Layer (FastMLFE2.Legacy)                    │
-│  ┌────────────────────────────────────────────────┐ │
-│  │  CLI · Runtime (Config, CliArgs, Solver)       │ │
-│  │  NativeFFI · C++ FFI (native/)                 │ │
 │  └────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────┘
 ```
@@ -115,6 +117,14 @@ agree.
 - **GridContext** — thin aliases from `GridPixelData` into the canonical local-context
   surface. Provides `GridPixelData.localCtx` as the authored one-pixel context on faithful
   grid geometry.
+- **InteriorKernel** — Interior-pixel specialized surface. `interiorToValidDir` injects
+  all four `Direction4` directions into `ValidDir p` for interior pixels. `interiorLocalCtx`
+  and `interiorClosedFormSolution` expose the local context and closed-form solver without
+  subtype plumbing at call sites.
+- **ClampPlacement** — Projection-policy variants for `CanonicalPixelData`: `rawStep`
+  (no projection), `insideClampedStep` (clamp after each step), `endClampedIterate` (clamp
+  only at the end of `k` steps). Includes concrete counterexample data showing the three
+  policies can disagree.
 - **LocalCommitments** — Enumerates shared commitments: four-connected neighborhood,
   nearest-neighbor resize, projection inside iteration, deterministic simultaneous update.
 - **MultilevelSchedule** — `levelSizes` computing the coarse-to-fine pyramid using
@@ -157,21 +167,56 @@ Machine-checked results under explicit assumptions.
   `det(A) > 0` and `IsUnit det(A)`.
 - **ClosedForm** — Explicit 2×2 inverse formula; proved to solve the normal equation;
   uniqueness of solution; equivalence with matrix-inverse form.
+- **ClosedFormBox** — Conditional `[0,1]` membership of the closed-form solution from
+  numerator bounds; `clamp01` acts as identity when bounds hold.
+- **ClosedFormBoxInput** — `closedFormForegroundMeanAffine` mean-affine solution form;
+  explicit counterexample showing the naive box-input `[0,1]` claim fails without extra
+  hypotheses.
+- **ClosedFormMeanResidual** — `meanResidualSolution` exposing the shared `meanResidual`
+  correction; by uniqueness this characterizes any normal-equation solution.
+- **NormalizedWeights** — `normalizedWeight j = w_j / W`; `foregroundMean` and
+  `backgroundMean` as normalized-weight sums; normalized weights sum to `1`.
 - **CostToNormalEquation** — Quadratic expansion of line-cost in perturbation parameter;
   genuine `HasDerivAt` derivatives; the key equivalence
   `IsCostStationary ↔ SolvesNormalEquation`.
 - **Conditioning** — Rank-1 decomposition `A = s·I + u·uᵀ`; exact eigenvalues `s` and
   `s + q(α)` where `q(α) = α² + (1−α)²`; condition number `κ = 1 + q(α)/s` with tight
   bounds.
+- **BinaryAlpha** — Normal matrix, RHS, and `closedFormDenom` specializations for `α = 0`
+  and `α = 1`; diagonal degenerations of the 2×2 system.
+- **BinaryAlphaCost** — `localCost` form and stationarity conditions for binary `α`.
+- **ChannelReuse** — `SameWeightData` and `SameRhsData` predicates; proves normal matrix,
+  `totalWeight`, `weightedMeanDenom`, and `closedFormDenom` equal across contexts sharing
+  only α, ε_r, ω. Formally guarantees shared-coefficient reuse in multi-channel processing.
+- **ClampLocal** — `clamp01Scalar` is a fixed point exactly on `[0,1]`; `clamp01` and
+  `clamp01Scalar` are non-expanding under the infinity norm.
+- **JacobiContraction** — Local Jacobi step (`jacobiStep`, `jacobiDiagForeground/Background`,
+  `jacobiCrossTerm`); spectral radius `ρ < 1` under `CoreMathAssumptions`; geometric error
+  contraction.
+- **ClampPlacement** — `rawStepGain < 1`; inside-clamped and end-clamped iterates have
+  distinct fixed-point sets (explicit counterexample supplied by `ClampPlacementCounterexample`).
 - **CompositingError** — Triangle-inequality bound on compositing difference in terms of
   component errors; tighter authored form when `0 ≤ α ≤ 1`.
 - **MeanResidualBounds** — Boxed-input bound on `|meanResidual|` plus foreground/background
   correction estimates.
 - **ResidualCompositeBounds** — Exact compositing error written as a scaled mean residual;
   finite-family infinity-norm corollary.
+- **ContractionBounds** — Relaxed updates contract for `0 < λ < λ_max = 2/(1+q)`; scalar
+  sign-flip counterexample shows the bound is sharp; early-termination threshold from
+  `E₀ q^k ≤ η`.
+- **NearBinary** — `meanResidual`-corrected closed-form solution around weighted means;
+  `NearBinaryCounterexample` refutes the naive clamp-binary swap claim.
+- **BleedThrough** — Component-wise Jacobi iterate error bound
+  `|fg_k − fg*| ≤ jacobiOneStepGain × ρ^(k−1) × ‖x₀ − x*‖∞`.
+- **BlurFusionGap** — Synthetic `blurStageTwoCtx` whose local cost equals the Blur-Fusion
+  stage-two surrogate; exact joint minimizer vs sequential stage-two output gap quantified.
+- **BlurFusionFixedPoint** — Counterexample showing the Blur-Fusion `x1` update is generally
+  not a fixed point and differs from the canonical closed-form Jacobi step.
 - **Jacobi** — pointwise lifting theorems showing each simultaneous Jacobi-updated pixel is
   a closed-form local solution, solves the local normal equation, and is cost-stationary.
 - **Locality** — proves that builder locality lifts to `jacobiUpdateAt` and `jacobiStep`.
+- **IterationInvariance** — In a `CanonicalPixelData` builder, `neighborWeight`, `totalWeight`,
+  and `weightedMeanDenom` are independent of the current pixel state across `build` calls.
 - **PropagationRadius** — lifts builder locality through repeated Jacobi / Blur-Fusion passes,
   yielding recursive `k`-hop support bounds for fixed-level propagation.
 - **SpatialDecay** — abstract exponential radius-decay and fixed-exterior halo envelopes.
@@ -186,30 +231,9 @@ Machine-checked results under explicit assumptions.
   to `CoreMathAssumptions` on authored grid contexts.
 - **GridLocal** — thin wrapper theorems exposing existing local closed-form theorems on
   `GridPixelData.localCtx`.
-
-## Legacy Layer
-
-### Runtime (`FastMLFE2.Runtime`)
-
-Executable multilevel solver aligned with the PyMatting reference implementation.
-
-- **Config** — `ExecutionConfig` record and level-size scheduling functions.
-- **CliArgs** — Argument parsing for the CLI executable.
-- **Solver** — `runMultilevelForegroundEstimation`: mean-color initialization, coarse-to-fine
-  loop with nearest-neighbor resize and iterative refinement via FFI.
-
-### CLI (`FastMLFE2.CLI`)
-
-Thin entry point wrapping `Runtime.parseCliInvocation` and `Runtime.runCliInvocation`.
-
-### NativeFFI (`FastMLFE2.NativeFFI`)
-
-Opaque Lean bindings to the C++ FFI layer. `NativeGrayImage` is an opaque type backed by a
-C++ float buffer. `NativeRgbImage` is a Lean structure of three `NativeGrayImage` channels.
-
-### C++ FFI (`native/`)
-
-Reference C++ implementation. See [native/README.md](../native/README.md).
+- **InteriorKernel** — equivalence between `ValidDir`-indexed and `Direction4`-indexed
+  contexts for interior pixels; `interiorLocalCtx` matches `localCtx` up to the
+  `validDirEquivDirection4` bijection; closed-form solution correctness on interior contexts.
 
 ## Import Graph
 
@@ -223,7 +247,9 @@ FastMLFE2  (default target)
         ├── Level.Locality
         ├── Canonical.Builder
         ├── Canonical.Grid
-        ├── Canonical.GridContext
+        ├── Canonical.GridContext ──► Canonical.Grid, Canonical.Builder
+        ├── Canonical.InteriorKernel ──► Canonical.GridContext
+        ├── Canonical.ClampPlacement ──► Canonical.Builder
         ├── Canonical.LocalCommitments
         ├── Canonical.MultilevelSchedule
         ├── Approximation.BlurFusion
@@ -231,9 +257,9 @@ FastMLFE2  (default target)
         ├── Assumptions.Grid ──► Canonical.Grid, Assumptions.Bundles
         └── Theorems.*  ──► Core.*, Compositing.*, Level.*, Canonical.*, Assumptions.*
 
-FastMLFE2.Legacy
-  ├── Runtime  (Config, CliArgs, Solver ──► NativeFFI)
-  └── CLI ──► Runtime
+Experimental (not in FastMLFE2.lean umbrella, work in progress):
+  ├── FastMLFE2.GlobalSystem  ──► ConcreteImage, NormalEquation (pending)
+  └── FastMLFE2.MultigridSpec ──► FastMLFE2.GlobalSystem
 ```
 
 ## Design Rationale
@@ -245,13 +271,9 @@ FastMLFE2.Legacy
 2. **Explicit assumptions.** Every theorem states its hypotheses through `CoreMathAssumptions`
    or similar bundles. No global axioms beyond Lean's core and Mathlib's.
 
-3. **Clean theory/runtime separation.** The default `lake build` produces only the theory
-   library. The runtime requires native FFI and OpenCV — a strictly optional dependency.
-
-4. **Canonical then variant.** The canonical layer records what the paper and PyMatting agree
+3. **Canonical then variant.** The canonical layer records what the paper and PyMatting agree
    on. Backend-specific divergences (CPU async in-place, GPU Jacobi) are modeled as separate
    `BackendScheduleVariant` values with planned relational theorems.
 
-5. **Refoundation, not wrapping.** The theory was built from scratch around the mathematics,
-   not by wrapping the C++ implementation in Lean types. The runtime is kept for comparison
-   but does not define correctness.
+4. **Refoundation, not wrapping.** The theory is built from scratch around the mathematics.
+   Correctness is defined by the formal semantics, not by any external implementation.
