@@ -26,6 +26,7 @@ import FastMLFE2.Theorems.ChannelReuse
 import FastMLFE2.Theorems.ClampLocal
 import FastMLFE2.Theorems.CompositingError
 import FastMLFE2.Theorems.JacobiContraction
+import FastMLFE2.Theorems.ContractionBounds
 import FastMLFE2.Theorems.BlurFusionGap
 import FastMLFE2.Theorems.BlurFusionFixedPoint
 import FastMLFE2.Theorems.PropagationRadius

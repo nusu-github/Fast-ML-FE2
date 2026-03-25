@@ -1,4 +1,5 @@
 import FastMLFE2.Theorems.CompositingError
+import FastMLFE2.Theorems.ContractionBounds
 import FastMLFE2.Theorems.JacobiContraction
 import FastMLFE2.Theorems.ClosedFormBox
 
@@ -46,31 +47,6 @@ theorem localInfinityNorm_sub_le_one_of_boxed
     rw [this]; exact abs_le.2 ⟨by nlinarith, by nlinarith⟩
   · have : background (g - h) = background g - background h := by simp [background]
     rw [this]; exact abs_le.2 ⟨by nlinarith, by nlinarith⟩
-
-private theorem scale_mul_pow_le_of_log_threshold
-    {scale eta rho : ℝ}
-    {k : Nat}
-    (hscale : 0 < scale)
-    (heta : 0 < eta)
-    (hrho0 : 0 < rho)
-    (hrho1 : rho < 1)
-    (hk : 1 + Real.log (scale / eta) / Real.log (1 / rho) ≤ (k + 1 : ℝ)) :
-    scale * rho ^ k ≤ eta := by
-  have hlogDenPos : 0 < Real.log (1 / rho) := Real.log_pos (one_lt_one_div hrho0 hrho1)
-  have hk' : Real.log (scale / eta) ≤ (k : ℝ) * Real.log (1 / rho) :=
-    (div_le_iff₀ hlogDenPos).1 (by nlinarith)
-  have hdivle' : scale / eta ≤ (1 / rho : ℝ) ^ k := by
-    have hposR := Real.rpow_pos_of_pos (one_div_pos.mpr hrho0) (k : ℝ)
-    have := (Real.strictMonoOn_log.le_iff_le (div_pos hscale heta) hposR).1
-      (by rw [Real.log_rpow (one_div_pos.mpr hrho0)]; exact hk')
-    simpa [Real.rpow_natCast] using this
-  have hunit : ((1 / rho : ℝ) ^ k) * rho ^ k = 1 := by
-    rw [one_div_pow]; field_simp [pow_ne_zero k hrho0.ne']
-  have hscalele : scale ≤ eta * ((1 / rho : ℝ) ^ k) := by
-    linarith [(div_le_iff₀ heta).1 hdivle']
-  calc scale * rho ^ k ≤ (eta * ((1 / rho : ℝ) ^ k)) * rho ^ k :=
-        mul_le_mul_of_nonneg_right hscalele (pow_pos hrho0 _).le
-    _ = eta := by rw [mul_assoc, hunit, mul_one]
 
 theorem jacobiIterate_compose_error_le
     (ctx : LocalContext ι) [CoreMathAssumptions ctx]

@@ -51,6 +51,7 @@ FastMLFE2/
     ├── CostToNormalEquation.lean   ← ∂cost/∂t = 0 ↔ normal equation
     ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
     ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
+    ├── ContractionBounds.lean      ← relaxed updates, λ_max, and iteration budgets
     ├── NearBinary.lean             ← meanResidual correction around weighted means
     └── CompositingError.lean       ← |Δcompose| ≤ α|ΔF| + (1-α)|ΔB|
 ```
@@ -75,6 +76,8 @@ pipeline stages:
 - **Local Conditioning** — Normal matrix decomposes as `s·I + u·uᵀ` (rank-1 update);
   exact eigenvalues `s` and `s + q(α)` where `q(α) = α² + (1−α)²`; condition number
   `κ = 1 + q(α)/s` with bounds `1 + 1/(2s) ≤ κ ≤ 1 + 1/s`.
+- **Relaxation Bounds** — relaxed updates contract for `0 < λ < λ_max = 2/(1+q)`;
+  a scalar sign-flip example shows the bound is sharp.
 - **Normalized-Weight Means** — With `λ_j = w_j / W`, the existing weighted means admit the
   equivalent forms `foregroundMean = ∑ j, λ_j F_j` and `backgroundMean = ∑ j, λ_j B_j`, and
   the normalized weights sum to `1`.
@@ -92,6 +95,8 @@ pipeline stages:
   genuine `HasDerivAt` derivatives; `IsCostStationary ↔ SolvesNormalEquation`.
 - **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend
   only on the recursively expanded `k`-hop neighborhood induced by the builder locality law.
+- **Iteration Budgets** — `E₀ q^k ≤ η` gives a sufficient early-termination threshold via a
+  reusable log-based theorem.
 
 ## Prerequisites
 
