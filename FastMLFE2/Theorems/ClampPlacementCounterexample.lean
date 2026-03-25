@@ -45,26 +45,6 @@ theorem clampPlacementCounterexample_gain_gt_one :
           clampPlacementCounterexampleState0) := by
   rw [clampPlacementCounterexample_gain]; norm_num
 
-private def rawStepSimpLemmas :=
-  [ ``CanonicalPixelData.rawStep,
-    ``CanonicalPixelData.canonicalBuilder,
-    ``CanonicalPixelData.toLocalContext,
-    ``Level.LocalContextBuilder.jacobiStep,
-    ``Level.LocalContextBuilder.jacobiUpdateAt,
-    ``clampPlacementCounterexampleData,
-    ``clampPlacementConstState,
-    ``LocalContext.closedFormSolution,
-    ``LocalContext.closedFormDenom,
-    ``LocalContext.rhs,
-    ``LocalContext.foregroundSum,
-    ``LocalContext.backgroundSum,
-    ``LocalContext.totalWeight,
-    ``LocalContext.neighborWeight,
-    ``foreground,
-    ``background,
-    ``mkLocalUnknown
-  ]
-
 theorem clampPlacementCounterexample_rawStep_const (f b : ℝ) :
     clampPlacementCounterexampleData.rawStep
         (clampPlacementConstState f b) PUnit.unit =

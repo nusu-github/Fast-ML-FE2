@@ -124,7 +124,8 @@ theorem background_closedFormSolution_eq_weightedMeanForm
     closedFormDenom_eq_totalWeight_mul_weightedMeanDenom]
   field_simp [htw0, hred0]
 
-private theorem div_mem_unitInterval_iff {x d : ℝ} (hd : 0 < d) :
+private theorem div_mem_unitInterval_iff {α : Type*} [Field α] [LinearOrder α]
+    [IsStrictOrderedRing α] {x d : α} (hd : 0 < d) :
     (0 ≤ x / d ∧ x / d ≤ 1) ↔ (0 ≤ x ∧ x ≤ d) := by
   rw [div_nonneg_iff]; constructor
   · rintro ⟨hx0 | hx0, hx1⟩
