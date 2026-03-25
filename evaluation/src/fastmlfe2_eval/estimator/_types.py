@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -18,6 +17,11 @@ class EstimatorParams:
     n_small_iterations: int = 10
     n_big_iterations: int = 2
     small_size: int = 32
+
+    def __post_init__(self) -> None:
+        if not math.isfinite(self.regularization) or self.regularization <= 0:
+            msg = "regularization must be a finite positive value"
+            raise ValueError(msg)
 
 
 @dataclass(frozen=True, slots=True)

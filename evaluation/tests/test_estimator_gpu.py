@@ -55,8 +55,11 @@ class TestGPUProperties:
 
         def compositing_err(n):
             F, B = estimate_foreground(
-                image, alpha, backend="gpu",
-                n_small_iterations=n, n_big_iterations=n,
+                image,
+                alpha,
+                backend="gpu",
+                n_small_iterations=n,
+                n_big_iterations=n,
                 return_background=True,
             )
             return float(np.mean(np.abs(image - a * F - (1 - a) * B)))
@@ -112,7 +115,7 @@ class TestMetricRegression:
         from fastmlfe2_eval.metrics import gradient_error, mse_error, sad_error
 
         image, alpha, F_true, B_true = _make_composited(h=64, w=64)
-        F_est, B_est = estimate_foreground(image, alpha, backend="gpu", return_background=True)
+        F_est, _B_est = estimate_foreground(image, alpha, backend="gpu", return_background=True)
         mask = (alpha > 0.0) & (alpha < 1.0)
         weights = np.ones_like(alpha)
 

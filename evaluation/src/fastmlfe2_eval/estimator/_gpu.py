@@ -263,9 +263,22 @@ def estimate_fb_ml(
 
         # First iteration: fused resize + iterate (reads from previous level's buffer)
         _ml_fused_resize_iterate_kernel(
-            grid, _BLOCK,
-            (d_F, d_B, d_F_prev, d_B_prev, d_image_level, d_alpha_level,
-             w, h, w_prev, h_prev, eps, omega),
+            grid,
+            _BLOCK,
+            (
+                d_F,
+                d_B,
+                d_F_prev,
+                d_B_prev,
+                d_image_level,
+                d_alpha_level,
+                w,
+                h,
+                w_prev,
+                h_prev,
+                eps,
+                omega,
+            ),
         )
         d_F_prev, d_F = d_F, d_F_prev
         d_B_prev, d_B = d_B, d_B_prev
@@ -273,9 +286,9 @@ def estimate_fb_ml(
         # Remaining iterations: global-memory Jacobi
         for _ in range(n_iter - 1):
             _ml_iterate_kernel(
-                grid, _BLOCK,
-                (d_F, d_B, d_F_prev, d_B_prev, d_image_level, d_alpha_level,
-                 w, h, eps, omega),
+                grid,
+                _BLOCK,
+                (d_F, d_B, d_F_prev, d_B_prev, d_image_level, d_alpha_level, w, h, eps, omega),
             )
             d_F_prev, d_F = d_F, d_F_prev
             d_B_prev, d_B = d_B, d_B_prev

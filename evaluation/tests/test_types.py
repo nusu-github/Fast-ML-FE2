@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from fastmlfe2_eval.estimator._types import (
     EstimatorParams,
@@ -61,6 +62,11 @@ def test_initial_means_mixed():
     fg, bg = compute_initial_means(image, alpha)
     assert fg.shape == (3,) and fg.dtype == np.float32
     assert bg.shape == (3,) and bg.dtype == np.float32
+
+
+def test_estimator_params_reject_nonpositive_regularization():
+    with pytest.raises(ValueError, match="regularization must be a finite positive value"):
+        EstimatorParams(regularization=0.0)
 
 
 def test_schedule_1x1_image():

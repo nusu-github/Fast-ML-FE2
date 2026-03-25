@@ -1,6 +1,33 @@
 import numpy as np
 
-from fastmlfe2_eval.estimator._cpu import _resize_nearest, _resize_nearest_multichannel, _update_rb_half
+from fastmlfe2_eval.estimator import estimate_foreground
+from fastmlfe2_eval.estimator._cpu import (
+    _build_level_coefficients,
+    _resize_nearest,
+    _resize_nearest_multichannel,
+    _update_rb_half_cached,
+)
+
+
+def _build_cached_kernel_inputs(alpha, eps, omega):
+    """Allocate and populate the cached-kernel coefficient buffers."""
+    h, w = alpha.shape
+    neighbor_weights = np.empty((h, w, 4), dtype=np.float32)
+    inv_W = np.empty((h, w), dtype=np.float32)
+    inv_Wp1 = np.empty((h, w), dtype=np.float32)
+    fg_gain = np.empty((h, w), dtype=np.float32)
+    bg_gain = np.empty((h, w), dtype=np.float32)
+    _build_level_coefficients(
+        alpha,
+        np.float32(eps),
+        np.float32(omega),
+        neighbor_weights,
+        inv_W,
+        inv_Wp1,
+        fg_gain,
+        bg_gain,
+    )
+    return neighbor_weights, inv_W, inv_Wp1, fg_gain, bg_gain
 
 
 class TestResizeNearest:
@@ -38,7 +65,8 @@ class TestMeanResidualKernel:
         image = np.full((h, w, 3), 0.8, dtype=np.float32)
         alpha = np.full((h, w), 0.5, dtype=np.float32)
 
-        _update_rb_half(F, B, image, alpha, h, w, 0.1, 0.0, 0)  # red
+        coeffs = _build_cached_kernel_inputs(alpha, 0.1, 0.0)
+        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 0)  # red
 
         expected_F = 0.6 + 0.5 * 0.35 / 0.9
         expected_B = 0.3 + 0.5 * 0.35 / 0.9
@@ -53,7 +81,8 @@ class TestMeanResidualKernel:
         image = np.full((h, w, 3), 0.7, dtype=np.float32)
         alpha = np.zeros((h, w), dtype=np.float32)
 
-        _update_rb_half(F, B, image, alpha, h, w, 0.1, 0.0, 0)
+        coeffs = _build_cached_kernel_inputs(alpha, 0.1, 0.0)
+        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 0)
 
         # α=0: F = μ_F = 0.5, B = μ_B + r/(W+1)
         # W = 4*0.1 = 0.4, r = 0.7 - 0*0.5 - 1*0.3 = 0.4
@@ -69,7 +98,8 @@ class TestMeanResidualKernel:
         image = np.full((h, w, 3), 0.7, dtype=np.float32)
         alpha = np.ones((h, w), dtype=np.float32)
 
-        _update_rb_half(F, B, image, alpha, h, w, 0.1, 0.0, 0)
+        coeffs = _build_cached_kernel_inputs(alpha, 0.1, 0.0)
+        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 0)
 
         # α=1: B = μ_B = 0.3, F = μ_F + r/(W+1)
         # r = 0.7 - 1*0.5 - 0*0.3 = 0.2
@@ -88,7 +118,8 @@ class TestMeanResidualKernel:
 
         F_before = F.copy()
         B_before = B.copy()
-        _update_rb_half(F, B, image, alpha, h, w, 5e-3, 0.1, 0)  # red only
+        coeffs = _build_cached_kernel_inputs(alpha, 5e-3, 0.1)
+        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 0)  # red only
 
         # Black pixels should be unchanged in both F and B
         for y in range(h):
@@ -106,14 +137,12 @@ class TestMeanResidualKernel:
         image = rng.random((h, w, 3)).astype(np.float32)
         alpha = rng.random((h, w)).astype(np.float32)
 
-        _update_rb_half(F, B, image, alpha, h, w, 5e-3, 0.1, 0)
-        _update_rb_half(F, B, image, alpha, h, w, 5e-3, 0.1, 1)
+        coeffs = _build_cached_kernel_inputs(alpha, 5e-3, 0.1)
+        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 0)
+        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 1)
 
         assert np.all(F >= 0.0) and np.all(F <= 1.0)
         assert np.all(B >= 0.0) and np.all(B <= 1.0)
-
-
-from fastmlfe2_eval.estimator import estimate_foreground
 
 
 def _make_composited(h=32, w=32, seed=42):
@@ -188,15 +217,19 @@ class TestCPUProperties:
 
         def compositing_err(n):
             F, B = estimate_foreground(
-                image, alpha, backend="cpu",
-                n_small_iterations=n, n_big_iterations=n,
+                image,
+                alpha,
+                backend="cpu",
+                n_small_iterations=n,
+                n_big_iterations=n,
                 return_background=True,
             )
             return float(np.mean(np.abs(image - a * F - (1 - a) * B)))
 
         err1 = compositing_err(1)
         err10 = compositing_err(10)
-        assert err10 < err1, f"n=10 residual {err10:.5f} should be less than n=1 residual {err1:.5f}"
+        msg = f"n=10 residual {err10:.5f} should be less than n=1 residual {err1:.5f}"
+        assert err10 < err1, msg
 
     def test_1x1_image(self):
         image = np.array([[[0.5, 0.3, 0.7]]], dtype=np.float32)
