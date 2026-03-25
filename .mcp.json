@@ -2,9 +2,22 @@
   "mcpServers": {
     "lean-lsp": {
       "command": "uvx",
-      "args": ["lean-lsp-mcp", "--repl"],
+      "args": [
+        "lean-lsp-mcp",
+        "--repl",
+        "--loogle-local"
+      ],
       "env": {},
       "timeout": 600000
+    },
+    "leanexplore": {
+      "command": "lean-explore",
+      "args": [
+        "mcp",
+        "serve",
+        "--backend",
+        "api"
+      ]
     }
   }
 }
