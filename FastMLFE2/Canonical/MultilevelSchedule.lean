@@ -72,6 +72,37 @@ def nearestNeighborResize {α : Type*} {hSrc wSrc hDst wDst : Nat} [Fact (0 < hS
       state (nearestNeighborPixel (hSrc := hSrc) (wSrc := wSrc) (hDst := hDst)
         (wDst := wDst) p) := rfl
 
+@[simp] theorem nearestNeighborImage_apply {hSrc wSrc hDst wDst : Nat}
+    [Fact (0 < hSrc)] [Fact (0 < wSrc)] (image : Pixel hSrc wSrc → ℝ)
+    (p : Pixel hDst wDst) :
+    nearestNeighborResize (hSrc := hSrc) (wSrc := wSrc) (hDst := hDst) (wDst := wDst) image p =
+      image (nearestNeighborPixel (hSrc := hSrc) (wSrc := wSrc) (hDst := hDst)
+        (wDst := wDst) p) := rfl
+
+@[simp] theorem nearestNeighborAlpha_apply {hSrc wSrc hDst wDst : Nat}
+    [Fact (0 < hSrc)] [Fact (0 < wSrc)] (alpha : Pixel hSrc wSrc → ℝ)
+    (p : Pixel hDst wDst) :
+    nearestNeighborResize (hSrc := hSrc) (wSrc := wSrc) (hDst := hDst) (wDst := wDst) alpha p =
+      alpha (nearestNeighborPixel (hSrc := hSrc) (wSrc := wSrc) (hDst := hDst)
+        (wDst := wDst) p) := rfl
+
+@[simp] theorem nearestNeighborCoord_self {source : Nat} [Fact (0 < source)]
+    (i : Fin source) :
+    nearestNeighborCoord (source := source) (target := source) i = i := by
+  apply Fin.ext
+  have hdiv : i.1 * source / source = i.1 := by
+    simpa [Nat.mul_comm] using (Nat.mul_div_right i.1 (m := source) Fact.out)
+  have hmin : min (source - 1) (i.1 * source / source) = i.1 := by
+    rw [hdiv]
+    exact Nat.min_eq_right (Nat.le_pred_of_lt i.2)
+  simpa [nearestNeighborCoord] using hmin
+
+@[simp] theorem nearestNeighborResize_self {α : Type*} {h w : Nat}
+    [Fact (0 < h)] [Fact (0 < w)] (state : Pixel h w → α) :
+    nearestNeighborResize (hSrc := h) (wSrc := w) (hDst := h) (wDst := w) state = state := by
+  funext p
+  simp [nearestNeighborResize, nearestNeighborPixel, nearestNeighborCoord_self]
+
 /-- A fused nearest-neighbor update that reads the coarse state through the coarse-to-fine
 lookup at the point of use instead of materializing a resized fine state first. -/
 noncomputable def fusedNearestNeighborUpdateAt {hSrc wSrc hDst wDst : Nat}
@@ -108,5 +139,58 @@ theorem nearestNeighborResize_then_update_eq_fused {hSrc wSrc hDst wDst : Nat}
   unfold nearestNeighborResize fusedNearestNeighborUpdateAt LocalContextBuilder.jacobiStep
     LocalContextBuilder.jacobiUpdateAt
   rfl
+
+theorem nearestNeighborResize_sameSize_then_update_eq {h w : Nat}
+    [Fact (0 < h)] [Fact (0 < w)] {η : Pixel h w → Type*} [∀ p, Fintype (η p)]
+    (builder : LocalContextBuilder (Pixel h w) η)
+    (state : PixelState (Pixel h w))
+    (p : Pixel h w) :
+    builder.jacobiStep (nearestNeighborResize (hSrc := h) (wSrc := w) (hDst := h)
+      (wDst := w) state) p = builder.jacobiStep state p := by
+  rw [nearestNeighborResize_self]
+
+theorem nearestNeighborResize_sameSize_iterate_eq {height width : Nat}
+    [Fact (0 < height)] [Fact (0 < width)] {η : Pixel height width → Type*} [∀ p, Fintype (η p)]
+    (builder : LocalContextBuilder (Pixel height width) η)
+    (state : PixelState (Pixel height width))
+    (n : Nat) :
+    Nat.iterate (builder.jacobiStep) n
+      (nearestNeighborResize (hSrc := height) (wSrc := width) (hDst := height)
+        (wDst := width) state) =
+      Nat.iterate (builder.jacobiStep) n state := by
+  induction n generalizing state with
+  | zero =>
+      simp [Nat.iterate]
+  | succ n ih =>
+      have hIH := ih state
+      calc
+        Nat.iterate (builder.jacobiStep) (Nat.succ n)
+            (nearestNeighborResize (hSrc := height) (wSrc := width) (hDst := height)
+              (wDst := width) state)
+            = builder.jacobiStep (Nat.iterate (builder.jacobiStep) n
+                (nearestNeighborResize (hSrc := height) (wSrc := width) (hDst := height)
+                  (wDst := width) state)) := by
+                rw [Function.iterate_succ_apply']
+        _ = builder.jacobiStep (Nat.iterate (builder.jacobiStep) n state) := by
+              rw [hIH]
+        _ = Nat.iterate (builder.jacobiStep) (Nat.succ n) state := by
+              rw [Function.iterate_succ_apply']
+
+/-- When two consecutive levels have the same size, their updates can be merged by adding
+their iteration counts. -/
+theorem nearestNeighborResize_sameSize_merge_iterate_eq {height width : Nat}
+    [Fact (0 < height)] [Fact (0 < width)] {η : Pixel height width → Type*} [∀ p, Fintype (η p)]
+    (builder : LocalContextBuilder (Pixel height width) η)
+    (state : PixelState (Pixel height width))
+    (n₁ n₂ : Nat) :
+    Nat.iterate (builder.jacobiStep) n₂
+      (Nat.iterate (builder.jacobiStep) n₁
+        (nearestNeighborResize (hSrc := height) (wSrc := width) (hDst := height)
+          (wDst := width) state)) =
+      Nat.iterate (builder.jacobiStep) (n₁ + n₂) state := by
+  rw [nearestNeighborResize_self]
+  have hIter := congrArg (fun g => g state) (Function.iterate_add (builder.jacobiStep) n₂ n₁)
+  rw [Nat.add_comm] at hIter
+  exact hIter.symm
 
 end FastMLFE2.Canonical
