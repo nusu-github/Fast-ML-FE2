@@ -6,17 +6,16 @@
         "lean-lsp-mcp",
         "--repl",
         "--loogle-local"
-      ],
-      "env": {},
-      "timeout": 600000
+      ]
     },
     "leanexplore": {
-      "command": "lean-explore",
+      "command": "uvx",
       "args": [
+        "lean-explore",
         "mcp",
         "serve",
         "--backend",
-        "api"
+        "local"
       ]
     }
   }
