@@ -49,7 +49,7 @@ class TestGPUProperties:
         np.testing.assert_allclose(F, image, atol=0.05)
 
     def test_convergence_monotone(self):
-        """jacobiIterate_error_le: compositing residual decreases with more Jacobi iterations."""
+        """Compositing residual decreases with more in-place sweep iterations."""
         image, alpha, _, _ = _make_composited()
         a = alpha[:, :, np.newaxis]
 
@@ -88,6 +88,27 @@ class TestGPUProperties:
         F, B = estimate_foreground(image, alpha, backend="gpu", return_background=True)
         assert F.shape == (1, 1, 3)
         assert np.all(np.isfinite(F)) and np.all(np.isfinite(B))
+
+    def test_zero_iterations_matches_cpu(self):
+        image, alpha, _, _ = _make_composited(h=16, w=16)
+        F_cpu, B_cpu = estimate_foreground(
+            image,
+            alpha,
+            backend="cpu",
+            n_small_iterations=0,
+            n_big_iterations=0,
+            return_background=True,
+        )
+        F_gpu, B_gpu = estimate_foreground(
+            image,
+            alpha,
+            backend="gpu",
+            n_small_iterations=0,
+            n_big_iterations=0,
+            return_background=True,
+        )
+        np.testing.assert_allclose(F_gpu, F_cpu, atol=1e-6)
+        np.testing.assert_allclose(B_gpu, B_cpu, atol=1e-6)
 
     def test_checkerboard_alpha(self):
         h, w = 16, 16
@@ -132,16 +153,11 @@ class TestMetricRegression:
 
 
 class TestCPUGPUAgreement:
-    """Both backends implement the same mean-residual math.
-
-    CPU uses red-black GS, GPU uses Jacobi — results differ slightly
-    but should converge to similar solutions.
-    """
+    """Both backends implement the same mean-residual math."""
 
     def test_agreement_random(self):
-        # CPU (red-black GS) and GPU (Jacobi) converge to similar but not identical
-        # solutions after 10 iterations. GS converges ~2x faster per iteration, so
-        # the gap after finite iterations can be ~0.1.
+        # CPU and GPU both use red-black sweeps, so the same iteration schedule
+        # should converge to similar solutions.
         image, alpha, _, _ = _make_composited(h=32, w=32)
         F_cpu = estimate_foreground(image, alpha, backend="cpu")
         F_gpu = estimate_foreground(image, alpha, backend="gpu")
