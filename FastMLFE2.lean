@@ -29,6 +29,7 @@ import FastMLFE2.Theorems.MeanResidualBounds
 import FastMLFE2.Theorems.ResidualCompositeBounds
 import FastMLFE2.Theorems.JacobiContraction
 import FastMLFE2.Theorems.ContractionBounds
+import FastMLFE2.Theorems.QuantizationBounds
 import FastMLFE2.Theorems.BlurFusionGap
 import FastMLFE2.Theorems.BlurFusionFixedPoint
 import FastMLFE2.Theorems.PropagationRadius
