@@ -64,6 +64,60 @@ void ml_fused_resize_iterate(
     float a0 = alpha[i];
     float a1 = 1.0f - a0;
 
+    if (0 < x && x < w - 1 && 0 < y && y < h - 1){
+        int nb_x[4] = {x - 1, x + 1, x, x};
+        int nb_y[4] = {y, y, y - 1, y + 1};
+
+        float W = 0.0f;
+        float sum_wF[3] = {0.0f, 0.0f, 0.0f};
+        float sum_wB[3] = {0.0f, 0.0f, 0.0f};
+
+        for (int d = 0; d < 4; d++){
+            int j_prev = min(h_prev - 1, max(0, nb_y[d] * h_prev / h)) * w_prev +
+                min(w_prev - 1, max(0, nb_x[d] * w_prev / w));
+            float a_nb = alpha[nb_y[d] * w + nb_x[d]];
+            float wj = regularization + gradient_weight * fabsf(a0 - a_nb);
+            W += wj;
+            for (int c = 0; c < 3; c++){
+                sum_wF[c] += wj * F_prev_level[j_prev * 3 + c];
+                sum_wB[c] += wj * B_prev_level[j_prev * 3 + c];
+            }
+        }
+
+        float inv_W = 1.0f / W;
+
+        if (a0 < 0.01f || a0 > 0.99f){
+            float inv_Wp1 = 1.0f / (W + 1.0f);
+            for (int c = 0; c < 3; c++){
+                float mu_F = sum_wF[c] * inv_W;
+                float mu_B = sum_wB[c] * inv_W;
+                float r = image[i * 3 + c] - a0 * mu_F - a1 * mu_B;
+                if (a0 < 0.01f){
+                    F[i*3+c] = fmaxf(0.0f, fminf(1.0f, mu_F));
+                    B[i*3+c] = fmaxf(0.0f, fminf(1.0f, mu_B + r * inv_Wp1));
+                } else {
+                    F[i*3+c] = fmaxf(0.0f, fminf(1.0f, mu_F + r * inv_Wp1));
+                    B[i*3+c] = fmaxf(0.0f, fminf(1.0f, mu_B));
+                }
+            }
+            return;
+        }
+
+        float D = W + a0 * a0 + a1 * a1;
+        float inv_D = 1.0f / D;
+        float a0_inv_D = a0 * inv_D;
+        float a1_inv_D = a1 * inv_D;
+
+        for (int c = 0; c < 3; c++){
+            float mu_F = sum_wF[c] * inv_W;
+            float mu_B = sum_wB[c] * inv_W;
+            float r = image[i * 3 + c] - a0 * mu_F - a1 * mu_B;
+            F[i*3+c] = fmaxf(0.0f, fminf(1.0f, mu_F + a0_inv_D * r));
+            B[i*3+c] = fmaxf(0.0f, fminf(1.0f, mu_B + a1_inv_D * r));
+        }
+        return;
+    }
+
     /* Nearest-neighbor lookup into previous level */
     #define NN(gx, gy) \
         (min(h_prev - 1, max(0, (gy) * h_prev / h)) * w_prev + \
@@ -147,6 +201,62 @@ void ml_rb_half(
     int i = y * w + x;
     float a0 = alpha[i];
     float a1 = 1.0f - a0;
+
+    if (0 < x && x < w - 1 && 0 < y && y < h - 1){
+        float W = 0.0f;
+        float sum_wF[3] = {0.0f, 0.0f, 0.0f};
+        float sum_wB[3] = {0.0f, 0.0f, 0.0f};
+
+        int nb[4] = {
+            (x - 1) + y * w,
+            (x + 1) + y * w,
+            x + (y - 1) * w,
+            x + (y + 1) * w,
+        };
+
+        for (int d = 0; d < 4; d++){
+            int j = nb[d];
+            float wj = regularization + gradient_weight * fabsf(a0 - alpha[j]);
+            W += wj;
+            for (int c = 0; c < 3; c++){
+                sum_wF[c] += wj * F[j * 3 + c];
+                sum_wB[c] += wj * B[j * 3 + c];
+            }
+        }
+
+        float inv_W = 1.0f / W;
+
+        if (a0 < 0.01f || a0 > 0.99f){
+            float inv_Wp1 = 1.0f / (W + 1.0f);
+            for (int c = 0; c < 3; c++){
+                float mu_F = sum_wF[c] * inv_W;
+                float mu_B = sum_wB[c] * inv_W;
+                float r = image[i * 3 + c] - a0 * mu_F - a1 * mu_B;
+                if (a0 < 0.01f){
+                    F[i * 3 + c] = fmaxf(0.0f, fminf(1.0f, mu_F));
+                    B[i * 3 + c] = fmaxf(0.0f, fminf(1.0f, mu_B + r * inv_Wp1));
+                } else {
+                    F[i * 3 + c] = fmaxf(0.0f, fminf(1.0f, mu_F + r * inv_Wp1));
+                    B[i * 3 + c] = fmaxf(0.0f, fminf(1.0f, mu_B));
+                }
+            }
+            return;
+        }
+
+        float D = W + a0 * a0 + a1 * a1;
+        float inv_D = 1.0f / D;
+        float a0_inv_D = a0 * inv_D;
+        float a1_inv_D = a1 * inv_D;
+
+        for (int c = 0; c < 3; c++){
+            float mu_F = sum_wF[c] * inv_W;
+            float mu_B = sum_wB[c] * inv_W;
+            float r = image[i * 3 + c] - a0 * mu_F - a1 * mu_B;
+            F[i * 3 + c] = fmaxf(0.0f, fminf(1.0f, mu_F + a0_inv_D * r));
+            B[i * 3 + c] = fmaxf(0.0f, fminf(1.0f, mu_B + a1_inv_D * r));
+        }
+        return;
+    }
 
     int nb[4] = {
         max(0, x - 1) + y * w,

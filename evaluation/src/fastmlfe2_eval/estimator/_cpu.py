@@ -68,6 +68,54 @@ def _update_rb_half_cached(
             a0 = alpha[y, x]
             a1 = 1.0 - a0
 
+            if 0 < x < w - 1 and 0 < y < h - 1:
+                sum_wF0 = 0.0
+                sum_wF1 = 0.0
+                sum_wF2 = 0.0
+                sum_wB0 = 0.0
+                sum_wB1 = 0.0
+                sum_wB2 = 0.0
+
+                for d in range(4):
+                    wj = neighbor_weights[y, x, d]
+                    x2 = x + dx[d]
+                    y2 = y + dy[d]
+                    sum_wF0 += wj * F[y2, x2, 0]
+                    sum_wF1 += wj * F[y2, x2, 1]
+                    sum_wF2 += wj * F[y2, x2, 2]
+                    sum_wB0 += wj * B[y2, x2, 0]
+                    sum_wB1 += wj * B[y2, x2, 1]
+                    sum_wB2 += wj * B[y2, x2, 2]
+
+                inv_W_local = inv_W[y, x]
+
+                if a0 < 0.01 or a0 > 0.99:
+                    inv_Wp1_local = inv_Wp1[y, x]
+                    mu_F0 = sum_wF0 * inv_W_local
+                    mu_B0 = sum_wB0 * inv_W_local
+                    r0 = image[y, x, 0] - a0 * mu_F0 - a1 * mu_B0
+                    mu_F1 = sum_wF1 * inv_W_local
+                    mu_B1 = sum_wB1 * inv_W_local
+                    r1 = image[y, x, 1] - a0 * mu_F1 - a1 * mu_B1
+                    mu_F2 = sum_wF2 * inv_W_local
+                    mu_B2 = sum_wB2 * inv_W_local
+                    r2 = image[y, x, 2] - a0 * mu_F2 - a1 * mu_B2
+                    if a0 < 0.01:
+                        F[y, x, 0] = max(0.0, min(1.0, mu_F0))
+                        F[y, x, 1] = max(0.0, min(1.0, mu_F1))
+                        F[y, x, 2] = max(0.0, min(1.0, mu_F2))
+                        B[y, x, 0] = max(0.0, min(1.0, mu_B0 + r0 * inv_Wp1_local))
+                        B[y, x, 1] = max(0.0, min(1.0, mu_B1 + r1 * inv_Wp1_local))
+                        B[y, x, 2] = max(0.0, min(1.0, mu_B2 + r2 * inv_Wp1_local))
+                    else:
+                        F[y, x, 0] = max(0.0, min(1.0, mu_F0 + r0 * inv_Wp1_local))
+                        F[y, x, 1] = max(0.0, min(1.0, mu_F1 + r1 * inv_Wp1_local))
+                        F[y, x, 2] = max(0.0, min(1.0, mu_F2 + r2 * inv_Wp1_local))
+                        B[y, x, 0] = max(0.0, min(1.0, mu_B0))
+                        B[y, x, 1] = max(0.0, min(1.0, mu_B1))
+                        B[y, x, 2] = max(0.0, min(1.0, mu_B2))
+                    continue
+
             sum_wF0 = 0.0
             sum_wF1 = 0.0
             sum_wF2 = 0.0
@@ -165,6 +213,87 @@ def _update_rb_half_cached_from_prev_level(
         for x in range(x_start, w, 2):
             a0 = alpha[y, x]
             a1 = 1.0 - a0
+
+            if 0 < x < w - 1 and 0 < y < h - 1:
+                y_prev = y_current_prev
+                x_prev = x_prev_map[x]
+                x_left_prev = x_prev_map[x - 1]
+                x_right_prev = x_prev_map[x + 1]
+                sum_wF0 = 0.0
+                sum_wF1 = 0.0
+                sum_wF2 = 0.0
+                sum_wB0 = 0.0
+                sum_wB1 = 0.0
+                sum_wB2 = 0.0
+
+                wj = neighbor_weights[y, x, 0]
+                sum_wF0 += wj * F_prev[y_prev, x_left_prev, 0]
+                sum_wF1 += wj * F_prev[y_prev, x_left_prev, 1]
+                sum_wF2 += wj * F_prev[y_prev, x_left_prev, 2]
+                sum_wB0 += wj * B_prev[y_prev, x_left_prev, 0]
+                sum_wB1 += wj * B_prev[y_prev, x_left_prev, 1]
+                sum_wB2 += wj * B_prev[y_prev, x_left_prev, 2]
+
+                wj = neighbor_weights[y, x, 1]
+                sum_wF0 += wj * F_prev[y_prev, x_right_prev, 0]
+                sum_wF1 += wj * F_prev[y_prev, x_right_prev, 1]
+                sum_wF2 += wj * F_prev[y_prev, x_right_prev, 2]
+                sum_wB0 += wj * B_prev[y_prev, x_right_prev, 0]
+                sum_wB1 += wj * B_prev[y_prev, x_right_prev, 1]
+                sum_wB2 += wj * B_prev[y_prev, x_right_prev, 2]
+
+                wj = neighbor_weights[y, x, 2]
+                sum_wF0 += wj * F_prev[y_up_prev, x_prev, 0]
+                sum_wF1 += wj * F_prev[y_up_prev, x_prev, 1]
+                sum_wF2 += wj * F_prev[y_up_prev, x_prev, 2]
+                sum_wB0 += wj * B_prev[y_up_prev, x_prev, 0]
+                sum_wB1 += wj * B_prev[y_up_prev, x_prev, 1]
+                sum_wB2 += wj * B_prev[y_up_prev, x_prev, 2]
+
+                wj = neighbor_weights[y, x, 3]
+                sum_wF0 += wj * F_prev[y_down_prev, x_prev, 0]
+                sum_wF1 += wj * F_prev[y_down_prev, x_prev, 1]
+                sum_wF2 += wj * F_prev[y_down_prev, x_prev, 2]
+                sum_wB0 += wj * B_prev[y_down_prev, x_prev, 0]
+                sum_wB1 += wj * B_prev[y_down_prev, x_prev, 1]
+                sum_wB2 += wj * B_prev[y_down_prev, x_prev, 2]
+
+                inv_W_local = inv_W[y, x]
+                inv_Wp1_local = inv_Wp1[y, x]
+                mu_F0 = sum_wF0 * inv_W_local
+                mu_B0 = sum_wB0 * inv_W_local
+                r0 = image[y, x, 0] - a0 * mu_F0 - a1 * mu_B0
+                mu_F1 = sum_wF1 * inv_W_local
+                mu_B1 = sum_wB1 * inv_W_local
+                r1 = image[y, x, 1] - a0 * mu_F1 - a1 * mu_B1
+                mu_F2 = sum_wF2 * inv_W_local
+                mu_B2 = sum_wB2 * inv_W_local
+                r2 = image[y, x, 2] - a0 * mu_F2 - a1 * mu_B2
+
+                if a0 < 0.01:
+                    F[y, x, 0] = max(0.0, min(1.0, mu_F0))
+                    F[y, x, 1] = max(0.0, min(1.0, mu_F1))
+                    F[y, x, 2] = max(0.0, min(1.0, mu_F2))
+                    B[y, x, 0] = max(0.0, min(1.0, mu_B0 + r0 * inv_Wp1_local))
+                    B[y, x, 1] = max(0.0, min(1.0, mu_B1 + r1 * inv_Wp1_local))
+                    B[y, x, 2] = max(0.0, min(1.0, mu_B2 + r2 * inv_Wp1_local))
+                elif a0 > 0.99:
+                    F[y, x, 0] = max(0.0, min(1.0, mu_F0 + r0 * inv_Wp1_local))
+                    F[y, x, 1] = max(0.0, min(1.0, mu_F1 + r1 * inv_Wp1_local))
+                    F[y, x, 2] = max(0.0, min(1.0, mu_F2 + r2 * inv_Wp1_local))
+                    B[y, x, 0] = max(0.0, min(1.0, mu_B0))
+                    B[y, x, 1] = max(0.0, min(1.0, mu_B1))
+                    B[y, x, 2] = max(0.0, min(1.0, mu_B2))
+                else:
+                    fg_g = fg_gain[y, x]
+                    bg_g = bg_gain[y, x]
+                    F[y, x, 0] = max(0.0, min(1.0, mu_F0 + fg_g * r0))
+                    F[y, x, 1] = max(0.0, min(1.0, mu_F1 + fg_g * r1))
+                    F[y, x, 2] = max(0.0, min(1.0, mu_F2 + fg_g * r2))
+                    B[y, x, 0] = max(0.0, min(1.0, mu_B0 + bg_g * r0))
+                    B[y, x, 1] = max(0.0, min(1.0, mu_B1 + bg_g * r1))
+                    B[y, x, 2] = max(0.0, min(1.0, mu_B2 + bg_g * r2))
+                continue
 
             x_left = max(0, x - 1)
             x_right = min(w - 1, x + 1)
@@ -284,6 +413,75 @@ def _update_rb_half_cached_from_prev_level_with_boundary_fallback(
         for x in range(x_start, w, 2):
             a0 = alpha[y, x]
             a1 = 1.0 - a0
+
+            if 0 < x < w - 1 and 0 < y < h - 1:
+                sum_wF0 = 0.0
+                sum_wF1 = 0.0
+                sum_wF2 = 0.0
+                sum_wB0 = 0.0
+                sum_wB1 = 0.0
+                sum_wB2 = 0.0
+
+                wj = neighbor_weights[y, x, 0]
+                sum_wF0 += wj * F[y, x - 1, 0]
+                sum_wF1 += wj * F[y, x - 1, 1]
+                sum_wF2 += wj * F[y, x - 1, 2]
+                sum_wB0 += wj * B[y, x - 1, 0]
+                sum_wB1 += wj * B[y, x - 1, 1]
+                sum_wB2 += wj * B[y, x - 1, 2]
+
+                wj = neighbor_weights[y, x, 1]
+                sum_wF0 += wj * F[y, x + 1, 0]
+                sum_wF1 += wj * F[y, x + 1, 1]
+                sum_wF2 += wj * F[y, x + 1, 2]
+                sum_wB0 += wj * B[y, x + 1, 0]
+                sum_wB1 += wj * B[y, x + 1, 1]
+                sum_wB2 += wj * B[y, x + 1, 2]
+
+                wj = neighbor_weights[y, x, 2]
+                sum_wF0 += wj * F[y - 1, x, 0]
+                sum_wF1 += wj * F[y - 1, x, 1]
+                sum_wF2 += wj * F[y - 1, x, 2]
+                sum_wB0 += wj * B[y - 1, x, 0]
+                sum_wB1 += wj * B[y - 1, x, 1]
+                sum_wB2 += wj * B[y - 1, x, 2]
+
+                wj = neighbor_weights[y, x, 3]
+                sum_wF0 += wj * F[y + 1, x, 0]
+                sum_wF1 += wj * F[y + 1, x, 1]
+                sum_wF2 += wj * F[y + 1, x, 2]
+                sum_wB0 += wj * B[y + 1, x, 0]
+                sum_wB1 += wj * B[y + 1, x, 1]
+                sum_wB2 += wj * B[y + 1, x, 2]
+
+                inv_W_local = inv_W[y, x]
+
+                if a0 < 0.01 or a0 > 0.99:
+                    inv_Wp1_local = inv_Wp1[y, x]
+                    mu_F0 = sum_wF0 * inv_W_local
+                    mu_B0 = sum_wB0 * inv_W_local
+                    r0 = image[y, x, 0] - a0 * mu_F0 - a1 * mu_B0
+                    mu_F1 = sum_wF1 * inv_W_local
+                    mu_B1 = sum_wB1 * inv_W_local
+                    r1 = image[y, x, 1] - a0 * mu_F1 - a1 * mu_B1
+                    mu_F2 = sum_wF2 * inv_W_local
+                    mu_B2 = sum_wB2 * inv_W_local
+                    r2 = image[y, x, 2] - a0 * mu_F2 - a1 * mu_B2
+                    if a0 < 0.01:
+                        F[y, x, 0] = max(0.0, min(1.0, mu_F0))
+                        F[y, x, 1] = max(0.0, min(1.0, mu_F1))
+                        F[y, x, 2] = max(0.0, min(1.0, mu_F2))
+                        B[y, x, 0] = max(0.0, min(1.0, mu_B0 + r0 * inv_Wp1_local))
+                        B[y, x, 1] = max(0.0, min(1.0, mu_B1 + r1 * inv_Wp1_local))
+                        B[y, x, 2] = max(0.0, min(1.0, mu_B2 + r2 * inv_Wp1_local))
+                    else:
+                        F[y, x, 0] = max(0.0, min(1.0, mu_F0 + r0 * inv_Wp1_local))
+                        F[y, x, 1] = max(0.0, min(1.0, mu_F1 + r1 * inv_Wp1_local))
+                        F[y, x, 2] = max(0.0, min(1.0, mu_F2 + r2 * inv_Wp1_local))
+                        B[y, x, 0] = max(0.0, min(1.0, mu_B0))
+                        B[y, x, 1] = max(0.0, min(1.0, mu_B1))
+                        B[y, x, 2] = max(0.0, min(1.0, mu_B2))
+                    continue
 
             x_left = max(0, x - 1)
             x_right = min(w - 1, x + 1)
@@ -433,15 +631,21 @@ def _build_level_coefficients(
             a0 = alpha[y, x]
             a1 = 1.0 - a0
 
-            x_left = max(0, x - 1)
-            x_right = min(w - 1, x + 1)
-            y_up = max(0, y - 1)
-            y_down = min(h - 1, y + 1)
+            if 0 < x < w - 1 and 0 < y < h - 1:
+                w0 = eps + omega * abs(a0 - alpha[y, x - 1])
+                w1 = eps + omega * abs(a0 - alpha[y, x + 1])
+                w2 = eps + omega * abs(a0 - alpha[y - 1, x])
+                w3 = eps + omega * abs(a0 - alpha[y + 1, x])
+            else:
+                x_left = max(0, x - 1)
+                x_right = min(w - 1, x + 1)
+                y_up = max(0, y - 1)
+                y_down = min(h - 1, y + 1)
 
-            w0 = eps + omega * abs(a0 - alpha[y, x_left])
-            w1 = eps + omega * abs(a0 - alpha[y, x_right])
-            w2 = eps + omega * abs(a0 - alpha[y_up, x])
-            w3 = eps + omega * abs(a0 - alpha[y_down, x])
+                w0 = eps + omega * abs(a0 - alpha[y, x_left])
+                w1 = eps + omega * abs(a0 - alpha[y, x_right])
+                w2 = eps + omega * abs(a0 - alpha[y_up, x])
+                w3 = eps + omega * abs(a0 - alpha[y_down, x])
 
             neighbor_weights[y, x, 0] = w0
             neighbor_weights[y, x, 1] = w1
