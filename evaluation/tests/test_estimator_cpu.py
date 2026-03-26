@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from fastmlfe2_eval.estimator import estimate_foreground
 from fastmlfe2_eval.estimator._cpu import (
@@ -259,3 +260,85 @@ class TestCPUProperties:
         image, alpha, _, _ = _make_composited()
         result = estimate_foreground(image, alpha, backend="cpu", return_background=True)
         assert isinstance(result, tuple) and len(result) == 2
+
+
+def _make_quantized_pattern(
+    h: int = 64,
+    w: int = 64,
+    seed: int = 123,
+) -> tuple[np.ndarray, np.ndarray]:
+    rng = np.random.default_rng(seed)
+    yy, xx = np.mgrid[0:h, 0:w]
+    x = xx.astype(np.float32) / max(w - 1, 1)
+    y = yy.astype(np.float32) / max(h - 1, 1)
+
+    checker = ((xx // 9 + yy // 11) & 1).astype(np.float32)
+    image = np.stack(
+        [
+            0.10 + 0.72 * x + 0.08 * checker,
+            0.18 + 0.62 * y + 0.10 * np.sin(6.0 * np.pi * x),
+            0.22 + 0.48 * (1.0 - x) * (1.0 - y) + 0.08 * rng.random((h, w), dtype=np.float32),
+        ],
+        axis=2,
+    )
+    alpha = 0.5 + 0.34 * np.sin(4.0 * np.pi * (x + 0.15 * y)) * np.cos(3.0 * np.pi * (y - 0.2 * x))
+    alpha += 0.08 * checker - 0.05 * rng.random((h, w), dtype=np.float32)
+
+    image = np.clip(image, 0.0, 1.0)
+    alpha = np.clip(alpha, 0.0, 1.0)
+
+    return np.rint(image * 255.0).astype(np.uint8), np.rint(alpha * 255.0).astype(np.uint8)
+
+
+class TestCPUu8Backend:
+    def test_accepts_uint8_and_returns_uint8(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(32, 32)
+        foreground, background = estimate_foreground(
+            image_u8,
+            alpha_u8,
+            backend="cpu_u8",
+            return_background=True,
+        )
+
+        assert foreground.dtype == np.uint8
+        assert background.dtype == np.uint8
+        assert foreground.shape == image_u8.shape
+        assert background.shape == image_u8.shape
+        assert np.all(foreground <= 255)
+        assert np.all(background <= 255)
+
+    def test_rejects_non_uint8_inputs(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(16, 16)
+        with pytest.raises(ValueError, match="cpu_u8 backend requires uint8 image"):
+            estimate_foreground(image_u8.astype(np.float32) / 255.0, alpha_u8, backend="cpu_u8")
+        with pytest.raises(ValueError, match="cpu_u8 backend requires uint8 alpha"):
+            estimate_foreground(image_u8, alpha_u8.astype(np.float32) / 255.0, backend="cpu_u8")
+
+    def test_matches_float32_cpu_on_quantized_pattern(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(64, 64, seed=7)
+        image_f32 = image_u8.astype(np.float32) / 255.0
+        alpha_f32 = alpha_u8.astype(np.float32) / 255.0
+
+        cpu_u8_f, cpu_u8_b = estimate_foreground(
+            image_u8,
+            alpha_u8,
+            backend="cpu_u8",
+            return_background=True,
+        )
+        cpu_f32_f, cpu_f32_b = estimate_foreground(
+            image_f32,
+            alpha_f32,
+            backend="cpu",
+            return_background=True,
+        )
+
+        cpu_u8_f32 = cpu_u8_f.astype(np.float32) / 255.0
+        cpu_u8_b32 = cpu_u8_b.astype(np.float32) / 255.0
+        np.testing.assert_allclose(cpu_u8_f32, cpu_f32_f, atol=0.05, rtol=0.0)
+        np.testing.assert_allclose(cpu_u8_b32, cpu_f32_b, atol=0.05, rtol=0.0)
+
+    def test_large_shape_smoke(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(1024, 1024, seed=11)
+        foreground = estimate_foreground(image_u8, alpha_u8, backend="cpu_u8")
+        assert foreground.dtype == np.uint8
+        assert foreground.shape == image_u8.shape

@@ -30,7 +30,12 @@ def estimate_foreground(
     small_size: int = 32,
     backend: str = "auto",
     return_background: bool = False,
-) -> NDArray[np.float32] | tuple[NDArray[np.float32], NDArray[np.float32]]:
+) -> (
+    NDArray[np.float32]
+    | NDArray[np.uint8]
+    | tuple[NDArray[np.float32], NDArray[np.float32]]
+    | tuple[NDArray[np.uint8], NDArray[np.uint8]]
+):
     if image.ndim != 3 or image.shape[2] != 3:
         msg = f"image must be h×w×3, got shape {image.shape}"
         raise ValueError(msg)
@@ -40,9 +45,6 @@ def estimate_foreground(
     if image.shape[:2] != alpha.shape:
         msg = f"shape mismatch: image {image.shape[:2]} vs alpha {alpha.shape}"
         raise ValueError(msg)
-
-    image_f32 = np.ascontiguousarray(image, dtype=np.float32)
-    alpha_f32 = np.ascontiguousarray(alpha, dtype=np.float32)
 
     params = EstimatorParams(
         regularization=regularization,
@@ -56,10 +58,18 @@ def estimate_foreground(
         backend = _detect_backend()
 
     if backend == "cpu":
+        image_f32 = np.ascontiguousarray(image, dtype=np.float32)
+        alpha_f32 = np.ascontiguousarray(alpha, dtype=np.float32)
         from fastmlfe2_eval.estimator._cpu import estimate_fb_ml
 
         foreground, background = estimate_fb_ml(image_f32, alpha_f32, params)
+    elif backend == "cpu_u8":
+        from fastmlfe2_eval.estimator._cpu_u8 import estimate_fb_ml
+
+        foreground, background = estimate_fb_ml(image, alpha, params)
     elif backend == "gpu":
+        image_f32 = np.ascontiguousarray(image, dtype=np.float32)
+        alpha_f32 = np.ascontiguousarray(alpha, dtype=np.float32)
         try:
             from fastmlfe2_eval.estimator._gpu import estimate_fb_ml
         except ImportError:
@@ -68,7 +78,7 @@ def estimate_foreground(
 
         foreground, background = estimate_fb_ml(image_f32, alpha_f32, params)
     else:
-        msg = f"unknown backend: {backend!r}, expected 'auto', 'cpu', or 'gpu'"
+        msg = f"unknown backend: {backend!r}, expected 'auto', 'cpu', 'cpu_u8', or 'gpu'"
         raise ValueError(msg)
 
     if return_background:
