@@ -6,6 +6,34 @@
 
 namespace {
 
+struct NearestScalarInputRef {
+  std::span<const float> data;
+  int src_width;
+  std::span<const std::int32_t> x_index_map;
+  std::span<const std::int32_t> y_index_map;
+
+  float operator()(int y, int x) const {
+    return data[scalar_index(
+        static_cast<std::size_t>(y_index_map[static_cast<std::size_t>(y)]),
+        static_cast<std::size_t>(x_index_map[static_cast<std::size_t>(x)]),
+        static_cast<std::size_t>(src_width))];
+  }
+};
+
+struct NearestRgbInputRef {
+  std::span<const float> data;
+  int src_width;
+  std::span<const std::int32_t> x_index_map;
+  std::span<const std::int32_t> y_index_map;
+
+  std::span<const float, kChannels> pixel(int y, int x) const {
+    const auto src_y = static_cast<std::size_t>(y_index_map[static_cast<std::size_t>(y)]);
+    const auto src_x = static_cast<std::size_t>(x_index_map[static_cast<std::size_t>(x)]);
+    const auto offset = rgb_index(src_y, src_x, static_cast<std::size_t>(src_width));
+    return std::span<const float, kChannels>(data.data() + offset, static_cast<std::size_t>(kChannels));
+  }
+};
+
 struct CurrentLevelSource {
   ConstRgbView foreground;
   ConstRgbView background;
@@ -360,7 +388,7 @@ inline void write_solution_planar(
 }
 
 inline void build_level_solver_coefficients_planar(
-    ConstPlaneView alpha,
+    const NearestScalarInputRef &alpha_input,
     int h,
     int w,
     float regularization,
@@ -376,20 +404,21 @@ inline void build_level_solver_coefficients_planar(
 
   for (int y = 0; y < h; ++y) {
     for (int x = 0; x < w; ++x) {
-      const float alpha0 = alpha(y, x);
+      const float alpha0 = alpha_input(y, x);
       const float alpha1 = 1.0f - alpha0;
+      const std::size_t idx =
+          scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(coeffs.stride));
+      coeffs.alpha[idx] = alpha0;
 
       for (int n : kNeighborIndices) {
         const NeighborOffset offset = kNeighborOffsets[n];
         const int sample_y = clamp_index(y + offset.dy, h_max);
         const int sample_x = clamp_index(x + offset.dx, w_max);
         coeffs.neighbor(y, x, static_cast<std::size_t>(n)) =
-            regularization + gradient_weight * std::fabs(alpha0 - alpha(sample_y, sample_x));
+            regularization + gradient_weight * std::fabs(alpha0 - alpha_input(sample_y, sample_x));
       }
 
       const float W = coeffs.neighbor(y, x, 0) + coeffs.neighbor(y, x, 1) + coeffs.neighbor(y, x, 2) + coeffs.neighbor(y, x, 3);
-      const std::size_t idx =
-          scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(coeffs.stride));
       coeffs.inverse_weight_sum[idx] = 1.0f / W;
       coeffs.inverse_weight_sum_plus_one[idx] = 1.0f / (W + 1.0f);
 
@@ -439,8 +468,7 @@ template <SweepColor Color>
 inline void update_red_black_half_step_planar(
     MutablePlanarRgbView foreground,
     MutablePlanarRgbView background,
-    ConstPlanarRgbView image,
-    ConstPlaneView alpha,
+    const NearestRgbInputRef &image,
     ConstPlanarCoeffView coeffs,
     int h,
     int w
@@ -467,10 +495,10 @@ inline void update_red_black_half_step_planar(
             y,
             x,
             PixelSolutionInputs {
-                .alpha = alpha(y, x),
-                .image_r = image(y, x, 0),
-                .image_g = image(y, x, 1),
-                .image_b = image(y, x, 2),
+                .alpha = coeffs.alpha[idx],
+                .image_r = image.pixel(y, x)[0],
+                .image_g = image.pixel(y, x)[1],
+                .image_b = image.pixel(y, x)[2],
                 .foreground_weighted_sum_r = fg_sum[0],
                 .foreground_weighted_sum_g = fg_sum[1],
                 .foreground_weighted_sum_b = fg_sum[2],
@@ -498,10 +526,10 @@ inline void update_red_black_half_step_planar(
           y,
           0,
           PixelSolutionInputs {
-              .alpha = alpha(y, 0),
-              .image_r = image(y, 0, 0),
-              .image_g = image(y, 0, 1),
-              .image_b = image(y, 0, 2),
+              .alpha = coeffs.alpha[idx],
+              .image_r = image.pixel(y, 0)[0],
+              .image_g = image.pixel(y, 0)[1],
+              .image_b = image.pixel(y, 0)[2],
               .foreground_weighted_sum_r = fg_sum[0],
               .foreground_weighted_sum_g = fg_sum[1],
               .foreground_weighted_sum_b = fg_sum[2],
@@ -540,10 +568,10 @@ inline void update_red_black_half_step_planar(
           y,
           x,
           PixelSolutionInputs {
-              .alpha = alpha(y, x),
-              .image_r = image(y, x, 0),
-              .image_g = image(y, x, 1),
-              .image_b = image(y, x, 2),
+              .alpha = coeffs.alpha[idx],
+              .image_r = image.pixel(y, x)[0],
+              .image_g = image.pixel(y, x)[1],
+              .image_b = image.pixel(y, x)[2],
               .foreground_weighted_sum_r = fg_sum[0],
               .foreground_weighted_sum_g = fg_sum[1],
               .foreground_weighted_sum_b = fg_sum[2],
@@ -570,10 +598,10 @@ inline void update_red_black_half_step_planar(
           y,
           x,
           PixelSolutionInputs {
-              .alpha = alpha(y, x),
-              .image_r = image(y, x, 0),
-              .image_g = image(y, x, 1),
-              .image_b = image(y, x, 2),
+              .alpha = coeffs.alpha[idx],
+              .image_r = image.pixel(y, x)[0],
+              .image_g = image.pixel(y, x)[1],
+              .image_b = image.pixel(y, x)[2],
               .foreground_weighted_sum_r = fg_sum[0],
               .foreground_weighted_sum_g = fg_sum[1],
               .foreground_weighted_sum_b = fg_sum[2],
@@ -611,6 +639,14 @@ inline void estimate_multilevel_foreground_background(
 
   FloatWorkspace &workspace = thread_workspace();
   workspace.ensure_capacity(h0, w0);
+  const auto input_image_span = std::span<const float> {
+      input_image.data(),
+      static_cast<std::size_t>(h0) * static_cast<std::size_t>(w0) * kChannels,
+  };
+  const auto input_alpha_span = std::span<const float> {
+      input_alpha.data(),
+      static_cast<std::size_t>(h0) * static_cast<std::size_t>(w0),
+  };
 
   const ConstRgbView input_image_view {.data = input_image.data(), .width = w0};
   const ConstScalarView input_alpha_view {.data = input_alpha.data(), .width = w0};
@@ -646,18 +682,29 @@ inline void estimate_multilevel_foreground_background(
       n_iter = (w <= small_size && h <= small_size) ? n_small_iterations : n_big_iterations;
     }
 
-    const MutablePlanarRgbView image_view = workspace.image.mutable_view(workspace.stride);
-    const MutablePlaneView alpha_view = workspace.mutable_alpha_view();
     const MutablePlanarRgbView current_foreground = workspace.current_foreground.mutable_view(workspace.stride);
     const MutablePlanarRgbView current_background = workspace.current_background.mutable_view(workspace.stride);
     const ConstPlanarRgbView previous_foreground = workspace.previous_foreground.const_view(workspace.stride);
     const ConstPlanarRgbView previous_background = workspace.previous_background.const_view(workspace.stride);
     const PlanarCoeffView coeffs = workspace.coeffs.mutable_view(workspace.stride);
-
-    resize_nearest_rgb_to_planar(image_view, input_image_view, h0, w0, h, w);
-    resize_nearest_plane_buffer(alpha_view, ConstPlaneView {.data = input_alpha.data(), .stride = w0}, h0, w0, h, w);
+    build_resize_index_map_buffer(w0, w, workspace.x_index_map.data());
+    build_resize_index_map_buffer(h0, h, workspace.y_index_map.data());
+    const auto x_index_map = std::span<const std::int32_t> {workspace.x_index_map.data(), static_cast<std::size_t>(w)};
+    const auto y_index_map = std::span<const std::int32_t> {workspace.y_index_map.data(), static_cast<std::size_t>(h)};
+    const NearestRgbInputRef image_input {
+        .data = input_image_span,
+        .src_width = w0,
+        .x_index_map = x_index_map,
+        .y_index_map = y_index_map,
+    };
+    const NearestScalarInputRef alpha_input {
+        .data = input_alpha_span,
+        .src_width = w0,
+        .x_index_map = x_index_map,
+        .y_index_map = y_index_map,
+    };
     build_level_solver_coefficients_planar(
-        workspace.const_alpha_view(),
+        alpha_input,
         h,
         w,
         regularization,
@@ -671,16 +718,14 @@ inline void estimate_multilevel_foreground_background(
       update_red_black_half_step_planar<SweepColor::red>(
           current_foreground,
           current_background,
-          workspace.image.const_view(workspace.stride),
-          workspace.const_alpha_view(),
+          image_input,
           workspace.coeffs.const_view(workspace.stride),
           h,
           w);
       update_red_black_half_step_planar<SweepColor::black>(
           current_foreground,
           current_background,
-          workspace.image.const_view(workspace.stride),
-          workspace.const_alpha_view(),
+          image_input,
           workspace.coeffs.const_view(workspace.stride),
           h,
           w);

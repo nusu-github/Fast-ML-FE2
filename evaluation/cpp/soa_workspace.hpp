@@ -2,6 +2,7 @@
 
 #include "planar_views.hpp"
 
+#include <cstdint>
 #include <memory>
 
 template <typename T, std::size_t Alignment>
@@ -72,6 +73,7 @@ struct PlanarRgbStorage {
 
 struct PlanarCoeffStorage {
   std::array<AlignedFloatVector, kNeighborCount> neighbor_weights;
+  AlignedFloatVector alpha;
   AlignedFloatVector inverse_weight_sum;
   AlignedFloatVector inverse_weight_sum_plus_one;
   AlignedFloatVector foreground_gain;
@@ -81,6 +83,7 @@ struct PlanarCoeffStorage {
     for (auto &weights : neighbor_weights) {
       weights.resize(size);
     }
+    alpha.resize(size);
     inverse_weight_sum.resize(size);
     inverse_weight_sum_plus_one.resize(size);
     foreground_gain.resize(size);
@@ -95,6 +98,7 @@ struct PlanarCoeffStorage {
             neighbor_weights[2].data(),
             neighbor_weights[3].data(),
         },
+        .alpha = alpha.data(),
         .inverse_weight_sum = inverse_weight_sum.data(),
         .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one.data(),
         .foreground_gain = foreground_gain.data(),
@@ -111,6 +115,7 @@ struct PlanarCoeffStorage {
             neighbor_weights[2].data(),
             neighbor_weights[3].data(),
         },
+        .alpha = alpha.data(),
         .inverse_weight_sum = inverse_weight_sum.data(),
         .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one.data(),
         .foreground_gain = foreground_gain.data(),
@@ -129,9 +134,9 @@ struct FloatWorkspace {
   PlanarRgbStorage previous_background;
   PlanarRgbStorage current_foreground;
   PlanarRgbStorage current_background;
-  PlanarRgbStorage image;
-  AlignedFloatVector alpha;
   PlanarCoeffStorage coeffs;
+  std::vector<std::int32_t> x_index_map;
+  std::vector<std::int32_t> y_index_map;
 
   void ensure_capacity(int max_h, int max_w) {
     max_height = max_h;
@@ -143,13 +148,10 @@ struct FloatWorkspace {
     previous_background.resize(plane_size);
     current_foreground.resize(plane_size);
     current_background.resize(plane_size);
-    image.resize(plane_size);
-    alpha.resize(plane_size);
     coeffs.resize(plane_size);
+    x_index_map.resize(static_cast<std::size_t>(max_w));
+    y_index_map.resize(static_cast<std::size_t>(max_h));
   }
-
-  MutablePlaneView mutable_alpha_view() { return MutablePlaneView {.data = alpha.data(), .stride = stride}; }
-  ConstPlaneView const_alpha_view() const { return ConstPlaneView {.data = alpha.data(), .stride = stride}; }
 };
 
 constinit inline thread_local FloatWorkspace *g_thread_workspace = nullptr;

@@ -3,6 +3,15 @@
 #include "common.hpp"
 #include "planar_views.hpp"
 
+#include <span>
+
+inline void build_resize_index_map_buffer(int src_size, int dst_size, std::int32_t *dst) {
+  const int src_max = src_size - 1;
+  for (int dst_index = 0; dst_index < dst_size; ++dst_index) {
+    dst[dst_index] = static_cast<std::int32_t>(clamp_index((dst_index * src_size) / dst_size, src_max));
+  }
+}
+
 template <typename DstView, typename SrcView, std::size_t Channels>
 inline void resize_nearest_buffer(DstView dst, SrcView src, int h_src, int w_src, int h_dst, int w_dst) {
   const int src_h_max = h_src - 1;
@@ -143,4 +152,10 @@ inline void export_planar_rgb(
       }
     }
   }
+}
+
+inline auto build_resize_index_map(int src_size, int dst_size) -> std::vector<std::int32_t> {
+  std::vector<std::int32_t> result(static_cast<std::size_t>(dst_size));
+  build_resize_index_map_buffer(src_size, dst_size, result.data());
+  return result;
 }

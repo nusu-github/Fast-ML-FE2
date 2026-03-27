@@ -3,6 +3,7 @@
 #include "common.hpp"
 
 #include <array>
+#include <span>
 
 template <typename T>
 struct PlaneView {
@@ -14,6 +15,7 @@ struct PlaneView {
   }
 
   T *row(int y) const { return data + static_cast<std::size_t>(y) * static_cast<std::size_t>(stride); }
+  std::span<T> row_span(int y) const { return {row(y), static_cast<std::size_t>(stride)}; }
 };
 
 using ConstPlaneView = PlaneView<const float>;
@@ -30,6 +32,8 @@ struct PlanarRgbView {
 
   T *channel(std::size_t c) const { return channels[c]; }
   T *row(std::size_t c, int y) const { return channels[c] + static_cast<std::size_t>(y) * static_cast<std::size_t>(stride); }
+  std::span<T> row_span(std::size_t c, int y) const { return {row(c, y), static_cast<std::size_t>(stride)}; }
+  std::span<T> channel_span(std::size_t c, std::size_t size) const { return {channels[c], size}; }
 };
 
 using ConstPlanarRgbView = PlanarRgbView<const float>;
@@ -37,6 +41,7 @@ using MutablePlanarRgbView = PlanarRgbView<float>;
 
 struct PlanarCoeffView {
   std::array<float *, kNeighborCount> neighbor_weights;
+  float *alpha;
   float *inverse_weight_sum;
   float *inverse_weight_sum_plus_one;
   float *foreground_gain;
@@ -50,10 +55,15 @@ struct PlanarCoeffView {
   float *neighbor_row(std::size_t n, int y) const {
     return neighbor_weights[n] + static_cast<std::size_t>(y) * static_cast<std::size_t>(stride);
   }
+
+  std::span<float> neighbor_row_span(std::size_t n, int y) const {
+    return {neighbor_row(n, y), static_cast<std::size_t>(stride)};
+  }
 };
 
 struct ConstPlanarCoeffView {
   std::array<const float *, kNeighborCount> neighbor_weights;
+  const float *alpha;
   const float *inverse_weight_sum;
   const float *inverse_weight_sum_plus_one;
   const float *foreground_gain;
@@ -66,5 +76,9 @@ struct ConstPlanarCoeffView {
 
   const float *neighbor_row(std::size_t n, int y) const {
     return neighbor_weights[n] + static_cast<std::size_t>(y) * static_cast<std::size_t>(stride);
+  }
+
+  std::span<const float> neighbor_row_span(std::size_t n, int y) const {
+    return {neighbor_row(n, y), static_cast<std::size_t>(stride)};
   }
 };

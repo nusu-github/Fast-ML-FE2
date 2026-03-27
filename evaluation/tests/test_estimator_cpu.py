@@ -5,6 +5,7 @@ from fastmlfe2_eval.estimator import _cpu as cpu_backend
 from fastmlfe2_eval.estimator import estimate_foreground
 from fastmlfe2_eval.estimator._cpu import (
     _build_level_solver_coefficients,
+    _build_resize_index_map,
     _resize_nearest_rgb,
     _resize_nearest_scalar,
     _update_red_black_half_step,
@@ -47,6 +48,20 @@ def test_cpu_backend_public_surface_is_minimal():
 
 
 class TestResizeNearest:
+    def test_resize_index_map_matches_python_helper(self):
+        np.testing.assert_array_equal(
+            _build_resize_index_map(7, 5),
+            cpu_backend._resize_index_map(7, 5),
+        )
+        np.testing.assert_array_equal(
+            _build_resize_index_map(5, 7),
+            cpu_backend._resize_index_map(5, 7),
+        )
+        np.testing.assert_array_equal(
+            _build_resize_index_map(1, 9),
+            cpu_backend._resize_index_map(1, 9),
+        )
+
     def test_identity(self):
         src = np.random.default_rng(0).random((4, 4, 3)).astype(np.float32)
         dst = np.empty_like(src)

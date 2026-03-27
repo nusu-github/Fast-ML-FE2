@@ -17,6 +17,7 @@ inline void bind_cpu_impl(nb::module_ &m) {
       nb::arg("small_size"));
   m.def("_resize_nearest_rgb", &resize_nearest_rgb, nb::arg("dst"), nb::arg("src"));
   m.def("_resize_nearest_scalar", &resize_nearest_scalar, nb::arg("dst"), nb::arg("src"));
+  m.def("_build_resize_index_map", &build_resize_index_map, nb::arg("src_size"), nb::arg("dst_size"));
   m.def(
       "_build_level_solver_coefficients",
       &build_level_solver_coefficients,

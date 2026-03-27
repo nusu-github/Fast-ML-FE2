@@ -22,6 +22,7 @@ _update_red_black_half_step_from_previous_level_with_boundary_fallback = (
     _cpu_impl._update_red_black_half_step_from_previous_level_with_boundary_fallback
 )
 _estimate_multilevel_foreground_background = _cpu_impl.estimate_multilevel_foreground_background
+_build_resize_index_map = _cpu_impl._build_resize_index_map
 
 __all__ = [
     "estimate_multilevel_foreground_background",
