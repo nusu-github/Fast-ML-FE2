@@ -58,11 +58,22 @@ def estimate_foreground(
         backend = _detect_backend()
 
     if backend == "cpu":
-        image_f32 = np.ascontiguousarray(image, dtype=np.float32)
-        alpha_f32 = np.ascontiguousarray(alpha, dtype=np.float32)
         from fastmlfe2_eval.estimator._cpu import estimate_multilevel_foreground_background
 
-        foreground, background = estimate_multilevel_foreground_background(image_f32, alpha_f32, params)
+        if image.dtype != np.float32 or alpha.dtype != np.float32:
+            msg = (
+                "cpu backend requires float32 image and alpha inputs; "
+                "call prepare_cpu_estimator_inputs() for explicit conversion"
+            )
+            raise ValueError(msg)
+        if not image.flags.c_contiguous or not alpha.flags.c_contiguous:
+            msg = (
+                "cpu backend requires C-contiguous image and alpha inputs; "
+                "call prepare_cpu_estimator_inputs() for explicit conversion"
+            )
+            raise ValueError(msg)
+
+        foreground, background = estimate_multilevel_foreground_background(image, alpha, params)
     elif backend == "gpu":
         image_f32 = np.ascontiguousarray(image, dtype=np.float32)
         alpha_f32 = np.ascontiguousarray(alpha, dtype=np.float32)

@@ -2,6 +2,7 @@
 
 #include "common.hpp"
 #include "resize_ops.hpp"
+#include "soa_workspace.hpp"
 
 namespace {
 
@@ -315,6 +316,279 @@ inline void update_red_black_half_step_buffer(
   }
 }
 
+inline void write_solution_planar(
+    MutablePlanarRgbView foreground,
+    MutablePlanarRgbView background,
+    int y,
+    int x,
+    const PixelSolutionInputs &inputs
+) {
+  const float alpha1 = 1.0f - inputs.alpha;
+  const float mu_F0 = inputs.foreground_weighted_sum_r * inputs.inverse_weight_sum;
+  const float mu_F1 = inputs.foreground_weighted_sum_g * inputs.inverse_weight_sum;
+  const float mu_F2 = inputs.foreground_weighted_sum_b * inputs.inverse_weight_sum;
+  const float mu_B0 = inputs.background_weighted_sum_r * inputs.inverse_weight_sum;
+  const float mu_B1 = inputs.background_weighted_sum_g * inputs.inverse_weight_sum;
+  const float mu_B2 = inputs.background_weighted_sum_b * inputs.inverse_weight_sum;
+
+  const float r0 = inputs.image_r - inputs.alpha * mu_F0 - alpha1 * mu_B0;
+  const float r1 = inputs.image_g - inputs.alpha * mu_F1 - alpha1 * mu_B1;
+  const float r2 = inputs.image_b - inputs.alpha * mu_F2 - alpha1 * mu_B2;
+
+  if (inputs.alpha < kAlphaLowThreshold) {
+    foreground(y, x, 0) = clamp01(mu_F0);
+    foreground(y, x, 1) = clamp01(mu_F1);
+    foreground(y, x, 2) = clamp01(mu_F2);
+    background(y, x, 0) = clamp01(mu_B0 + r0 * inputs.inverse_weight_sum_plus_one);
+    background(y, x, 1) = clamp01(mu_B1 + r1 * inputs.inverse_weight_sum_plus_one);
+    background(y, x, 2) = clamp01(mu_B2 + r2 * inputs.inverse_weight_sum_plus_one);
+  } else if (inputs.alpha > kAlphaHighThreshold) {
+    foreground(y, x, 0) = clamp01(mu_F0 + r0 * inputs.inverse_weight_sum_plus_one);
+    foreground(y, x, 1) = clamp01(mu_F1 + r1 * inputs.inverse_weight_sum_plus_one);
+    foreground(y, x, 2) = clamp01(mu_F2 + r2 * inputs.inverse_weight_sum_plus_one);
+    background(y, x, 0) = clamp01(mu_B0);
+    background(y, x, 1) = clamp01(mu_B1);
+    background(y, x, 2) = clamp01(mu_B2);
+  } else {
+    foreground(y, x, 0) = clamp01(mu_F0 + inputs.foreground_gain * r0);
+    foreground(y, x, 1) = clamp01(mu_F1 + inputs.foreground_gain * r1);
+    foreground(y, x, 2) = clamp01(mu_F2 + inputs.foreground_gain * r2);
+    background(y, x, 0) = clamp01(mu_B0 + inputs.background_gain * r0);
+    background(y, x, 1) = clamp01(mu_B1 + inputs.background_gain * r1);
+    background(y, x, 2) = clamp01(mu_B2 + inputs.background_gain * r2);
+  }
+}
+
+inline void build_level_solver_coefficients_planar(
+    ConstPlaneView alpha,
+    int h,
+    int w,
+    float regularization,
+    float gradient_weight,
+    PlanarCoeffView coeffs
+) {
+  if (h <= 0 || w <= 0) {
+    return;
+  }
+
+  const int h_max = h - 1;
+  const int w_max = w - 1;
+
+  for (int y = 0; y < h; ++y) {
+    for (int x = 0; x < w; ++x) {
+      const float alpha0 = alpha(y, x);
+      const float alpha1 = 1.0f - alpha0;
+
+      for (int n : kNeighborIndices) {
+        const NeighborOffset offset = kNeighborOffsets[n];
+        const int sample_y = clamp_index(y + offset.dy, h_max);
+        const int sample_x = clamp_index(x + offset.dx, w_max);
+        coeffs.neighbor(y, x, static_cast<std::size_t>(n)) =
+            regularization + gradient_weight * std::fabs(alpha0 - alpha(sample_y, sample_x));
+      }
+
+      const float W = coeffs.neighbor(y, x, 0) + coeffs.neighbor(y, x, 1) + coeffs.neighbor(y, x, 2) + coeffs.neighbor(y, x, 3);
+      const std::size_t idx =
+          scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(coeffs.stride));
+      coeffs.inverse_weight_sum[idx] = 1.0f / W;
+      coeffs.inverse_weight_sum_plus_one[idx] = 1.0f / (W + 1.0f);
+
+      const float D = W + alpha0 * alpha0 + alpha1 * alpha1;
+      const float inv_D = 1.0f / D;
+      coeffs.foreground_gain[idx] = alpha0 * inv_D;
+      coeffs.background_gain[idx] = alpha1 * inv_D;
+    }
+  }
+}
+
+template <typename ForegroundView, typename BackgroundView>
+inline void accumulate_boundary_sums(
+    ForegroundView foreground,
+    BackgroundView background,
+    ConstPlanarCoeffView coeffs,
+    int h,
+    int w,
+    int y,
+    int x,
+    float *fg_sum,
+    float *bg_sum
+) {
+  const int h_max = h - 1;
+  const int w_max = w - 1;
+  fg_sum[0] = 0.0f;
+  fg_sum[1] = 0.0f;
+  fg_sum[2] = 0.0f;
+  bg_sum[0] = 0.0f;
+  bg_sum[1] = 0.0f;
+  bg_sum[2] = 0.0f;
+
+  for (int n : kNeighborIndices) {
+    const NeighborOffset offset = kNeighborOffsets[n];
+    const int sample_y = clamp_index(y + offset.dy, h_max);
+    const int sample_x = clamp_index(x + offset.dx, w_max);
+    const float weight = coeffs.neighbor(y, x, static_cast<std::size_t>(n));
+    for (int c : kChannelIndices) {
+      const std::size_t channel = static_cast<std::size_t>(c);
+      fg_sum[c] += weight * foreground(sample_y, sample_x, channel);
+      bg_sum[c] += weight * background(sample_y, sample_x, channel);
+    }
+  }
+}
+
+template <SweepColor Color>
+inline void update_red_black_half_step_planar(
+    MutablePlanarRgbView foreground,
+    MutablePlanarRgbView background,
+    ConstPlanarRgbView image,
+    ConstPlaneView alpha,
+    ConstPlanarCoeffView coeffs,
+    int h,
+    int w
+) {
+  if (h <= 0 || w <= 0) {
+    return;
+  }
+
+  constexpr int parity = static_cast<int>(Color);
+
+  for (int y = 0; y < h; ++y) {
+    const int x_start = (parity + y) % 2;
+
+    if (y == 0 || y == h - 1 || w <= 2) {
+      for (int x = x_start; x < w; x += 2) {
+        float fg_sum[kChannels] {};
+        float bg_sum[kChannels] {};
+        accumulate_boundary_sums(foreground, background, coeffs, h, w, y, x, fg_sum, bg_sum);
+        const std::size_t idx =
+            scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(coeffs.stride));
+        write_solution_planar(
+            foreground,
+            background,
+            y,
+            x,
+            PixelSolutionInputs {
+                .alpha = alpha(y, x),
+                .image_r = image(y, x, 0),
+                .image_g = image(y, x, 1),
+                .image_b = image(y, x, 2),
+                .foreground_weighted_sum_r = fg_sum[0],
+                .foreground_weighted_sum_g = fg_sum[1],
+                .foreground_weighted_sum_b = fg_sum[2],
+                .background_weighted_sum_r = bg_sum[0],
+                .background_weighted_sum_g = bg_sum[1],
+                .background_weighted_sum_b = bg_sum[2],
+                .inverse_weight_sum = coeffs.inverse_weight_sum[idx],
+                .inverse_weight_sum_plus_one = coeffs.inverse_weight_sum_plus_one[idx],
+                .foreground_gain = coeffs.foreground_gain[idx],
+                .background_gain = coeffs.background_gain[idx],
+            });
+      }
+      continue;
+    }
+
+    if (x_start == 0) {
+      float fg_sum[kChannels] {};
+      float bg_sum[kChannels] {};
+      accumulate_boundary_sums(foreground, background, coeffs, h, w, y, 0, fg_sum, bg_sum);
+      const std::size_t idx =
+          scalar_index(static_cast<std::size_t>(y), 0, static_cast<std::size_t>(coeffs.stride));
+      write_solution_planar(
+          foreground,
+          background,
+          y,
+          0,
+          PixelSolutionInputs {
+              .alpha = alpha(y, 0),
+              .image_r = image(y, 0, 0),
+              .image_g = image(y, 0, 1),
+              .image_b = image(y, 0, 2),
+              .foreground_weighted_sum_r = fg_sum[0],
+              .foreground_weighted_sum_g = fg_sum[1],
+              .foreground_weighted_sum_b = fg_sum[2],
+              .background_weighted_sum_r = bg_sum[0],
+              .background_weighted_sum_g = bg_sum[1],
+              .background_weighted_sum_b = bg_sum[2],
+              .inverse_weight_sum = coeffs.inverse_weight_sum[idx],
+              .inverse_weight_sum_plus_one = coeffs.inverse_weight_sum_plus_one[idx],
+              .foreground_gain = coeffs.foreground_gain[idx],
+              .background_gain = coeffs.background_gain[idx],
+          });
+    }
+
+    const int interior_start = (x_start == 0) ? 2 : 1;
+    for (int x = interior_start; x < w - 1; x += 2) {
+      const float w_left = coeffs.neighbor(y, x, 0);
+      const float w_right = coeffs.neighbor(y, x, 1);
+      const float w_up = coeffs.neighbor(y, x, 2);
+      const float w_down = coeffs.neighbor(y, x, 3);
+
+      float fg_sum[kChannels] {};
+      float bg_sum[kChannels] {};
+      for (int c : kChannelIndices) {
+        const std::size_t channel = static_cast<std::size_t>(c);
+        fg_sum[c] = w_left * foreground(y, x - 1, channel) + w_right * foreground(y, x + 1, channel) +
+                    w_up * foreground(y - 1, x, channel) + w_down * foreground(y + 1, x, channel);
+        bg_sum[c] = w_left * background(y, x - 1, channel) + w_right * background(y, x + 1, channel) +
+                    w_up * background(y - 1, x, channel) + w_down * background(y + 1, x, channel);
+      }
+
+      const std::size_t idx =
+          scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(coeffs.stride));
+      write_solution_planar(
+          foreground,
+          background,
+          y,
+          x,
+          PixelSolutionInputs {
+              .alpha = alpha(y, x),
+              .image_r = image(y, x, 0),
+              .image_g = image(y, x, 1),
+              .image_b = image(y, x, 2),
+              .foreground_weighted_sum_r = fg_sum[0],
+              .foreground_weighted_sum_g = fg_sum[1],
+              .foreground_weighted_sum_b = fg_sum[2],
+              .background_weighted_sum_r = bg_sum[0],
+              .background_weighted_sum_g = bg_sum[1],
+              .background_weighted_sum_b = bg_sum[2],
+              .inverse_weight_sum = coeffs.inverse_weight_sum[idx],
+              .inverse_weight_sum_plus_one = coeffs.inverse_weight_sum_plus_one[idx],
+              .foreground_gain = coeffs.foreground_gain[idx],
+              .background_gain = coeffs.background_gain[idx],
+          });
+    }
+
+    if (((w - 1) & 1) == x_start) {
+      const int x = w - 1;
+      float fg_sum[kChannels] {};
+      float bg_sum[kChannels] {};
+      accumulate_boundary_sums(foreground, background, coeffs, h, w, y, x, fg_sum, bg_sum);
+      const std::size_t idx =
+          scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(coeffs.stride));
+      write_solution_planar(
+          foreground,
+          background,
+          y,
+          x,
+          PixelSolutionInputs {
+              .alpha = alpha(y, x),
+              .image_r = image(y, x, 0),
+              .image_g = image(y, x, 1),
+              .image_b = image(y, x, 2),
+              .foreground_weighted_sum_r = fg_sum[0],
+              .foreground_weighted_sum_g = fg_sum[1],
+              .foreground_weighted_sum_b = fg_sum[2],
+              .background_weighted_sum_r = bg_sum[0],
+              .background_weighted_sum_g = bg_sum[1],
+              .background_weighted_sum_b = bg_sum[2],
+              .inverse_weight_sum = coeffs.inverse_weight_sum[idx],
+              .inverse_weight_sum_plus_one = coeffs.inverse_weight_sum_plus_one[idx],
+              .foreground_gain = coeffs.foreground_gain[idx],
+              .background_gain = coeffs.background_gain[idx],
+          });
+    }
+  }
+}
+
 inline void estimate_multilevel_foreground_background(
     MutableImage foreground_out,
     MutableImage background_out,
@@ -335,9 +609,8 @@ inline void estimate_multilevel_foreground_background(
 
   nb::gil_scoped_release release;
 
-  const std::size_t max_pixels = static_cast<std::size_t>(h0) * static_cast<std::size_t>(w0);
   FloatWorkspace &workspace = thread_workspace();
-  workspace.ensure_capacity(max_pixels);
+  workspace.ensure_capacity(h0, w0);
 
   const ConstRgbView input_image_view {.data = input_image.data(), .width = w0};
   const ConstScalarView input_alpha_view {.data = input_alpha.data(), .width = w0};
@@ -347,8 +620,8 @@ inline void estimate_multilevel_foreground_background(
   compute_initial_means(input_alpha_view, input_image_view, h0, w0, fg_mean, bg_mean);
 
   for (int c : kChannelIndices) {
-    workspace.previous_foreground_storage[c] = fg_mean[c];
-    workspace.previous_background_storage[c] = bg_mean[c];
+    workspace.previous_foreground.channels[static_cast<std::size_t>(c)][0] = fg_mean[c];
+    workspace.previous_background.channels[static_cast<std::size_t>(c)][0] = bg_mean[c];
   }
 
   int prev_h = 1;
@@ -373,59 +646,55 @@ inline void estimate_multilevel_foreground_background(
       n_iter = (w <= small_size && h <= small_size) ? n_small_iterations : n_big_iterations;
     }
 
-    resize_nearest_rgb_buffer(workspace.image.data(), input_image.data(), h0, w0, h, w);
-    resize_nearest_scalar_buffer(workspace.alpha.data(), input_alpha.data(), h0, w0, h, w);
-    build_level_solver_coefficients_buffer(
-        workspace.alpha.data(),
+    const MutablePlanarRgbView image_view = workspace.image.mutable_view(workspace.stride);
+    const MutablePlaneView alpha_view = workspace.mutable_alpha_view();
+    const MutablePlanarRgbView current_foreground = workspace.current_foreground.mutable_view(workspace.stride);
+    const MutablePlanarRgbView current_background = workspace.current_background.mutable_view(workspace.stride);
+    const ConstPlanarRgbView previous_foreground = workspace.previous_foreground.const_view(workspace.stride);
+    const ConstPlanarRgbView previous_background = workspace.previous_background.const_view(workspace.stride);
+    const PlanarCoeffView coeffs = workspace.coeffs.mutable_view(workspace.stride);
+
+    resize_nearest_rgb_to_planar(image_view, input_image_view, h0, w0, h, w);
+    resize_nearest_plane_buffer(alpha_view, ConstPlaneView {.data = input_alpha.data(), .stride = w0}, h0, w0, h, w);
+    build_level_solver_coefficients_planar(
+        workspace.const_alpha_view(),
         h,
         w,
         regularization,
         gradient_weight,
-        workspace.neighbor_weights.data(),
-        workspace.inverse_weight_sum.data(),
-        workspace.inverse_weight_sum_plus_one.data(),
-        workspace.foreground_gain.data(),
-        workspace.background_gain.data());
+        coeffs);
 
-    const bool final_level = i_level == n_levels;
-    float *current_foreground = final_level ? foreground_out.data() : workspace.current_foreground_storage.data();
-    float *current_background = final_level ? background_out.data() : workspace.current_background_storage.data();
-
-    resize_nearest_rgb_buffer(current_foreground, workspace.previous_foreground_storage.data(), prev_h, prev_w, h, w);
-    resize_nearest_rgb_buffer(current_background, workspace.previous_background_storage.data(), prev_h, prev_w, h, w);
+    resize_nearest_planar_rgb(current_foreground, previous_foreground, prev_h, prev_w, h, w);
+    resize_nearest_planar_rgb(current_background, previous_background, prev_h, prev_w, h, w);
 
     for (int i_iter = 0; i_iter < n_iter; ++i_iter) {
-      update_red_black_half_step_buffer(
+      update_red_black_half_step_planar<SweepColor::red>(
           current_foreground,
           current_background,
-          workspace.image.data(),
-          workspace.alpha.data(),
-          workspace.neighbor_weights.data(),
-          workspace.inverse_weight_sum.data(),
-          workspace.inverse_weight_sum_plus_one.data(),
-          workspace.foreground_gain.data(),
-          workspace.background_gain.data(),
+          workspace.image.const_view(workspace.stride),
+          workspace.const_alpha_view(),
+          workspace.coeffs.const_view(workspace.stride),
           h,
-          w,
-          static_cast<int>(SweepColor::red));
-      update_red_black_half_step_buffer(
+          w);
+      update_red_black_half_step_planar<SweepColor::black>(
           current_foreground,
           current_background,
-          workspace.image.data(),
-          workspace.alpha.data(),
-          workspace.neighbor_weights.data(),
-          workspace.inverse_weight_sum.data(),
-          workspace.inverse_weight_sum_plus_one.data(),
-          workspace.foreground_gain.data(),
-          workspace.background_gain.data(),
+          workspace.image.const_view(workspace.stride),
+          workspace.const_alpha_view(),
+          workspace.coeffs.const_view(workspace.stride),
           h,
-          w,
-          static_cast<int>(SweepColor::black));
+          w);
+    }
+
+    const bool final_level = i_level == n_levels;
+    if (final_level) {
+      export_planar_rgb(foreground_out, workspace.current_foreground.const_view(workspace.stride), h, w);
+      export_planar_rgb(background_out, workspace.current_background.const_view(workspace.stride), h, w);
     }
 
     if (!final_level) {
-      std::swap(workspace.previous_foreground_storage, workspace.current_foreground_storage);
-      std::swap(workspace.previous_background_storage, workspace.current_background_storage);
+      std::swap(workspace.previous_foreground, workspace.current_foreground);
+      std::swap(workspace.previous_background, workspace.current_background);
       prev_h = h;
       prev_w = w;
     }

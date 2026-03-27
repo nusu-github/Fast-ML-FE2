@@ -1,13 +1,14 @@
 import numpy as np
 import pytest
 
-from fastmlfe2_eval.estimator import estimate_foreground
 from fastmlfe2_eval.estimator import _cpu as cpu_backend
+from fastmlfe2_eval.estimator import estimate_foreground
 from fastmlfe2_eval.estimator._cpu import (
     _build_level_solver_coefficients,
     _resize_nearest_rgb,
     _resize_nearest_scalar,
     _update_red_black_half_step,
+    prepare_cpu_estimator_inputs,
 )
 
 
@@ -29,11 +30,20 @@ def _build_cached_kernel_inputs(alpha, eps, omega):
         foreground_gain,
         background_gain,
     )
-    return neighbor_weights, inverse_weight_sum, inverse_weight_sum_plus_one, foreground_gain, background_gain
+    return (
+        neighbor_weights,
+        inverse_weight_sum,
+        inverse_weight_sum_plus_one,
+        foreground_gain,
+        background_gain,
+    )
 
 
 def test_cpu_backend_public_surface_is_minimal():
-    assert cpu_backend.__all__ == ["estimate_multilevel_foreground_background"]
+    assert cpu_backend.__all__ == [
+        "estimate_multilevel_foreground_background",
+        "prepare_cpu_estimator_inputs",
+    ]
 
 
 class TestResizeNearest:
@@ -264,6 +274,35 @@ class TestCPUProperties:
     def test_return_background(self):
         image, alpha, _, _ = _make_composited()
         result = estimate_foreground(image, alpha, backend="cpu", return_background=True)
+        assert isinstance(result, tuple) and len(result) == 2
+
+    def test_cpu_backend_rejects_non_float32_inputs(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(16, 16)
+
+        with pytest.raises(ValueError, match="cpu backend requires float32"):
+            estimate_foreground(image_u8, alpha_u8, backend="cpu")
+
+    def test_cpu_backend_rejects_non_contiguous_inputs(self):
+        image, alpha, _, _ = _make_composited(h=16, w=16)
+        image_view = image[:, ::2, :]
+        alpha_view = alpha[:, ::2]
+        assert not image_view.flags.c_contiguous
+        assert not alpha_view.flags.c_contiguous
+
+        with pytest.raises(ValueError, match="cpu backend requires C-contiguous"):
+            estimate_foreground(image_view, alpha_view, backend="cpu")
+
+    def test_prepare_cpu_estimator_inputs_makes_strict_inputs(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(16, 16)
+
+        image_f32, alpha_f32 = prepare_cpu_estimator_inputs(image_u8, alpha_u8)
+
+        assert image_f32.dtype == np.float32
+        assert alpha_f32.dtype == np.float32
+        assert image_f32.flags.c_contiguous
+        assert alpha_f32.flags.c_contiguous
+
+        result = estimate_foreground(image_f32, alpha_f32, backend="cpu", return_background=True)
         assert isinstance(result, tuple) and len(result) == 2
 
 
