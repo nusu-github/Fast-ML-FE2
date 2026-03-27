@@ -10,6 +10,34 @@ inline float fmadd(float a, float b, float c) {
   return std::fmaf(a, b, c);
 }
 
+inline PixelSolutionInputs make_pixel_solution_inputs(
+    float alpha,
+    const float *image_px,
+    const float *foreground_weighted_sum,
+    const float *background_weighted_sum,
+    float inverse_weight_sum,
+    float inverse_weight_sum_plus_one,
+    float foreground_gain,
+    float background_gain
+) {
+  return PixelSolutionInputs {
+      .alpha = alpha,
+      .image_r = image_px[0],
+      .image_g = image_px[1],
+      .image_b = image_px[2],
+      .foreground_weighted_sum_r = foreground_weighted_sum[0],
+      .foreground_weighted_sum_g = foreground_weighted_sum[1],
+      .foreground_weighted_sum_b = foreground_weighted_sum[2],
+      .background_weighted_sum_r = background_weighted_sum[0],
+      .background_weighted_sum_g = background_weighted_sum[1],
+      .background_weighted_sum_b = background_weighted_sum[2],
+      .inverse_weight_sum = inverse_weight_sum,
+      .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one,
+      .foreground_gain = foreground_gain,
+      .background_gain = background_gain,
+  };
+}
+
 template <AlphaRegion Region, typename WritePixel>
 inline void write_solution_channels(const PixelSolutionInputs &inputs, WritePixel &&write_pixel) {
   const float alpha1 = 1.0f - inputs.alpha;
@@ -292,22 +320,15 @@ inline void update_red_black_half_step_region_buffer(
           nw[2] * background[rgb_pixel_base(idx_up) + C] + nw[3] * background[rgb_pixel_base(idx_down) + C];
     });
 
-    const PixelSolutionInputs inputs {
-        .alpha = alpha[idx],
-        .image_r = image[image_idx + 0],
-        .image_g = image[image_idx + 1],
-        .image_b = image[image_idx + 2],
-        .foreground_weighted_sum_r = foreground_weighted_sum[0],
-        .foreground_weighted_sum_g = foreground_weighted_sum[1],
-        .foreground_weighted_sum_b = foreground_weighted_sum[2],
-        .background_weighted_sum_r = background_weighted_sum[0],
-        .background_weighted_sum_g = background_weighted_sum[1],
-        .background_weighted_sum_b = background_weighted_sum[2],
-        .inverse_weight_sum = inverse_weight_sum[idx],
-        .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one[idx],
-        .foreground_gain = foreground_gain[idx],
-        .background_gain = background_gain[idx],
-    };
+    const PixelSolutionInputs inputs = make_pixel_solution_inputs(
+        alpha[idx],
+        image + image_idx,
+        foreground_weighted_sum,
+        background_weighted_sum,
+        inverse_weight_sum[idx],
+        inverse_weight_sum_plus_one[idx],
+        foreground_gain[idx],
+        background_gain[idx]);
     write_solution_buffer(foreground, background, idx, inputs);
   };
 
@@ -507,44 +528,19 @@ inline void update_red_black_half_step(
     int w,
     int color
 ) {
-  for (int y = 0; y < h; ++y) {
-    const int x_start = (color + y) % 2;
-    for (int x = x_start; x < w; x += 2) {
-      const int x_left = x == 0 ? 0 : x - 1;
-      const int x_right = x + 1 >= w ? w - 1 : x + 1;
-      const int y_up = y == 0 ? 0 : y - 1;
-      const int y_down = y + 1 >= h ? h - 1 : y + 1;
-      const PixelSolutionInputs inputs {
-          .alpha = alpha(y, x),
-          .image_r = image(y, x, 0),
-          .image_g = image(y, x, 1),
-          .image_b = image(y, x, 2),
-          .foreground_weighted_sum_r =
-              neighbor_weights(y, x, 0) * foreground(y, x_left, 0) + neighbor_weights(y, x, 1) * foreground(y, x_right, 0) +
-              neighbor_weights(y, x, 2) * foreground(y_up, x, 0) + neighbor_weights(y, x, 3) * foreground(y_down, x, 0),
-          .foreground_weighted_sum_g =
-              neighbor_weights(y, x, 0) * foreground(y, x_left, 1) + neighbor_weights(y, x, 1) * foreground(y, x_right, 1) +
-              neighbor_weights(y, x, 2) * foreground(y_up, x, 1) + neighbor_weights(y, x, 3) * foreground(y_down, x, 1),
-          .foreground_weighted_sum_b =
-              neighbor_weights(y, x, 0) * foreground(y, x_left, 2) + neighbor_weights(y, x, 1) * foreground(y, x_right, 2) +
-              neighbor_weights(y, x, 2) * foreground(y_up, x, 2) + neighbor_weights(y, x, 3) * foreground(y_down, x, 2),
-          .background_weighted_sum_r =
-              neighbor_weights(y, x, 0) * background(y, x_left, 0) + neighbor_weights(y, x, 1) * background(y, x_right, 0) +
-              neighbor_weights(y, x, 2) * background(y_up, x, 0) + neighbor_weights(y, x, 3) * background(y_down, x, 0),
-          .background_weighted_sum_g =
-              neighbor_weights(y, x, 0) * background(y, x_left, 1) + neighbor_weights(y, x, 1) * background(y, x_right, 1) +
-              neighbor_weights(y, x, 2) * background(y_up, x, 1) + neighbor_weights(y, x, 3) * background(y_down, x, 1),
-          .background_weighted_sum_b =
-              neighbor_weights(y, x, 0) * background(y, x_left, 2) + neighbor_weights(y, x, 1) * background(y, x_right, 2) +
-              neighbor_weights(y, x, 2) * background(y_up, x, 2) + neighbor_weights(y, x, 3) * background(y_down, x, 2),
-          .inverse_weight_sum = inverse_weight_sum(y, x),
-          .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one(y, x),
-          .foreground_gain = foreground_gain(y, x),
-          .background_gain = background_gain(y, x),
-      };
-      write_solution(foreground, background, static_cast<std::size_t>(y), static_cast<std::size_t>(x), inputs);
-    }
-  }
+  update_red_black_half_step_buffer(
+      foreground.data(),
+      background.data(),
+      image.data(),
+      alpha.data(),
+      neighbor_weights.data(),
+      inverse_weight_sum.data(),
+      inverse_weight_sum_plus_one.data(),
+      foreground_gain.data(),
+      background_gain.data(),
+      h,
+      w,
+      color);
 }
 
 inline void update_red_black_half_step_from_previous_level(
@@ -628,22 +624,15 @@ inline void update_red_black_half_step_from_previous_level_buffer(
       accumulate_neighbor(2, y_up == y, y_up, x);
       accumulate_neighbor(3, y_down == y, y_down, x);
 
-      const PixelSolutionInputs inputs {
-          .alpha = alpha[idx],
-          .image_r = image_px[0],
-          .image_g = image_px[1],
-          .image_b = image_px[2],
-          .foreground_weighted_sum_r = foreground_weighted_sum[0],
-          .foreground_weighted_sum_g = foreground_weighted_sum[1],
-          .foreground_weighted_sum_b = foreground_weighted_sum[2],
-          .background_weighted_sum_r = background_weighted_sum[0],
-          .background_weighted_sum_g = background_weighted_sum[1],
-          .background_weighted_sum_b = background_weighted_sum[2],
-          .inverse_weight_sum = inverse_weight_sum[idx],
-          .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one[idx],
-          .foreground_gain = foreground_gain[idx],
-          .background_gain = background_gain[idx],
-      };
+      const PixelSolutionInputs inputs = make_pixel_solution_inputs(
+          alpha[idx],
+          image_px,
+          foreground_weighted_sum,
+          background_weighted_sum,
+          inverse_weight_sum[idx],
+          inverse_weight_sum_plus_one[idx],
+          foreground_gain[idx],
+          background_gain[idx]);
       write_solution_buffer(foreground, background, idx, inputs);
     }
   }

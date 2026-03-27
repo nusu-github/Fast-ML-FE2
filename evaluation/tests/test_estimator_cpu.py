@@ -322,6 +322,92 @@ class TestMeanResidualKernel:
         assert np.all(foreground >= 0.0) and np.all(foreground <= 1.0)
         assert np.all(background >= 0.0) and np.all(background <= 1.0)
 
+    def test_direct_red_update_matches_previous_level_identity_map(self):
+        rng = np.random.default_rng(21)
+        h, w = 5, 7
+        foreground = rng.random((h, w, 3)).astype(np.float32)
+        background = rng.random((h, w, 3)).astype(np.float32)
+        image = rng.random((h, w, 3)).astype(np.float32)
+        alpha = rng.random((h, w)).astype(np.float32)
+        coeffs = _build_cached_kernel_inputs(alpha, 5e-3, 0.1)
+        x_previous_index_map = np.arange(w, dtype=np.int32)
+        y_previous_index_map = np.arange(h, dtype=np.int32)
+
+        direct_foreground = foreground.copy()
+        direct_background = background.copy()
+        identity_foreground = foreground.copy()
+        identity_background = background.copy()
+
+        _update_red_black_half_step(
+            direct_foreground,
+            direct_background,
+            image,
+            alpha,
+            *coeffs,
+            h,
+            w,
+            0,
+        )
+        _update_red_black_half_step_from_previous_level(
+            identity_foreground,
+            identity_background,
+            image,
+            alpha,
+            *coeffs,
+            foreground,
+            background,
+            x_previous_index_map,
+            y_previous_index_map,
+            h,
+            w,
+        )
+
+        np.testing.assert_allclose(direct_foreground, identity_foreground, atol=1e-6)
+        np.testing.assert_allclose(direct_background, identity_background, atol=1e-6)
+
+    def test_direct_black_update_matches_boundary_fallback_identity_map(self):
+        rng = np.random.default_rng(22)
+        h, w = 5, 7
+        foreground = rng.random((h, w, 3)).astype(np.float32)
+        background = rng.random((h, w, 3)).astype(np.float32)
+        image = rng.random((h, w, 3)).astype(np.float32)
+        alpha = rng.random((h, w)).astype(np.float32)
+        coeffs = _build_cached_kernel_inputs(alpha, 5e-3, 0.1)
+        x_previous_index_map = np.arange(w, dtype=np.int32)
+        y_previous_index_map = np.arange(h, dtype=np.int32)
+
+        direct_foreground = foreground.copy()
+        direct_background = background.copy()
+        identity_foreground = foreground.copy()
+        identity_background = background.copy()
+
+        _update_red_black_half_step(
+            direct_foreground,
+            direct_background,
+            image,
+            alpha,
+            *coeffs,
+            h,
+            w,
+            1,
+        )
+        _update_red_black_half_step_from_previous_level_with_boundary_fallback(
+            identity_foreground,
+            identity_background,
+            image,
+            alpha,
+            *coeffs,
+            foreground,
+            background,
+            x_previous_index_map,
+            y_previous_index_map,
+            h,
+            w,
+        )
+
+        np.testing.assert_allclose(direct_foreground, identity_foreground, atol=1e-6)
+        np.testing.assert_allclose(direct_background, identity_background, atol=1e-6)
+
 
 def _make_composited(h=32, w=32, seed=42):
     """Create a composited image with known ground-truth F, B, alpha."""
