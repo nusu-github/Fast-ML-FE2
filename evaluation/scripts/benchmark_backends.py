@@ -114,20 +114,21 @@ def summarize_times(name: str, timings: list[float]) -> None:
     print(f"[{name}] mean={mean:.6f}s median={median:.6f}s std={std:.6f}s", flush=True)
 
 
-def compare_cpu_and_cpu_u8(
+def compare_cpu_and_u8_backend(
     cpu_result: tuple[np.ndarray, np.ndarray],
-    cpu_u8_result: tuple[np.ndarray, np.ndarray],
+    u8_result: tuple[np.ndarray, np.ndarray],
+    label: str,
 ) -> None:
     cpu_f, cpu_b = cpu_result
-    cpu_u8_f, cpu_u8_b = cpu_u8_result
-    cpu_u8_f32 = cpu_u8_f.astype(np.float32) * INV_255
-    cpu_u8_b32 = cpu_u8_b.astype(np.float32) * INV_255
-    abs_diff_f = np.abs(cpu_u8_f32 - cpu_f)
-    abs_diff_b = np.abs(cpu_u8_b32 - cpu_b)
+    u8_f, u8_b = u8_result
+    u8_f32 = u8_f.astype(np.float32) * INV_255
+    u8_b32 = u8_b.astype(np.float32) * INV_255
+    abs_diff_f = np.abs(u8_f32 - cpu_f)
+    abs_diff_b = np.abs(u8_b32 - cpu_b)
     mean_abs = float((abs_diff_f.mean() + abs_diff_b.mean()) / 2.0)
     max_abs = float(max(abs_diff_f.max(), abs_diff_b.max()))
     print(
-        f"[cpu_u8 vs cpu] mean_abs={mean_abs:.8f} ({mean_abs * 255.0:.4f} LSB) "
+        f"[{label} vs cpu] mean_abs={mean_abs:.8f} ({mean_abs * 255.0:.4f} LSB) "
         f"max_abs={max_abs:.8f} ({max_abs * 255.0:.4f} LSB)",
         flush=True,
     )
@@ -176,7 +177,7 @@ class BenchmarkArgumentParser(argparse.ArgumentParser):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = BenchmarkArgumentParser(description="Benchmark CPU float32, CPU u8, and GPU backends.")
+    parser = BenchmarkArgumentParser(description="Benchmark CPU float32, CPU u8, CPU fixed u8, and GPU backends.")
     parser.add_argument(
         "--size",
         action="append",
@@ -215,7 +216,17 @@ def main() -> int:
             args.idle_seconds,
         )
         summarize_times("cpu_u8", cpu_u8_times)
-        compare_cpu_and_cpu_u8(cpu_result, cpu_u8_result)
+        compare_cpu_and_u8_backend(cpu_result, cpu_u8_result, "cpu_u8")
+
+        cpu_fx_u8_times, cpu_fx_u8_result = timed_batch(
+            image_u8,
+            alpha_u8,
+            "cpu_fx_u8",
+            args.repeats,
+            args.idle_seconds,
+        )
+        summarize_times("cpu_fx_u8", cpu_fx_u8_times)
+        compare_cpu_and_u8_backend(cpu_result, cpu_fx_u8_result, "cpu_fx_u8")
 
         if HAS_CUPY:
             try:
@@ -238,6 +249,18 @@ def main() -> int:
                     flush=True,
                 )
                 print(
+                    f"[speed] cpu_fx_u8/cpu mean ratio="
+                    f"{stats.mean(cpu_fx_u8_times) / stats.mean(cpu_times):.3f}x "
+                    f"(>1.0 means cpu_fx_u8 is slower)",
+                    flush=True,
+                )
+                print(
+                    f"[speed] cpu_fx_u8/cpu_u8 mean ratio="
+                    f"{stats.mean(cpu_fx_u8_times) / stats.mean(cpu_u8_times):.3f}x "
+                    f"(>1.0 means cpu_fx_u8 is slower)",
+                    flush=True,
+                )
+                print(
                     f"[speed] cpu/gpu mean ratio="
                     f"{stats.mean(cpu_times) / stats.mean(gpu_times):.3f}x "
                     f"(>1.0 means gpu is faster)",
@@ -249,6 +272,18 @@ def main() -> int:
                 f"[speed] cpu_u8/cpu mean ratio="
                 f"{stats.mean(cpu_u8_times) / stats.mean(cpu_times):.3f}x "
                 f"(>1.0 means cpu_u8 is slower)",
+                flush=True,
+            )
+            print(
+                f"[speed] cpu_fx_u8/cpu mean ratio="
+                f"{stats.mean(cpu_fx_u8_times) / stats.mean(cpu_times):.3f}x "
+                f"(>1.0 means cpu_fx_u8 is slower)",
+                flush=True,
+            )
+            print(
+                f"[speed] cpu_fx_u8/cpu_u8 mean ratio="
+                f"{stats.mean(cpu_fx_u8_times) / stats.mean(cpu_u8_times):.3f}x "
+                f"(>1.0 means cpu_fx_u8 is slower)",
                 flush=True,
             )
 

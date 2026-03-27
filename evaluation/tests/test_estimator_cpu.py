@@ -304,6 +304,21 @@ def _make_quantized_pattern(
     return np.rint(image * 255.0).astype(np.uint8), np.rint(alpha * 255.0).astype(np.uint8)
 
 
+def _lsb_error_metrics(
+    actual_u8: np.ndarray,
+    actual_b_u8: np.ndarray,
+    reference_f32: np.ndarray,
+    reference_b32: np.ndarray,
+) -> tuple[float, float]:
+    actual_f32 = actual_u8.astype(np.float32) / 255.0
+    actual_b32 = actual_b_u8.astype(np.float32) / 255.0
+    abs_diff_f = np.abs(actual_f32 - reference_f32)
+    abs_diff_b = np.abs(actual_b32 - reference_b32)
+    mean_abs_lsb = float((abs_diff_f.mean() + abs_diff_b.mean()) * 255.0 / 2.0)
+    max_abs_lsb = float(max(abs_diff_f.max(), abs_diff_b.max()) * 255.0)
+    return mean_abs_lsb, max_abs_lsb
+
+
 class TestCPUu8Backend:
     def test_accepts_uint8_and_returns_uint8(self):
         image_u8, alpha_u8 = _make_quantized_pattern(32, 32)
@@ -400,3 +415,74 @@ class TestCPUu8Backend:
 
         np.testing.assert_array_equal(small_f0, small_f1)
         np.testing.assert_array_equal(small_b0, small_b1)
+
+
+class TestCPUFxU8Backend:
+    def test_accepts_uint8_and_returns_uint8(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(32, 32)
+        foreground, background = estimate_foreground(
+            image_u8,
+            alpha_u8,
+            backend="cpu_fx_u8",
+            return_background=True,
+        )
+
+        assert foreground.dtype == np.uint8
+        assert background.dtype == np.uint8
+        assert foreground.shape == image_u8.shape
+        assert background.shape == image_u8.shape
+
+    def test_rejects_non_uint8_inputs(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(16, 16)
+        with pytest.raises(ValueError, match="cpu_fx_u8 backend requires uint8 image"):
+            estimate_foreground(image_u8.astype(np.float32) / 255.0, alpha_u8, backend="cpu_fx_u8")
+        with pytest.raises(ValueError, match="cpu_fx_u8 backend requires uint8 alpha"):
+            estimate_foreground(image_u8, alpha_u8.astype(np.float32) / 255.0, backend="cpu_fx_u8")
+
+    @pytest.mark.parametrize("shape,seed", [((32, 32), 5), ((256, 256), 7)])
+    def test_matches_float32_cpu_within_error_budget(self, shape, seed):
+        h, w = shape
+        image_u8, alpha_u8 = _make_quantized_pattern(h, w, seed=seed)
+        image_f32 = image_u8.astype(np.float32) / 255.0
+        alpha_f32 = alpha_u8.astype(np.float32) / 255.0
+
+        fx_f, fx_b = estimate_foreground(
+            image_u8,
+            alpha_u8,
+            backend="cpu_fx_u8",
+            return_background=True,
+        )
+        cpu_f, cpu_b = estimate_foreground(
+            image_f32,
+            alpha_f32,
+            backend="cpu",
+            return_background=True,
+        )
+
+        mean_abs_lsb, max_abs_lsb = _lsb_error_metrics(fx_f, fx_b, cpu_f, cpu_b)
+        assert mean_abs_lsb <= 1.0, mean_abs_lsb
+        assert max_abs_lsb <= 3.0, max_abs_lsb
+
+    def test_large_shape_smoke(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(1024, 1024, seed=11)
+        foreground = estimate_foreground(image_u8, alpha_u8, backend="cpu_fx_u8")
+        assert foreground.dtype == np.uint8
+        assert foreground.shape == image_u8.shape
+
+    def test_repeated_calls_are_stable(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(96, 80, seed=21)
+        first_f, first_b = estimate_foreground(
+            image_u8,
+            alpha_u8,
+            backend="cpu_fx_u8",
+            return_background=True,
+        )
+        second_f, second_b = estimate_foreground(
+            image_u8,
+            alpha_u8,
+            backend="cpu_fx_u8",
+            return_background=True,
+        )
+
+        np.testing.assert_array_equal(first_f, second_f)
+        np.testing.assert_array_equal(first_b, second_b)
