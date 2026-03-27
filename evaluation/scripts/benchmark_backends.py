@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import math
 import statistics as stats
 import time
 
 import numpy as np
 
 from fastmlfe2_eval.estimator import estimate_foreground
+from fastmlfe2_eval.patterns import make_pattern_case
 
 INV_255 = 1.0 / 255.0
 
@@ -17,42 +17,6 @@ try:
     HAS_CUPY = True
 except Exception:
     HAS_CUPY = False
-
-
-def make_quantized_pattern(h: int, w: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
-    rng = np.random.default_rng(seed)
-    yy, xx = np.mgrid[0:h, 0:w]
-    x = xx.astype(np.float32) / max(w - 1, 1)
-    y = yy.astype(np.float32) / max(h - 1, 1)
-
-    checker = ((xx // 37 + yy // 53) & 1).astype(np.float32)
-    stripes = np.sin(2.0 * math.pi * (3.0 * x + 1.5 * y)).astype(np.float32)
-    rings = np.cos(
-        2.0 * math.pi * np.sqrt((x - 0.5) ** 2 + (y - 0.5) ** 2) * 4.0
-    ).astype(np.float32)
-    noise = rng.random((h, w), dtype=np.float32)
-
-    image = np.stack(
-        [
-            0.12 + 0.70 * x + 0.10 * stripes + 0.08 * checker,
-            0.08 + 0.72 * y + 0.08 * rings + 0.05 * noise,
-            0.18 + 0.55 * (1.0 - x) * (1.0 - y) + 0.12 * np.sin(4.0 * math.pi * (x + y)),
-        ],
-        axis=2,
-    )
-    alpha = 0.5 + 0.35 * np.sin(5.0 * math.pi * (x + 0.2 * y)) * np.cos(
-        3.0 * math.pi * (y - 0.3 * x)
-    )
-    alpha += 0.08 * checker - 0.04 * noise
-
-    image = np.clip(image, 0.0, 1.0)
-    alpha = np.clip(alpha, 0.0, 1.0)
-
-    image_u8 = np.rint(image * 255.0).astype(np.uint8)
-    alpha_u8 = np.rint(alpha * 255.0).astype(np.uint8)
-    return image_u8, alpha_u8
-
-
 def to_float32(image_u8: np.ndarray, alpha_u8: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return image_u8.astype(np.float32) * INV_255, alpha_u8.astype(np.float32) * INV_255
 
@@ -187,7 +151,29 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--repeats", type=int, default=7, help="Timed repeats per backend.")
     parser.add_argument("--idle-seconds", type=int, default=30, help="Idle time before timing.")
-    parser.add_argument("--seed", type=int, default=0, help="Base seed for synthetic patterns.")
+    parser.add_argument(
+        "--pattern",
+        choices=(
+            "saturating_slab",
+            "centered_vertical_step",
+            "shifted_vertical_step_pair",
+            "checkerboard",
+        ),
+        default="centered_vertical_step",
+        help="Lean-backed synthetic pattern family.",
+    )
+    parser.add_argument(
+        "--epsilon",
+        type=float,
+        default=1.0 / 255.0,
+        help="Near-opaque epsilon for the saturating slab pattern.",
+    )
+    parser.add_argument(
+        "--period",
+        type=int,
+        default=2,
+        help="Checkerboard block period in pixels.",
+    )
     return parser
 
 
@@ -195,8 +181,15 @@ def main() -> int:
     args = build_parser().parse_args()
 
     for index, (h, w) in enumerate(args.size):
-        print(f"\n=== synthetic pattern {h}x{w} ===", flush=True)
-        image_u8, alpha_u8 = make_quantized_pattern(h, w, args.seed + index)
+        print(f"\n=== synthetic pattern {args.pattern} {h}x{w} ===", flush=True)
+        kwargs: dict[str, float | int] = {}
+        if args.pattern == "saturating_slab":
+            kwargs["epsilon"] = args.epsilon
+        if args.pattern == "checkerboard":
+            kwargs["period"] = args.period
+        case = make_pattern_case(args.pattern, h, w, **kwargs)
+        image_u8 = np.rint(case.image * 255.0).astype(np.uint8)
+        alpha_u8 = np.rint(case.alpha * 255.0).astype(np.uint8)
         image_f32, alpha_f32 = to_float32(image_u8, alpha_u8)
 
         cpu_times, cpu_result = timed_batch(

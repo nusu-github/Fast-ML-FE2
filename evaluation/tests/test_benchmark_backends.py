@@ -24,3 +24,17 @@ def test_default_sizes_used_when_omitted():
     args = benchmark_backends.build_parser().parse_args(["--repeats", "1", "--idle-seconds", "0"])
 
     assert args.size == benchmark_backends.DEFAULT_SIZES
+
+
+def test_default_pattern_used_when_omitted():
+    args = benchmark_backends.build_parser().parse_args(["--repeats", "1", "--idle-seconds", "0"])
+
+    assert args.pattern == "centered_vertical_step"
+
+
+def test_explicit_pattern_is_parsed():
+    args = benchmark_backends.build_parser().parse_args(
+        ["--pattern", "checkerboard", "--repeats", "1", "--idle-seconds", "0"]
+    )
+
+    assert args.pattern == "checkerboard"
