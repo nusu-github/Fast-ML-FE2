@@ -4,17 +4,19 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from fastmlfe2_eval.estimator._cpu_impl import estimate_fb_ml_u8 as _estimate_fb_ml_u8
+from fastmlfe2_eval.estimator._cpu_impl import (
+    estimate_multilevel_foreground_background_u8 as _estimate_multilevel_foreground_background_u8,
+)
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from fastmlfe2_eval.estimator._types import EstimatorParams
 
-__all__ = ["estimate_fb_ml"]
+__all__ = ["estimate_multilevel_foreground_background_u8"]
 
 
-def estimate_fb_ml(
+def estimate_multilevel_foreground_background_u8(
     input_image: NDArray[np.uint8],
     input_alpha: NDArray[np.uint8],
     params: EstimatorParams,
@@ -40,7 +42,7 @@ def estimate_fb_ml(
 
     foreground = np.empty_like(image_u8, dtype=np.uint8)
     background = np.empty_like(image_u8, dtype=np.uint8)
-    _estimate_fb_ml_u8(
+    _estimate_multilevel_foreground_background_u8(
         foreground,
         background,
         image_u8,

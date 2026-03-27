@@ -28,19 +28,19 @@ using MutableAlphaU8 = nb::ndarray<std::uint8_t, nb::numpy, nb::shape<-1, -1>, n
 
 struct PixelSolutionInputs {
   float alpha;
-  float image0;
-  float image1;
-  float image2;
-  float sum_wF0;
-  float sum_wF1;
-  float sum_wF2;
-  float sum_wB0;
-  float sum_wB1;
-  float sum_wB2;
-  float inv_W;
-  float inv_Wp1;
-  float fg_gain;
-  float bg_gain;
+  float image_r;
+  float image_g;
+  float image_b;
+  float foreground_weighted_sum_r;
+  float foreground_weighted_sum_g;
+  float foreground_weighted_sum_b;
+  float background_weighted_sum_r;
+  float background_weighted_sum_g;
+  float background_weighted_sum_b;
+  float inverse_weight_sum;
+  float inverse_weight_sum_plus_one;
+  float foreground_gain;
+  float background_gain;
 };
 
 struct ResizeIndexMap {
@@ -58,51 +58,51 @@ private:
 };
 
 struct FloatWorkspace {
-  std::vector<float> prevF_storage;
-  std::vector<float> prevB_storage;
-  std::vector<float> currF_storage;
-  std::vector<float> currB_storage;
+  std::vector<float> previous_foreground_storage;
+  std::vector<float> previous_background_storage;
+  std::vector<float> current_foreground_storage;
+  std::vector<float> current_background_storage;
   std::vector<float> image;
   std::vector<float> alpha;
   std::vector<float> neighbor_weights;
-  std::vector<float> inv_W;
-  std::vector<float> inv_Wp1;
-  std::vector<float> fg_gain;
-  std::vector<float> bg_gain;
+  std::vector<float> inverse_weight_sum;
+  std::vector<float> inverse_weight_sum_plus_one;
+  std::vector<float> foreground_gain;
+  std::vector<float> background_gain;
 
   void ensure_capacity(std::size_t max_pixels) {
-    prevF_storage.resize(max_pixels * 3);
-    prevB_storage.resize(max_pixels * 3);
-    currF_storage.resize(max_pixels * 3);
-    currB_storage.resize(max_pixels * 3);
+    previous_foreground_storage.resize(max_pixels * 3);
+    previous_background_storage.resize(max_pixels * 3);
+    current_foreground_storage.resize(max_pixels * 3);
+    current_background_storage.resize(max_pixels * 3);
     image.resize(max_pixels * 3);
     alpha.resize(max_pixels);
     neighbor_weights.resize(max_pixels * 4);
-    inv_W.resize(max_pixels);
-    inv_Wp1.resize(max_pixels);
-    fg_gain.resize(max_pixels);
-    bg_gain.resize(max_pixels);
+    inverse_weight_sum.resize(max_pixels);
+    inverse_weight_sum_plus_one.resize(max_pixels);
+    foreground_gain.resize(max_pixels);
+    background_gain.resize(max_pixels);
   }
 };
 
 struct U8Workspace {
-  std::vector<std::uint8_t> prevF_storage;
-  std::vector<std::uint8_t> prevB_storage;
-  std::vector<std::uint8_t> currF_storage;
-  std::vector<std::uint8_t> currB_storage;
+  std::vector<std::uint8_t> previous_foreground_storage;
+  std::vector<std::uint8_t> previous_background_storage;
+  std::vector<std::uint8_t> current_foreground_storage;
+  std::vector<std::uint8_t> current_background_storage;
   std::vector<std::uint8_t> image;
   std::vector<std::uint8_t> alpha;
   std::vector<float> neighbor_weights;
-  std::vector<float> inv_W;
-  std::vector<float> inv_Wp1;
-  std::vector<float> fg_gain;
-  std::vector<float> bg_gain;
+  std::vector<float> inverse_weight_sum;
+  std::vector<float> inverse_weight_sum_plus_one;
+  std::vector<float> foreground_gain;
+  std::vector<float> background_gain;
   std::vector<std::uint32_t> weight_lut;
   std::array<float, 256> u8_to_f32 {};
-  ResizeIndexMap x_map;
-  ResizeIndexMap y_map;
-  ResizeIndexMap prev_x_map;
-  ResizeIndexMap prev_y_map;
+  ResizeIndexMap x_index_map;
+  ResizeIndexMap y_index_map;
+  ResizeIndexMap previous_x_index_map;
+  ResizeIndexMap previous_y_index_map;
   std::uint32_t lut_regularization_bits = 0;
   std::uint32_t lut_gradient_weight_bits = 0;
   bool lut_initialized = false;
@@ -115,17 +115,17 @@ struct U8Workspace {
   }
 
   void ensure_capacity(std::size_t max_pixels) {
-    prevF_storage.resize(max_pixels * 3);
-    prevB_storage.resize(max_pixels * 3);
-    currF_storage.resize(max_pixels * 3);
-    currB_storage.resize(max_pixels * 3);
+    previous_foreground_storage.resize(max_pixels * 3);
+    previous_background_storage.resize(max_pixels * 3);
+    current_foreground_storage.resize(max_pixels * 3);
+    current_background_storage.resize(max_pixels * 3);
     image.resize(max_pixels * 3);
     alpha.resize(max_pixels);
     neighbor_weights.resize(max_pixels * 4);
-    inv_W.resize(max_pixels);
-    inv_Wp1.resize(max_pixels);
-    fg_gain.resize(max_pixels);
-    bg_gain.resize(max_pixels);
+    inverse_weight_sum.resize(max_pixels);
+    inverse_weight_sum_plus_one.resize(max_pixels);
+    foreground_gain.resize(max_pixels);
+    background_gain.resize(max_pixels);
   }
 
   bool needs_weight_lut_refresh(float regularization, float gradient_weight) const {
@@ -161,18 +161,23 @@ inline std::size_t rgb_index(std::size_t y, std::size_t x, std::size_t w) {
   return (y * w + x) * 3;
 }
 
-inline void validate_float_outputs(MutableImage foreground, MutableImage background, int h0, int w0) {
-  if (static_cast<int>(foreground.shape(0)) != h0 || static_cast<int>(foreground.shape(1)) != w0 ||
-      static_cast<int>(foreground.shape(2)) != 3 || static_cast<int>(background.shape(0)) != h0 ||
-      static_cast<int>(background.shape(1)) != w0 || static_cast<int>(background.shape(2)) != 3) {
-    throw std::runtime_error("estimate_fb_ml: output shapes must match the input image");
+inline void validate_float_outputs(MutableImage foreground_output, MutableImage background_output, int h0, int w0) {
+  if (static_cast<int>(foreground_output.shape(0)) != h0 || static_cast<int>(foreground_output.shape(1)) != w0 ||
+      static_cast<int>(foreground_output.shape(2)) != 3 || static_cast<int>(background_output.shape(0)) != h0 ||
+      static_cast<int>(background_output.shape(1)) != w0 || static_cast<int>(background_output.shape(2)) != 3) {
+    throw std::runtime_error("estimate_multilevel_foreground_background: output shapes must match the input image");
   }
 }
 
-inline void validate_u8_outputs(MutableImageU8 foreground, MutableImageU8 background, int h0, int w0) {
-  if (static_cast<int>(foreground.shape(0)) != h0 || static_cast<int>(foreground.shape(1)) != w0 ||
-      static_cast<int>(foreground.shape(2)) != 3 || static_cast<int>(background.shape(0)) != h0 ||
-      static_cast<int>(background.shape(1)) != w0 || static_cast<int>(background.shape(2)) != 3) {
-    throw std::runtime_error("estimate_fb_ml_u8: output shapes must match the input image");
+inline void validate_u8_outputs(
+    MutableImageU8 foreground_output,
+    MutableImageU8 background_output,
+    int h0,
+    int w0
+) {
+  if (static_cast<int>(foreground_output.shape(0)) != h0 || static_cast<int>(foreground_output.shape(1)) != w0 ||
+      static_cast<int>(foreground_output.shape(2)) != 3 || static_cast<int>(background_output.shape(0)) != h0 ||
+      static_cast<int>(background_output.shape(1)) != w0 || static_cast<int>(background_output.shape(2)) != 3) {
+    throw std::runtime_error("estimate_multilevel_foreground_background_u8: output shapes must match the input image");
   }
 }

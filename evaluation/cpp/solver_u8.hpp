@@ -5,7 +5,7 @@
 
 namespace {
 
-inline void compute_initial_means_u8_raw(
+inline void compute_initial_means_u8_buffer(
     const std::uint8_t *image,
     const std::uint8_t *alpha,
     int h,
@@ -52,7 +52,7 @@ inline void compute_initial_means_u8_raw(
   }
 }
 
-inline void build_level_coefficients_u8_raw(
+inline void build_level_solver_coefficients_u8_buffer(
     const std::uint8_t *alpha,
     int h,
     int w,
@@ -60,10 +60,10 @@ inline void build_level_coefficients_u8_raw(
     float weight_scale_inv,
     const float *u8_to_f32,
     float *neighbor_weights,
-    float *inv_W,
-    float *inv_Wp1,
-    float *fg_gain,
-    float *bg_gain
+    float *inverse_weight_sum,
+    float *inverse_weight_sum_plus_one,
+    float *foreground_gain,
+    float *background_gain
 ) {
   if (h <= 0 || w <= 0) {
     return;
@@ -91,13 +91,13 @@ inline void build_level_coefficients_u8_raw(
     nw[3] = w3;
 
     const float W = w0 + w1 + w2 + w3;
-    inv_W[idx] = 1.0f / W;
-    inv_Wp1[idx] = 1.0f / (W + 1.0f);
+    inverse_weight_sum[idx] = 1.0f / W;
+    inverse_weight_sum_plus_one[idx] = 1.0f / (W + 1.0f);
 
     const float D = W + a0_f * a0_f + a1_f * a1_f;
     const float inv_D = 1.0f / D;
-    fg_gain[idx] = a0_f * inv_D;
-    bg_gain[idx] = a1_f * inv_D;
+    foreground_gain[idx] = a0_f * inv_D;
+    background_gain[idx] = a1_f * inv_D;
   };
 
   auto process_boundary_pixel = [&](int y, int x) {
@@ -123,13 +123,13 @@ inline void build_level_coefficients_u8_raw(
     nw[3] = w3;
 
     const float W = w0 + w1 + w2 + w3;
-    inv_W[idx] = 1.0f / W;
-    inv_Wp1[idx] = 1.0f / (W + 1.0f);
+    inverse_weight_sum[idx] = 1.0f / W;
+    inverse_weight_sum_plus_one[idx] = 1.0f / (W + 1.0f);
 
     const float D = W + a0_f * a0_f + a1_f * a1_f;
     const float inv_D = 1.0f / D;
-    fg_gain[idx] = a0_f * inv_D;
-    bg_gain[idx] = a1_f * inv_D;
+    foreground_gain[idx] = a0_f * inv_D;
+    background_gain[idx] = a1_f * inv_D;
   };
 
   if (h > 2 && w > 2) {
@@ -160,55 +160,55 @@ inline void build_level_coefficients_u8_raw(
 
 inline void write_solution_u8(std::uint8_t *foreground, std::uint8_t *background, std::size_t idx, const PixelSolutionInputs &inputs) {
   const float alpha1 = 1.0f - inputs.alpha;
-  const float mu_F0 = inputs.sum_wF0 * inputs.inv_W;
-  const float mu_F1 = inputs.sum_wF1 * inputs.inv_W;
-  const float mu_F2 = inputs.sum_wF2 * inputs.inv_W;
-  const float mu_B0 = inputs.sum_wB0 * inputs.inv_W;
-  const float mu_B1 = inputs.sum_wB1 * inputs.inv_W;
-  const float mu_B2 = inputs.sum_wB2 * inputs.inv_W;
+  const float mu_F0 = inputs.foreground_weighted_sum_r * inputs.inverse_weight_sum;
+  const float mu_F1 = inputs.foreground_weighted_sum_g * inputs.inverse_weight_sum;
+  const float mu_F2 = inputs.foreground_weighted_sum_b * inputs.inverse_weight_sum;
+  const float mu_B0 = inputs.background_weighted_sum_r * inputs.inverse_weight_sum;
+  const float mu_B1 = inputs.background_weighted_sum_g * inputs.inverse_weight_sum;
+  const float mu_B2 = inputs.background_weighted_sum_b * inputs.inverse_weight_sum;
 
-  const float r0 = inputs.image0 - inputs.alpha * mu_F0 - alpha1 * mu_B0;
-  const float r1 = inputs.image1 - inputs.alpha * mu_F1 - alpha1 * mu_B1;
-  const float r2 = inputs.image2 - inputs.alpha * mu_F2 - alpha1 * mu_B2;
+  const float r0 = inputs.image_r - inputs.alpha * mu_F0 - alpha1 * mu_B0;
+  const float r1 = inputs.image_g - inputs.alpha * mu_F1 - alpha1 * mu_B1;
+  const float r2 = inputs.image_b - inputs.alpha * mu_F2 - alpha1 * mu_B2;
 
-  std::uint8_t *F_px = foreground + idx * 3;
-  std::uint8_t *B_px = background + idx * 3;
+  std::uint8_t *foreground_px = foreground + idx * 3;
+  std::uint8_t *background_px = background + idx * 3;
 
   if (inputs.alpha < 0.01f) {
-    F_px[0] = quantize01_to_u8(mu_F0);
-    F_px[1] = quantize01_to_u8(mu_F1);
-    F_px[2] = quantize01_to_u8(mu_F2);
-    B_px[0] = quantize01_to_u8(mu_B0 + r0 * inputs.inv_Wp1);
-    B_px[1] = quantize01_to_u8(mu_B1 + r1 * inputs.inv_Wp1);
-    B_px[2] = quantize01_to_u8(mu_B2 + r2 * inputs.inv_Wp1);
+    foreground_px[0] = quantize01_to_u8(mu_F0);
+    foreground_px[1] = quantize01_to_u8(mu_F1);
+    foreground_px[2] = quantize01_to_u8(mu_F2);
+    background_px[0] = quantize01_to_u8(mu_B0 + r0 * inputs.inverse_weight_sum_plus_one);
+    background_px[1] = quantize01_to_u8(mu_B1 + r1 * inputs.inverse_weight_sum_plus_one);
+    background_px[2] = quantize01_to_u8(mu_B2 + r2 * inputs.inverse_weight_sum_plus_one);
   } else if (inputs.alpha > 0.99f) {
-    F_px[0] = quantize01_to_u8(mu_F0 + r0 * inputs.inv_Wp1);
-    F_px[1] = quantize01_to_u8(mu_F1 + r1 * inputs.inv_Wp1);
-    F_px[2] = quantize01_to_u8(mu_F2 + r2 * inputs.inv_Wp1);
-    B_px[0] = quantize01_to_u8(mu_B0);
-    B_px[1] = quantize01_to_u8(mu_B1);
-    B_px[2] = quantize01_to_u8(mu_B2);
+    foreground_px[0] = quantize01_to_u8(mu_F0 + r0 * inputs.inverse_weight_sum_plus_one);
+    foreground_px[1] = quantize01_to_u8(mu_F1 + r1 * inputs.inverse_weight_sum_plus_one);
+    foreground_px[2] = quantize01_to_u8(mu_F2 + r2 * inputs.inverse_weight_sum_plus_one);
+    background_px[0] = quantize01_to_u8(mu_B0);
+    background_px[1] = quantize01_to_u8(mu_B1);
+    background_px[2] = quantize01_to_u8(mu_B2);
   } else {
-    F_px[0] = quantize01_to_u8(mu_F0 + inputs.fg_gain * r0);
-    F_px[1] = quantize01_to_u8(mu_F1 + inputs.fg_gain * r1);
-    F_px[2] = quantize01_to_u8(mu_F2 + inputs.fg_gain * r2);
-    B_px[0] = quantize01_to_u8(mu_B0 + inputs.bg_gain * r0);
-    B_px[1] = quantize01_to_u8(mu_B1 + inputs.bg_gain * r1);
-    B_px[2] = quantize01_to_u8(mu_B2 + inputs.bg_gain * r2);
+    foreground_px[0] = quantize01_to_u8(mu_F0 + inputs.foreground_gain * r0);
+    foreground_px[1] = quantize01_to_u8(mu_F1 + inputs.foreground_gain * r1);
+    foreground_px[2] = quantize01_to_u8(mu_F2 + inputs.foreground_gain * r2);
+    background_px[0] = quantize01_to_u8(mu_B0 + inputs.background_gain * r0);
+    background_px[1] = quantize01_to_u8(mu_B1 + inputs.background_gain * r1);
+    background_px[2] = quantize01_to_u8(mu_B2 + inputs.background_gain * r2);
   }
 }
 
-inline void update_rb_half_cached_u8_raw(
+inline void update_red_black_half_step_u8_buffer(
     std::uint8_t *foreground,
     std::uint8_t *background,
     const std::uint8_t *image,
     const std::uint8_t *alpha,
     const float *u8_to_f32,
     const float *neighbor_weights,
-    const float *inv_W,
-    const float *inv_Wp1,
-    const float *fg_gain,
-    const float *bg_gain,
+    const float *inverse_weight_sum,
+    const float *inverse_weight_sum_plus_one,
+    const float *foreground_gain,
+    const float *background_gain,
     int h,
     int w,
     int color
@@ -235,41 +235,41 @@ inline void update_rb_half_cached_u8_raw(
     const float w2 = neighbor_weights[idx * 4 + 2];
     const float w3 = neighbor_weights[idx * 4 + 3];
 
-    const float sum_wF0 =
+    const float foreground_weighted_sum_r =
         w0 * u8_to_f32[foreground[idx_left * 3 + 0]] + w1 * u8_to_f32[foreground[idx_right * 3 + 0]] +
         w2 * u8_to_f32[foreground[idx_up * 3 + 0]] + w3 * u8_to_f32[foreground[idx_down * 3 + 0]];
-    const float sum_wF1 =
+    const float foreground_weighted_sum_g =
         w0 * u8_to_f32[foreground[idx_left * 3 + 1]] + w1 * u8_to_f32[foreground[idx_right * 3 + 1]] +
         w2 * u8_to_f32[foreground[idx_up * 3 + 1]] + w3 * u8_to_f32[foreground[idx_down * 3 + 1]];
-    const float sum_wF2 =
+    const float foreground_weighted_sum_b =
         w0 * u8_to_f32[foreground[idx_left * 3 + 2]] + w1 * u8_to_f32[foreground[idx_right * 3 + 2]] +
         w2 * u8_to_f32[foreground[idx_up * 3 + 2]] + w3 * u8_to_f32[foreground[idx_down * 3 + 2]];
-    const float sum_wB0 =
+    const float background_weighted_sum_r =
         w0 * u8_to_f32[background[idx_left * 3 + 0]] + w1 * u8_to_f32[background[idx_right * 3 + 0]] +
         w2 * u8_to_f32[background[idx_up * 3 + 0]] + w3 * u8_to_f32[background[idx_down * 3 + 0]];
-    const float sum_wB1 =
+    const float background_weighted_sum_g =
         w0 * u8_to_f32[background[idx_left * 3 + 1]] + w1 * u8_to_f32[background[idx_right * 3 + 1]] +
         w2 * u8_to_f32[background[idx_up * 3 + 1]] + w3 * u8_to_f32[background[idx_down * 3 + 1]];
-    const float sum_wB2 =
+    const float background_weighted_sum_b =
         w0 * u8_to_f32[background[idx_left * 3 + 2]] + w1 * u8_to_f32[background[idx_right * 3 + 2]] +
         w2 * u8_to_f32[background[idx_up * 3 + 2]] + w3 * u8_to_f32[background[idx_down * 3 + 2]];
 
     const std::size_t image_idx = idx * 3;
     const PixelSolutionInputs inputs {
         .alpha = alpha0,
-        .image0 = u8_to_f32[image[image_idx + 0]],
-        .image1 = u8_to_f32[image[image_idx + 1]],
-        .image2 = u8_to_f32[image[image_idx + 2]],
-        .sum_wF0 = sum_wF0,
-        .sum_wF1 = sum_wF1,
-        .sum_wF2 = sum_wF2,
-        .sum_wB0 = sum_wB0,
-        .sum_wB1 = sum_wB1,
-        .sum_wB2 = sum_wB2,
-        .inv_W = inv_W[idx],
-        .inv_Wp1 = inv_Wp1[idx],
-        .fg_gain = fg_gain[idx],
-        .bg_gain = bg_gain[idx],
+        .image_r = u8_to_f32[image[image_idx + 0]],
+        .image_g = u8_to_f32[image[image_idx + 1]],
+        .image_b = u8_to_f32[image[image_idx + 2]],
+        .foreground_weighted_sum_r = foreground_weighted_sum_r,
+        .foreground_weighted_sum_g = foreground_weighted_sum_g,
+        .foreground_weighted_sum_b = foreground_weighted_sum_b,
+        .background_weighted_sum_r = background_weighted_sum_r,
+        .background_weighted_sum_g = background_weighted_sum_g,
+        .background_weighted_sum_b = background_weighted_sum_b,
+        .inverse_weight_sum = inverse_weight_sum[idx],
+        .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one[idx],
+        .foreground_gain = foreground_gain[idx],
+        .background_gain = background_gain[idx],
     };
     write_solution_u8(foreground, background, idx, inputs);
   };
@@ -304,9 +304,9 @@ inline void update_rb_half_cached_u8_raw(
   }
 }
 
-inline void estimate_fb_ml_u8(
-    MutableImageU8 F_out,
-    MutableImageU8 B_out,
+inline void estimate_multilevel_foreground_background_u8(
+    MutableImageU8 foreground_out,
+    MutableImageU8 background_out,
     ImageU8 input_image,
     AlphaU8 input_alpha,
     float regularization,
@@ -317,9 +317,9 @@ inline void estimate_fb_ml_u8(
 ) {
   const int h0 = static_cast<int>(input_image.shape(0));
   const int w0 = static_cast<int>(input_image.shape(1));
-  validate_u8_outputs(F_out, B_out, h0, w0);
+  validate_u8_outputs(foreground_out, background_out, h0, w0);
   if (h0 <= 0 || w0 <= 0) {
-    throw std::runtime_error("estimate_fb_ml_u8: input image must be non-empty");
+    throw std::runtime_error("estimate_multilevel_foreground_background_u8: input image must be non-empty");
   }
 
   const auto *input_image_ptr = input_image.data();
@@ -351,14 +351,14 @@ inline void estimate_fb_ml_u8(
 
   std::uint8_t fg_mean[3];
   std::uint8_t bg_mean[3];
-  compute_initial_means_u8_raw(input_image_ptr, input_alpha_ptr, h0, w0, fg_mean, bg_mean);
+  compute_initial_means_u8_buffer(input_image_ptr, input_alpha_ptr, h0, w0, fg_mean, bg_mean);
 
-  workspace.prevF_storage[0] = fg_mean[0];
-  workspace.prevF_storage[1] = fg_mean[1];
-  workspace.prevF_storage[2] = fg_mean[2];
-  workspace.prevB_storage[0] = bg_mean[0];
-  workspace.prevB_storage[1] = bg_mean[1];
-  workspace.prevB_storage[2] = bg_mean[2];
+  workspace.previous_foreground_storage[0] = fg_mean[0];
+  workspace.previous_foreground_storage[1] = fg_mean[1];
+  workspace.previous_foreground_storage[2] = fg_mean[2];
+  workspace.previous_background_storage[0] = bg_mean[0];
+  workspace.previous_background_storage[1] = bg_mean[1];
+  workspace.previous_background_storage[2] = bg_mean[2];
 
   int prev_h = 1;
   int prev_w = 1;
@@ -382,27 +382,27 @@ inline void estimate_fb_ml_u8(
       n_iter = (w <= small_size && h <= small_size) ? n_small_iterations : n_big_iterations;
     }
 
-    workspace.x_map.resize(w);
-    workspace.y_map.resize(h);
-    build_resize_index_map_raw(w0, workspace.x_map);
-    build_resize_index_map_raw(h0, workspace.y_map);
-    resize_nearest_multichannel_u8_raw(
+    workspace.x_index_map.resize(w);
+    workspace.y_index_map.resize(h);
+    build_resize_index_map_buffer(w0, workspace.x_index_map);
+    build_resize_index_map_buffer(h0, workspace.y_index_map);
+    resize_nearest_rgb_u8_buffer(
         workspace.image.data(),
         input_image_ptr,
-        workspace.x_map.data(),
-        workspace.y_map.data(),
+        workspace.x_index_map.data(),
+        workspace.y_index_map.data(),
         w0,
         h,
         w);
-    resize_nearest_u8_raw(
+    resize_nearest_scalar_u8_buffer(
         workspace.alpha.data(),
         input_alpha_ptr,
-        workspace.x_map.data(),
-        workspace.y_map.data(),
+        workspace.x_index_map.data(),
+        workspace.y_index_map.data(),
         w0,
         h,
         w);
-    build_level_coefficients_u8_raw(
+    build_level_solver_coefficients_u8_buffer(
         workspace.alpha.data(),
         h,
         w,
@@ -410,71 +410,73 @@ inline void estimate_fb_ml_u8(
         weight_scale_inv,
         workspace.u8_to_f32.data(),
         workspace.neighbor_weights.data(),
-        workspace.inv_W.data(),
-        workspace.inv_Wp1.data(),
-        workspace.fg_gain.data(),
-        workspace.bg_gain.data());
+        workspace.inverse_weight_sum.data(),
+        workspace.inverse_weight_sum_plus_one.data(),
+        workspace.foreground_gain.data(),
+        workspace.background_gain.data());
 
     const bool final_level = i_level == n_levels;
-    std::uint8_t *currF = final_level ? F_out.data() : workspace.currF_storage.data();
-    std::uint8_t *currB = final_level ? B_out.data() : workspace.currB_storage.data();
+    std::uint8_t *current_foreground =
+        final_level ? foreground_out.data() : workspace.current_foreground_storage.data();
+    std::uint8_t *current_background =
+        final_level ? background_out.data() : workspace.current_background_storage.data();
 
-    workspace.prev_x_map.resize(w);
-    workspace.prev_y_map.resize(h);
-    build_resize_index_map_raw(prev_w, workspace.prev_x_map);
-    build_resize_index_map_raw(prev_h, workspace.prev_y_map);
+    workspace.previous_x_index_map.resize(w);
+    workspace.previous_y_index_map.resize(h);
+    build_resize_index_map_buffer(prev_w, workspace.previous_x_index_map);
+    build_resize_index_map_buffer(prev_h, workspace.previous_y_index_map);
 
-    resize_nearest_multichannel_u8_raw(
-        currF,
-        workspace.prevF_storage.data(),
-        workspace.prev_x_map.data(),
-        workspace.prev_y_map.data(),
+    resize_nearest_rgb_u8_buffer(
+        current_foreground,
+        workspace.previous_foreground_storage.data(),
+        workspace.previous_x_index_map.data(),
+        workspace.previous_y_index_map.data(),
         prev_w,
         h,
         w);
-    resize_nearest_multichannel_u8_raw(
-        currB,
-        workspace.prevB_storage.data(),
-        workspace.prev_x_map.data(),
-        workspace.prev_y_map.data(),
+    resize_nearest_rgb_u8_buffer(
+        current_background,
+        workspace.previous_background_storage.data(),
+        workspace.previous_x_index_map.data(),
+        workspace.previous_y_index_map.data(),
         prev_w,
         h,
         w);
 
     for (int i_iter = 0; i_iter < n_iter; ++i_iter) {
-      update_rb_half_cached_u8_raw(
-          currF,
-          currB,
+      update_red_black_half_step_u8_buffer(
+          current_foreground,
+          current_background,
           workspace.image.data(),
           workspace.alpha.data(),
           workspace.u8_to_f32.data(),
           workspace.neighbor_weights.data(),
-          workspace.inv_W.data(),
-          workspace.inv_Wp1.data(),
-          workspace.fg_gain.data(),
-          workspace.bg_gain.data(),
+          workspace.inverse_weight_sum.data(),
+          workspace.inverse_weight_sum_plus_one.data(),
+          workspace.foreground_gain.data(),
+          workspace.background_gain.data(),
           h,
           w,
           0);
-      update_rb_half_cached_u8_raw(
-          currF,
-          currB,
+      update_red_black_half_step_u8_buffer(
+          current_foreground,
+          current_background,
           workspace.image.data(),
           workspace.alpha.data(),
           workspace.u8_to_f32.data(),
           workspace.neighbor_weights.data(),
-          workspace.inv_W.data(),
-          workspace.inv_Wp1.data(),
-          workspace.fg_gain.data(),
-          workspace.bg_gain.data(),
+          workspace.inverse_weight_sum.data(),
+          workspace.inverse_weight_sum_plus_one.data(),
+          workspace.foreground_gain.data(),
+          workspace.background_gain.data(),
           h,
           w,
           1);
     }
 
     if (!final_level) {
-      std::swap(workspace.prevF_storage, workspace.currF_storage);
-      std::swap(workspace.prevB_storage, workspace.currB_storage);
+      std::swap(workspace.previous_foreground_storage, workspace.current_foreground_storage);
+      std::swap(workspace.previous_background_storage, workspace.current_background_storage);
       prev_h = h;
       prev_w = w;
     }

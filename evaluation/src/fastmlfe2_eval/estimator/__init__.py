@@ -60,13 +60,13 @@ def estimate_foreground(
     if backend == "cpu":
         image_f32 = np.ascontiguousarray(image, dtype=np.float32)
         alpha_f32 = np.ascontiguousarray(alpha, dtype=np.float32)
-        from fastmlfe2_eval.estimator._cpu import estimate_fb_ml
+        from fastmlfe2_eval.estimator._cpu import estimate_multilevel_foreground_background
 
-        foreground, background = estimate_fb_ml(image_f32, alpha_f32, params)
+        foreground, background = estimate_multilevel_foreground_background(image_f32, alpha_f32, params)
     elif backend == "cpu_u8":
-        from fastmlfe2_eval.estimator._cpu_u8 import estimate_fb_ml
+        from fastmlfe2_eval.estimator._cpu_u8 import estimate_multilevel_foreground_background_u8
 
-        foreground, background = estimate_fb_ml(image, alpha, params)
+        foreground, background = estimate_multilevel_foreground_background_u8(image, alpha, params)
     elif backend == "gpu":
         image_f32 = np.ascontiguousarray(image, dtype=np.float32)
         alpha_f32 = np.ascontiguousarray(alpha, dtype=np.float32)

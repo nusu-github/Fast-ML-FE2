@@ -4,10 +4,10 @@ import pytest
 from fastmlfe2_eval.estimator import estimate_foreground
 from fastmlfe2_eval.estimator import _cpu as cpu_backend
 from fastmlfe2_eval.estimator._cpu import (
-    _build_level_coefficients,
-    _resize_nearest,
-    _resize_nearest_multichannel,
-    _update_rb_half_cached,
+    _build_level_solver_coefficients,
+    _resize_nearest_rgb,
+    _resize_nearest_scalar,
+    _update_red_black_half_step,
 )
 
 
@@ -15,32 +15,32 @@ def _build_cached_kernel_inputs(alpha, eps, omega):
     """Allocate and populate the cached-kernel coefficient buffers."""
     h, w = alpha.shape
     neighbor_weights = np.empty((h, w, 4), dtype=np.float32)
-    inv_W = np.empty((h, w), dtype=np.float32)
-    inv_Wp1 = np.empty((h, w), dtype=np.float32)
-    fg_gain = np.empty((h, w), dtype=np.float32)
-    bg_gain = np.empty((h, w), dtype=np.float32)
-    _build_level_coefficients(
+    inverse_weight_sum = np.empty((h, w), dtype=np.float32)
+    inverse_weight_sum_plus_one = np.empty((h, w), dtype=np.float32)
+    foreground_gain = np.empty((h, w), dtype=np.float32)
+    background_gain = np.empty((h, w), dtype=np.float32)
+    _build_level_solver_coefficients(
         alpha,
         np.float32(eps),
         np.float32(omega),
         neighbor_weights,
-        inv_W,
-        inv_Wp1,
-        fg_gain,
-        bg_gain,
+        inverse_weight_sum,
+        inverse_weight_sum_plus_one,
+        foreground_gain,
+        background_gain,
     )
-    return neighbor_weights, inv_W, inv_Wp1, fg_gain, bg_gain
+    return neighbor_weights, inverse_weight_sum, inverse_weight_sum_plus_one, foreground_gain, background_gain
 
 
 def test_cpu_backend_reexports_native_helpers():
     expected = {
-        "_build_level_coefficients",
-        "_resize_nearest",
-        "_resize_nearest_multichannel",
-        "_update_rb_half_cached",
-        "_update_rb_half_cached_from_prev_level",
-        "_update_rb_half_cached_from_prev_level_with_boundary_fallback",
-        "estimate_fb_ml",
+        "_build_level_solver_coefficients",
+        "_resize_nearest_rgb",
+        "_resize_nearest_scalar",
+        "_update_red_black_half_step",
+        "_update_red_black_half_step_from_previous_level",
+        "_update_red_black_half_step_from_previous_level_with_boundary_fallback",
+        "estimate_multilevel_foreground_background",
     }
     assert expected.issubset(set(cpu_backend.__all__))
 
@@ -49,25 +49,25 @@ class TestResizeNearest:
     def test_identity(self):
         src = np.random.default_rng(0).random((4, 4, 3)).astype(np.float32)
         dst = np.empty_like(src)
-        _resize_nearest_multichannel(dst, src)
+        _resize_nearest_rgb(dst, src)
         np.testing.assert_array_equal(dst, src)
 
     def test_upsample_2x(self):
         src = np.array([[[1.0, 0.0, 0.0]]], dtype=np.float32)  # 1×1
         dst = np.empty((2, 2, 3), dtype=np.float32)
-        _resize_nearest_multichannel(dst, src)
+        _resize_nearest_rgb(dst, src)
         np.testing.assert_array_equal(dst, np.full((2, 2, 3), [[1.0, 0.0, 0.0]], dtype=np.float32))
 
     def test_downsample(self):
         src = np.arange(16, dtype=np.float32).reshape(4, 4)
         dst = np.empty((2, 2), dtype=np.float32)
-        _resize_nearest(dst, src)
+        _resize_nearest_scalar(dst, src)
         assert dst.shape == (2, 2)
 
     def test_1x1(self):
         src = np.ones((8, 8, 3), dtype=np.float32)
         dst = np.empty((1, 1, 3), dtype=np.float32)
-        _resize_nearest_multichannel(dst, src)
+        _resize_nearest_rgb(dst, src)
         np.testing.assert_array_equal(dst[0, 0], [1.0, 1.0, 1.0])
 
 
@@ -81,7 +81,7 @@ class TestMeanResidualKernel:
         alpha = np.full((h, w), 0.5, dtype=np.float32)
 
         coeffs = _build_cached_kernel_inputs(alpha, 0.1, 0.0)
-        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 0)  # red
+        _update_red_black_half_step(F, B, image, alpha, *coeffs, h, w, 0)  # red
 
         expected_F = 0.6 + 0.5 * 0.35 / 0.9
         expected_B = 0.3 + 0.5 * 0.35 / 0.9
@@ -97,7 +97,7 @@ class TestMeanResidualKernel:
         alpha = np.zeros((h, w), dtype=np.float32)
 
         coeffs = _build_cached_kernel_inputs(alpha, 0.1, 0.0)
-        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 0)
+        _update_red_black_half_step(F, B, image, alpha, *coeffs, h, w, 0)
 
         # α=0: F = μ_F = 0.5, B = μ_B + r/(W+1)
         # W = 4*0.1 = 0.4, r = 0.7 - 0*0.5 - 1*0.3 = 0.4
@@ -114,7 +114,7 @@ class TestMeanResidualKernel:
         alpha = np.ones((h, w), dtype=np.float32)
 
         coeffs = _build_cached_kernel_inputs(alpha, 0.1, 0.0)
-        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 0)
+        _update_red_black_half_step(F, B, image, alpha, *coeffs, h, w, 0)
 
         # α=1: B = μ_B = 0.3, F = μ_F + r/(W+1)
         # r = 0.7 - 1*0.5 - 0*0.3 = 0.2
@@ -134,7 +134,7 @@ class TestMeanResidualKernel:
         F_before = F.copy()
         B_before = B.copy()
         coeffs = _build_cached_kernel_inputs(alpha, 5e-3, 0.1)
-        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 0)  # red only
+        _update_red_black_half_step(F, B, image, alpha, *coeffs, h, w, 0)  # red only
 
         # Black pixels should be unchanged in both F and B
         for y in range(h):
@@ -153,8 +153,8 @@ class TestMeanResidualKernel:
         alpha = rng.random((h, w)).astype(np.float32)
 
         coeffs = _build_cached_kernel_inputs(alpha, 5e-3, 0.1)
-        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 0)
-        _update_rb_half_cached(F, B, image, alpha, *coeffs, h, w, 1)
+        _update_red_black_half_step(F, B, image, alpha, *coeffs, h, w, 0)
+        _update_red_black_half_step(F, B, image, alpha, *coeffs, h, w, 1)
 
         assert np.all(F >= 0.0) and np.all(F <= 1.0)
         assert np.all(B >= 0.0) and np.all(B <= 1.0)

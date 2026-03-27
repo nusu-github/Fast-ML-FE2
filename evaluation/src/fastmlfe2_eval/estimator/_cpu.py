@@ -5,15 +5,15 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from fastmlfe2_eval.estimator._cpu_impl import (
-    _build_level_coefficients,
-    _resize_nearest,
-    _resize_nearest_multichannel,
-    _update_rb_half_cached,
-    _update_rb_half_cached_from_prev_level,
-    _update_rb_half_cached_from_prev_level_with_boundary_fallback,
+    _build_level_solver_coefficients,
+    _resize_nearest_rgb,
+    _resize_nearest_scalar,
+    _update_red_black_half_step,
+    _update_red_black_half_step_from_previous_level,
+    _update_red_black_half_step_from_previous_level_with_boundary_fallback,
 )
 from fastmlfe2_eval.estimator._cpu_impl import (
-    estimate_fb_ml as _estimate_fb_ml,
+    estimate_multilevel_foreground_background as _estimate_multilevel_foreground_background,
 )
 
 if TYPE_CHECKING:
@@ -22,14 +22,14 @@ if TYPE_CHECKING:
     from fastmlfe2_eval.estimator._types import EstimatorParams
 
 __all__ = [
-    "_build_level_coefficients",
+    "_build_level_solver_coefficients",
     "_resize_index_map",
-    "_resize_nearest",
-    "_resize_nearest_multichannel",
-    "_update_rb_half_cached",
-    "_update_rb_half_cached_from_prev_level",
-    "_update_rb_half_cached_from_prev_level_with_boundary_fallback",
-    "estimate_fb_ml",
+    "_resize_nearest_scalar",
+    "_resize_nearest_rgb",
+    "_update_red_black_half_step",
+    "_update_red_black_half_step_from_previous_level",
+    "_update_red_black_half_step_from_previous_level_with_boundary_fallback",
+    "estimate_multilevel_foreground_background",
 ]
 
 
@@ -38,7 +38,7 @@ def _resize_index_map(src_size: int, dst_size: int) -> np.ndarray:
     return np.minimum(src_size - 1, coords * src_size // dst_size).astype(np.int32)
 
 
-def estimate_fb_ml(
+def estimate_multilevel_foreground_background(
     input_image: NDArray[np.floating],
     input_alpha: NDArray[np.floating],
     params: EstimatorParams,
@@ -58,7 +58,7 @@ def estimate_fb_ml(
 
     foreground = np.empty_like(image_f32, dtype=np.float32)
     background = np.empty_like(image_f32, dtype=np.float32)
-    _estimate_fb_ml(
+    _estimate_multilevel_foreground_background(
         foreground,
         background,
         image_f32,
