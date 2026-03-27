@@ -164,19 +164,34 @@ def parse_size(spec: str) -> tuple[int, int]:
     return h, w
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Benchmark CPU float32, CPU u8, and GPU backends.")
+DEFAULT_SIZES = [(1024, 1024), (1536, 1536)]
+
+
+class BenchmarkArgumentParser(argparse.ArgumentParser):
+    def parse_args(self, args=None, namespace=None):
+        parsed = super().parse_args(args, namespace)
+        if parsed.size is None:
+            parsed.size = list(DEFAULT_SIZES)
+        return parsed
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = BenchmarkArgumentParser(description="Benchmark CPU float32, CPU u8, and GPU backends.")
     parser.add_argument(
         "--size",
         action="append",
         type=parse_size,
-        default=[(1024, 1024), (1536, 1536)],
+        default=None,
         help="Synthetic benchmark size in HxW form. May be repeated.",
     )
     parser.add_argument("--repeats", type=int, default=7, help="Timed repeats per backend.")
     parser.add_argument("--idle-seconds", type=int, default=30, help="Idle time before timing.")
     parser.add_argument("--seed", type=int, default=0, help="Base seed for synthetic patterns.")
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> int:
+    args = build_parser().parse_args()
 
     for index, (h, w) in enumerate(args.size):
         print(f"\n=== synthetic pattern {h}x{w} ===", flush=True)

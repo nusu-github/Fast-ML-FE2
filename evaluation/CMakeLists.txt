@@ -21,7 +21,7 @@ execute_process(
 find_package(nanobind CONFIG REQUIRED)
 
 nanobind_add_module(_cpu_impl cpp/cpu_impl.cpp)
-target_compile_features(_cpu_impl PUBLIC cxx_std_17)
+target_compile_features(_cpu_impl PUBLIC cxx_std_20)
 set_target_properties(_cpu_impl PROPERTIES CXX_EXTENSIONS OFF)
 
 install(TARGETS _cpu_impl LIBRARY DESTINATION fastmlfe2_eval/estimator)

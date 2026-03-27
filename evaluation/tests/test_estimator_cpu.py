@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from fastmlfe2_eval.estimator import estimate_foreground
+from fastmlfe2_eval.estimator import _cpu as cpu_backend
 from fastmlfe2_eval.estimator._cpu import (
     _build_level_coefficients,
     _resize_nearest,
@@ -29,6 +30,19 @@ def _build_cached_kernel_inputs(alpha, eps, omega):
         bg_gain,
     )
     return neighbor_weights, inv_W, inv_Wp1, fg_gain, bg_gain
+
+
+def test_cpu_backend_reexports_native_helpers():
+    expected = {
+        "_build_level_coefficients",
+        "_resize_nearest",
+        "_resize_nearest_multichannel",
+        "_update_rb_half_cached",
+        "_update_rb_half_cached_from_prev_level",
+        "_update_rb_half_cached_from_prev_level_with_boundary_fallback",
+        "estimate_fb_ml",
+    }
+    assert expected.issubset(set(cpu_backend.__all__))
 
 
 class TestResizeNearest:
@@ -342,3 +356,47 @@ class TestCPUu8Backend:
         foreground = estimate_foreground(image_u8, alpha_u8, backend="cpu_u8")
         assert foreground.dtype == np.uint8
         assert foreground.shape == image_u8.shape
+
+    def test_repeated_calls_with_same_shape_are_stable(self):
+        image_u8, alpha_u8 = _make_quantized_pattern(96, 80, seed=21)
+        first_f, first_b = estimate_foreground(
+            image_u8,
+            alpha_u8,
+            backend="cpu_u8",
+            return_background=True,
+        )
+        second_f, second_b = estimate_foreground(
+            image_u8,
+            alpha_u8,
+            backend="cpu_u8",
+            return_background=True,
+        )
+
+        np.testing.assert_array_equal(first_f, second_f)
+        np.testing.assert_array_equal(first_b, second_b)
+
+    def test_repeated_calls_with_different_shapes_are_stable(self):
+        small_image, small_alpha = _make_quantized_pattern(48, 40, seed=30)
+        large_image, large_alpha = _make_quantized_pattern(72, 88, seed=31)
+
+        small_f0, small_b0 = estimate_foreground(
+            small_image,
+            small_alpha,
+            backend="cpu_u8",
+            return_background=True,
+        )
+        estimate_foreground(
+            large_image,
+            large_alpha,
+            backend="cpu_u8",
+            return_background=True,
+        )
+        small_f1, small_b1 = estimate_foreground(
+            small_image,
+            small_alpha,
+            backend="cpu_u8",
+            return_background=True,
+        )
+
+        np.testing.assert_array_equal(small_f0, small_f1)
+        np.testing.assert_array_equal(small_b0, small_b1)
