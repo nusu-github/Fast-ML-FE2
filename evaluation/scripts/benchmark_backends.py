@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import statistics as stats
 import time
+from collections.abc import Callable
+from typing import NamedTuple
 
 import numpy as np
 
@@ -18,8 +20,57 @@ try:
     HAS_CUPY = True
 except Exception:
     HAS_CUPY = False
+
+
+class BenchmarkTarget(NamedTuple):
+    input_kind: str
+    runner: Callable[[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]
+
+
 def to_float32(image_u8: np.ndarray, alpha_u8: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return image_u8.astype(np.float32) * INV_255, alpha_u8.astype(np.float32) * INV_255
+
+
+def run_fastmlfe_backend(
+    backend: str,
+) -> Callable[[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]:
+    def run(image: np.ndarray, alpha: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        return estimate_foreground(image, alpha, backend=backend, return_background=True)
+
+    return run
+
+
+def run_pymatting_ml(image: np.ndarray, alpha: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    from pymatting.foreground.estimate_foreground_ml import estimate_foreground_ml
+
+    return estimate_foreground_ml(image, alpha, return_background=True)
+
+
+def run_pymatting_ml_cupy(image: np.ndarray, alpha: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    from pymatting.foreground.estimate_foreground_ml_cupy import estimate_foreground_ml_cupy
+
+    return estimate_foreground_ml_cupy(image, alpha, return_background=True)
+
+
+def run_pymatting_cf(image: np.ndarray, alpha: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    from pymatting.foreground.estimate_foreground_cf import estimate_foreground_cf
+
+    return estimate_foreground_cf(image, alpha, return_background=True)
+
+
+def build_benchmark_targets(*, include_cf: bool = False) -> dict[str, BenchmarkTarget]:
+    targets = {
+        "cpu": BenchmarkTarget("f32", run_fastmlfe_backend("cpu")),
+        "cpu_u8": BenchmarkTarget("u8", run_fastmlfe_backend("cpu_u8")),
+        "cpu_fx_u8": BenchmarkTarget("u8", run_fastmlfe_backend("cpu_fx_u8")),
+        "pymatting_ml": BenchmarkTarget("f32", run_pymatting_ml),
+    }
+    if include_cf:
+        targets["pymatting_cf"] = BenchmarkTarget("f32", run_pymatting_cf)
+    if HAS_CUPY:
+        targets["gpu"] = BenchmarkTarget("f32", run_fastmlfe_backend("gpu"))
+        targets["pymatting_ml_cupy"] = BenchmarkTarget("f32", run_pymatting_ml_cupy)
+    return targets
 
 
 def detect_spike(times: list[float]) -> bool:
@@ -35,38 +86,39 @@ def detect_spike(times: list[float]) -> bool:
 def timed_batch(
     image: np.ndarray,
     alpha: np.ndarray,
-    backend: str,
+    name: str,
+    runner: Callable[[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]],
     repeats: int,
     idle_seconds: int,
 ) -> tuple[list[float], tuple[np.ndarray, np.ndarray]]:
-    estimate_foreground(image, alpha, backend=backend, return_background=True)
-    print(f"[{backend}] warmup complete; idling for {idle_seconds}s before timing...", flush=True)
+    runner(image, alpha)
+    print(f"[{name}] warmup complete; idling for {idle_seconds}s before timing...", flush=True)
     time.sleep(idle_seconds)
 
     timings: list[float] = []
     first_result: tuple[np.ndarray, np.ndarray] | None = None
     for i in range(repeats):
         t0 = time.perf_counter()
-        result = estimate_foreground(image, alpha, backend=backend, return_background=True)
+        result = runner(image, alpha)
         elapsed = time.perf_counter() - t0
         timings.append(elapsed)
         if first_result is None:
             first_result = result
-        print(f"[{backend}] run {i + 1}/{repeats}: {elapsed:.6f}s", flush=True)
+        print(f"[{name}] run {i + 1}/{repeats}: {elapsed:.6f}s", flush=True)
 
     if detect_spike(timings):
-        print(f"[{backend}] spike detected; rerunning batch after idle period", flush=True)
+        print(f"[{name}] spike detected; rerunning batch after idle period", flush=True)
         time.sleep(idle_seconds)
         timings = []
         first_result = None
         for i in range(repeats):
             t0 = time.perf_counter()
-            result = estimate_foreground(image, alpha, backend=backend, return_background=True)
+            result = runner(image, alpha)
             elapsed = time.perf_counter() - t0
             timings.append(elapsed)
             if first_result is None:
                 first_result = result
-            print(f"[{backend}] rerun {i + 1}/{repeats}: {elapsed:.6f}s", flush=True)
+            print(f"[{name}] rerun {i + 1}/{repeats}: {elapsed:.6f}s", flush=True)
 
     assert first_result is not None
     return timings, first_result
@@ -177,11 +229,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=2,
         help="Checkerboard block period in pixels.",
     )
+    parser.add_argument(
+        "--include-cf",
+        action="store_true",
+        help="Include PyMatting closed-form estimation in addition to the default multilevel comparisons.",
+    )
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
+    targets = build_benchmark_targets(include_cf=args.include_cf)
 
     for index, (h, w) in enumerate(args.size):
         print(f"\n=== synthetic pattern {args.pattern} {h}x{w} ===", flush=True)
@@ -194,91 +252,55 @@ def main() -> int:
         image_u8 = np.rint(case.image * 255.0).astype(np.uint8)
         alpha_u8 = np.rint(case.alpha * 255.0).astype(np.uint8)
         image_f32, alpha_f32 = to_float32(image_u8, alpha_u8)
+        inputs = {
+            "f32": (image_f32, alpha_f32),
+            "u8": (image_u8, alpha_u8),
+        }
+        benchmark_times: dict[str, list[float]] = {}
+        benchmark_results: dict[str, tuple[np.ndarray, np.ndarray]] = {}
 
-        cpu_times, cpu_result = timed_batch(
-            image_f32,
-            alpha_f32,
-            "cpu",
-            args.repeats,
-            args.idle_seconds,
-        )
-        summarize_times("cpu", cpu_times)
-
-        cpu_u8_times, cpu_u8_result = timed_batch(
-            image_u8,
-            alpha_u8,
-            "cpu_u8",
-            args.repeats,
-            args.idle_seconds,
-        )
-        summarize_times("cpu_u8", cpu_u8_times)
-        print_backend_metrics(cpu_result, cpu_u8_result, case.weights, case.mask, "cpu_u8")
-
-        cpu_fx_u8_times, cpu_fx_u8_result = timed_batch(
-            image_u8,
-            alpha_u8,
-            "cpu_fx_u8",
-            args.repeats,
-            args.idle_seconds,
-        )
-        summarize_times("cpu_fx_u8", cpu_fx_u8_times)
-        print_backend_metrics(cpu_result, cpu_fx_u8_result, case.weights, case.mask, "cpu_fx_u8")
-
-        if HAS_CUPY:
+        for name, target in targets.items():
+            image, alpha = inputs[target.input_kind]
             try:
-                gpu_times, gpu_result = timed_batch(
-                    image_f32,
-                    alpha_f32,
-                    "gpu",
+                timings, result = timed_batch(
+                    image,
+                    alpha,
+                    name,
+                    target.runner,
                     args.repeats,
                     args.idle_seconds,
                 )
             except Exception as exc:
-                print(f"[gpu] benchmark skipped: {exc!r}", flush=True)
-            else:
-                summarize_times("gpu", gpu_times)
-                print_backend_metrics(cpu_result, gpu_result, case.weights, case.mask, "gpu")
-                print(
-                    f"[speed] cpu_u8/cpu mean ratio="
-                    f"{stats.mean(cpu_u8_times) / stats.mean(cpu_times):.3f}x "
-                    f"(>1.0 means cpu_u8 is slower)",
-                    flush=True,
-                )
-                print(
-                    f"[speed] cpu_fx_u8/cpu mean ratio="
-                    f"{stats.mean(cpu_fx_u8_times) / stats.mean(cpu_times):.3f}x "
-                    f"(>1.0 means cpu_fx_u8 is slower)",
-                    flush=True,
-                )
-                print(
-                    f"[speed] cpu_fx_u8/cpu_u8 mean ratio="
-                    f"{stats.mean(cpu_fx_u8_times) / stats.mean(cpu_u8_times):.3f}x "
-                    f"(>1.0 means cpu_fx_u8 is slower)",
-                    flush=True,
-                )
-                print(
-                    f"[speed] cpu/gpu mean ratio="
-                    f"{stats.mean(cpu_times) / stats.mean(gpu_times):.3f}x "
-                    f"(>1.0 means gpu is faster)",
-                    flush=True,
-                )
-        else:
+                print(f"[{name}] benchmark skipped: {exc!r}", flush=True)
+                continue
+            benchmark_times[name] = timings
+            benchmark_results[name] = result
+            summarize_times(name, timings)
+
+        cpu_result = benchmark_results["cpu"]
+        cpu_times = benchmark_times["cpu"]
+
+        for name, result in benchmark_results.items():
+            if name == "cpu":
+                continue
+            print_backend_metrics(cpu_result, result, case.weights, case.mask, name)
+
+        if "gpu" not in targets:
             print("[gpu] CuPy unavailable; GPU benchmark skipped", flush=True)
+
+        for name, timings in benchmark_times.items():
+            if name == "cpu":
+                continue
             print(
-                f"[speed] cpu_u8/cpu mean ratio="
-                f"{stats.mean(cpu_u8_times) / stats.mean(cpu_times):.3f}x "
-                f"(>1.0 means cpu_u8 is slower)",
+                f"[speed] {name}/cpu mean ratio="
+                f"{stats.mean(timings) / stats.mean(cpu_times):.3f}x "
+                f"(>1.0 means {name} is slower)",
                 flush=True,
             )
-            print(
-                f"[speed] cpu_fx_u8/cpu mean ratio="
-                f"{stats.mean(cpu_fx_u8_times) / stats.mean(cpu_times):.3f}x "
-                f"(>1.0 means cpu_fx_u8 is slower)",
-                flush=True,
-            )
+        if "cpu_u8" in benchmark_times and "cpu_fx_u8" in benchmark_times:
             print(
                 f"[speed] cpu_fx_u8/cpu_u8 mean ratio="
-                f"{stats.mean(cpu_fx_u8_times) / stats.mean(cpu_u8_times):.3f}x "
+                f"{stats.mean(benchmark_times['cpu_fx_u8']) / stats.mean(benchmark_times['cpu_u8']):.3f}x "
                 f"(>1.0 means cpu_fx_u8 is slower)",
                 flush=True,
             )

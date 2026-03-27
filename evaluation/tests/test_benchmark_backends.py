@@ -74,3 +74,33 @@ def test_compare_backend_metrics_positive_for_changed_foreground():
     assert metrics["sad"] > 0.0
     assert metrics["mse"] > 0.0
     assert metrics["grad"] == pytest.approx(0.0, abs=1e-24)
+
+
+def test_build_benchmark_targets_includes_pymatting_backends():
+    targets = benchmark_backends.build_benchmark_targets()
+
+    assert "cpu" in targets
+    assert "cpu_u8" in targets
+    assert "cpu_fx_u8" in targets
+    assert "pymatting_ml" in targets
+    assert "pymatting_cf" not in targets
+
+
+def test_build_benchmark_targets_includes_pymatting_cf_when_requested():
+    targets = benchmark_backends.build_benchmark_targets(include_cf=True)
+
+    assert "pymatting_cf" in targets
+
+
+def test_build_benchmark_targets_skips_pymatting_ml_cupy_without_cupy(monkeypatch):
+    monkeypatch.setattr(benchmark_backends, "HAS_CUPY", False)
+
+    targets = benchmark_backends.build_benchmark_targets()
+
+    assert "pymatting_ml_cupy" not in targets
+
+
+def test_include_cf_flag_is_parsed():
+    args = benchmark_backends.build_parser().parse_args(["--include-cf", "--repeats", "1", "--idle-seconds", "0"])
+
+    assert args.include_cf is True
