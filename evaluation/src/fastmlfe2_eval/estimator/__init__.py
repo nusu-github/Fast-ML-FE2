@@ -63,14 +63,6 @@ def estimate_foreground(
         from fastmlfe2_eval.estimator._cpu import estimate_multilevel_foreground_background
 
         foreground, background = estimate_multilevel_foreground_background(image_f32, alpha_f32, params)
-    elif backend == "cpu_u8":
-        from fastmlfe2_eval.estimator._cpu_u8 import estimate_multilevel_foreground_background_u8
-
-        foreground, background = estimate_multilevel_foreground_background_u8(image, alpha, params)
-    elif backend == "cpu_fx_u8":
-        from fastmlfe2_eval.estimator._cpu_fx_u8 import estimate_multilevel_foreground_background_fx_u8
-
-        foreground, background = estimate_multilevel_foreground_background_fx_u8(image, alpha, params)
     elif backend == "gpu":
         image_f32 = np.ascontiguousarray(image, dtype=np.float32)
         alpha_f32 = np.ascontiguousarray(alpha, dtype=np.float32)
@@ -82,7 +74,7 @@ def estimate_foreground(
 
         foreground, background = estimate_fb_ml(image_f32, alpha_f32, params)
     else:
-        msg = f"unknown backend: {backend!r}, expected 'auto', 'cpu', 'cpu_u8', 'cpu_fx_u8', or 'gpu'"
+        msg = f"unknown backend: {backend!r}, expected 'auto', 'cpu', or 'gpu'"
         raise ValueError(msg)
 
     if return_background:

@@ -1,37 +1,11 @@
 #pragma once
 
-#include "solver_fx_u8.hpp"
 #include "solver_float.hpp"
-#include "solver_u8.hpp"
 
 inline void bind_cpu_impl(nb::module_ &m) {
   m.def(
       "estimate_multilevel_foreground_background",
       &estimate_multilevel_foreground_background,
-      nb::arg("foreground_out"),
-      nb::arg("background_out"),
-      nb::arg("input_image"),
-      nb::arg("input_alpha"),
-      nb::arg("regularization"),
-      nb::arg("gradient_weight"),
-      nb::arg("n_small_iterations"),
-      nb::arg("n_big_iterations"),
-      nb::arg("small_size"));
-  m.def(
-      "estimate_multilevel_foreground_background_u8",
-      &estimate_multilevel_foreground_background_u8,
-      nb::arg("foreground_out"),
-      nb::arg("background_out"),
-      nb::arg("input_image"),
-      nb::arg("input_alpha"),
-      nb::arg("regularization"),
-      nb::arg("gradient_weight"),
-      nb::arg("n_small_iterations"),
-      nb::arg("n_big_iterations"),
-      nb::arg("small_size"));
-  m.def(
-      "estimate_multilevel_foreground_background_fx_u8",
-      &estimate_multilevel_foreground_background_fx_u8,
       nb::arg("foreground_out"),
       nb::arg("background_out"),
       nb::arg("input_image"),

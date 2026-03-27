@@ -61,8 +61,6 @@ def run_pymatting_cf(image: np.ndarray, alpha: np.ndarray) -> tuple[np.ndarray, 
 def build_benchmark_targets(*, include_cf: bool = False) -> dict[str, BenchmarkTarget]:
     targets = {
         "cpu": BenchmarkTarget("f32", run_fastmlfe_backend("cpu")),
-        "cpu_u8": BenchmarkTarget("u8", run_fastmlfe_backend("cpu_u8")),
-        "cpu_fx_u8": BenchmarkTarget("u8", run_fastmlfe_backend("cpu_fx_u8")),
         "pymatting_ml": BenchmarkTarget("f32", run_pymatting_ml),
     }
     if include_cf:
@@ -196,7 +194,7 @@ class BenchmarkArgumentParser(argparse.ArgumentParser):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = BenchmarkArgumentParser(description="Benchmark CPU float32, CPU u8, CPU fixed u8, and GPU backends.")
+    parser = BenchmarkArgumentParser(description="Benchmark CPU float32, PyMatting, and GPU backends.")
     parser.add_argument(
         "--size",
         action="append",
@@ -297,14 +295,6 @@ def main() -> int:
                 f"(>1.0 means {name} is slower)",
                 flush=True,
             )
-        if "cpu_u8" in benchmark_times and "cpu_fx_u8" in benchmark_times:
-            print(
-                f"[speed] cpu_fx_u8/cpu_u8 mean ratio="
-                f"{stats.mean(benchmark_times['cpu_fx_u8']) / stats.mean(benchmark_times['cpu_u8']):.3f}x "
-                f"(>1.0 means cpu_fx_u8 is slower)",
-                flush=True,
-            )
-
     return 0
 
 

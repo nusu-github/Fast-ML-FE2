@@ -80,8 +80,8 @@ def test_build_benchmark_targets_includes_pymatting_backends():
     targets = benchmark_backends.build_benchmark_targets()
 
     assert "cpu" in targets
-    assert "cpu_u8" in targets
-    assert "cpu_fx_u8" in targets
+    assert "cpu_u8" not in targets
+    assert "cpu_fx_u8" not in targets
     assert "pymatting_ml" in targets
     assert "pymatting_cf" not in targets
 
