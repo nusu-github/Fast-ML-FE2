@@ -11,6 +11,8 @@ import FastMLFE2.Canonical.ClampPlacement
 import FastMLFE2.Canonical.LocalCommitments
 import FastMLFE2.Canonical.MultilevelSchedule
 import FastMLFE2.Approximation.BlurFusion
+import FastMLFE2.FixedPrecision.Format
+import FastMLFE2.FixedPrecision.LocalSolver
 import FastMLFE2.Assumptions.Bundles
 import FastMLFE2.Assumptions.Grid
 import FastMLFE2.Theorems.Invertibility
@@ -49,6 +51,8 @@ import FastMLFE2.Theorems.GridAssumptions
 import FastMLFE2.Theorems.InteriorKernel
 import FastMLFE2.Theorems.GridLocal
 import FastMLFE2.Theorems.CanonicalBuilder
+import FastMLFE2.Theorems.FixedPrecisionLocal
+import FastMLFE2.Theorems.FixedPrecisionWraparound
 
 namespace FastMLFE2
 
