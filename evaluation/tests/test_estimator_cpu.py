@@ -10,6 +10,8 @@ from fastmlfe2_eval.estimator._cpu import (
     _resize_nearest_rgb,
     _resize_nearest_scalar,
     _update_red_black_half_step,
+    _update_red_black_half_step_from_previous_level,
+    _update_red_black_half_step_from_previous_level_with_boundary_fallback,
     prepare_cpu_estimator_inputs,
 )
 
@@ -207,6 +209,118 @@ class TestMeanResidualKernel:
 
         assert np.all(F >= 0.0) and np.all(F <= 1.0)
         assert np.all(B >= 0.0) and np.all(B <= 1.0)
+
+    def test_previous_level_single_pixel_uses_previous_neighbors(self):
+        h, w = 1, 1
+        foreground = np.zeros((h, w, 3), dtype=np.float32)
+        background = np.zeros((h, w, 3), dtype=np.float32)
+        previous_foreground = np.full((1, 1, 3), 0.8, dtype=np.float32)
+        previous_background = np.full((1, 1, 3), 0.2, dtype=np.float32)
+        image = np.full((h, w, 3), 0.5, dtype=np.float32)
+        alpha = np.full((h, w), 0.5, dtype=np.float32)
+        neighbor_weights = np.full((h, w, 4), 0.25, dtype=np.float32)
+        inverse_weight_sum = np.ones((h, w), dtype=np.float32)
+        inverse_weight_sum_plus_one = np.full((h, w), 0.5, dtype=np.float32)
+        foreground_gain = np.full((h, w), 0.5, dtype=np.float32)
+        background_gain = np.full((h, w), 0.5, dtype=np.float32)
+        x_previous_index_map = np.array([0], dtype=np.int32)
+        y_previous_index_map = np.array([0], dtype=np.int32)
+
+        _update_red_black_half_step_from_previous_level(
+            foreground,
+            background,
+            image,
+            alpha,
+            neighbor_weights,
+            inverse_weight_sum,
+            inverse_weight_sum_plus_one,
+            foreground_gain,
+            background_gain,
+            previous_foreground,
+            previous_background,
+            x_previous_index_map,
+            y_previous_index_map,
+            h,
+            w,
+        )
+
+        np.testing.assert_allclose(foreground[0, 0], 0.8, atol=1e-6)
+        np.testing.assert_allclose(background[0, 0], 0.2, atol=1e-6)
+
+    def test_previous_level_red_pass_keeps_black_pixels_unchanged(self):
+        rng = np.random.default_rng(7)
+        h, w = 5, 5
+        foreground = rng.random((h, w, 3)).astype(np.float32)
+        background = rng.random((h, w, 3)).astype(np.float32)
+        image = rng.random((h, w, 3)).astype(np.float32)
+        alpha = rng.random((h, w)).astype(np.float32)
+        previous_foreground = rng.random((3, 3, 3)).astype(np.float32)
+        previous_background = rng.random((3, 3, 3)).astype(np.float32)
+        coeffs = _build_cached_kernel_inputs(alpha, 5e-3, 0.1)
+        x_previous_index_map = np.asarray(_build_resize_index_map(3, w), dtype=np.int32)
+        y_previous_index_map = np.asarray(_build_resize_index_map(3, h), dtype=np.int32)
+        foreground_before = foreground.copy()
+        background_before = background.copy()
+
+        _update_red_black_half_step_from_previous_level(
+            foreground,
+            background,
+            image,
+            alpha,
+            *coeffs,
+            previous_foreground,
+            previous_background,
+            x_previous_index_map,
+            y_previous_index_map,
+            h,
+            w,
+        )
+
+        for y in range(h):
+            for x in range(w):
+                if (x + y) % 2 == 1:
+                    np.testing.assert_array_equal(foreground[y, x], foreground_before[y, x])
+                    np.testing.assert_array_equal(background[y, x], background_before[y, x])
+
+    def test_previous_level_boundary_fallback_keeps_red_pixels_unchanged_and_bounded(self):
+        rng = np.random.default_rng(11)
+        h, w = 5, 5
+        foreground = rng.random((h, w, 3)).astype(np.float32)
+        background = rng.random((h, w, 3)).astype(np.float32)
+        image = rng.random((h, w, 3)).astype(np.float32)
+        alpha = rng.random((h, w)).astype(np.float32)
+        previous_foreground = rng.random((3, 3, 3)).astype(np.float32)
+        previous_background = rng.random((3, 3, 3)).astype(np.float32)
+        coeffs = _build_cached_kernel_inputs(alpha, 5e-3, 0.1)
+        x_previous_index_map = np.asarray(_build_resize_index_map(3, w), dtype=np.int32)
+        y_previous_index_map = np.asarray(_build_resize_index_map(3, h), dtype=np.int32)
+        foreground_before = foreground.copy()
+        background_before = background.copy()
+
+        _update_red_black_half_step_from_previous_level_with_boundary_fallback(
+            foreground,
+            background,
+            image,
+            alpha,
+            *coeffs,
+            previous_foreground,
+            previous_background,
+            x_previous_index_map,
+            y_previous_index_map,
+            h,
+            w,
+        )
+
+        for y in range(h):
+            for x in range(w):
+                if (x + y) % 2 == 0:
+                    np.testing.assert_array_equal(foreground[y, x], foreground_before[y, x])
+                    np.testing.assert_array_equal(background[y, x], background_before[y, x])
+
+        assert np.all(np.isfinite(foreground))
+        assert np.all(np.isfinite(background))
+        assert np.all(foreground >= 0.0) and np.all(foreground <= 1.0)
+        assert np.all(background >= 0.0) and np.all(background <= 1.0)
 
 
 def _make_composited(h=32, w=32, seed=42):

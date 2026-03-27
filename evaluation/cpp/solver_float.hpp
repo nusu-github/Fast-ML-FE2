@@ -563,108 +563,126 @@ inline void update_red_black_half_step_from_previous_level(
     IndexMap y_previous_index_map,
     int h,
     int w
+);
+
+template <bool BoundaryFallback>
+inline void update_red_black_half_step_from_previous_level_buffer(
+    float *foreground,
+    float *background,
+    const float *image,
+    const float *alpha,
+    const float *neighbor_weights,
+    const float *inverse_weight_sum,
+    const float *inverse_weight_sum_plus_one,
+    const float *foreground_gain,
+    const float *background_gain,
+    const float *previous_foreground,
+    const float *previous_background,
+    const std::int32_t *x_previous_index_map,
+    const std::int32_t *y_previous_index_map,
+    int h,
+    int w,
+    int previous_width
 ) {
+  const SweepColor sweep_color = BoundaryFallback ? SweepColor::black : SweepColor::red;
+
   for (int y = 0; y < h; ++y) {
-    const int x_start = y % 2;
-    const std::int32_t y_current_prev = y_previous_index_map(y);
-    const std::int32_t y_up = y == 0 ? 0 : y - 1;
-    const std::int32_t y_down = y + 1 >= h ? h - 1 : y + 1;
+    const int x_start = parity_of(y, sweep_color);
+    const std::int32_t y_current_prev = y_previous_index_map[y];
+    const int y_up = y == 0 ? 0 : y - 1;
+    const int y_down = y + 1 >= h ? h - 1 : y + 1;
 
     for (int x = x_start; x < w; x += 2) {
-      const std::int32_t x_prev = x_previous_index_map(x);
+      const std::size_t idx = scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
       const int x_left = x == 0 ? 0 : x - 1;
       const int x_right = x + 1 >= w ? w - 1 : x + 1;
+      const std::int32_t x_current_prev = x_previous_index_map[x];
+      const float *nw = neighbor_weights + idx * kNeighborCount;
+      const float *image_px = image + rgb_pixel_base(idx);
+      float foreground_weighted_sum[kChannels] {};
+      float background_weighted_sum[kChannels] {};
 
-      float foreground_weighted_sum_r = 0.0f;
-      float foreground_weighted_sum_g = 0.0f;
-      float foreground_weighted_sum_b = 0.0f;
-      float background_weighted_sum_r = 0.0f;
-      float background_weighted_sum_g = 0.0f;
-      float background_weighted_sum_b = 0.0f;
+      auto accumulate_neighbor = [&](int direction, bool use_previous, int current_y, int current_x) {
+        const float *foreground_px;
+        const float *background_px;
+        if (use_previous) {
+          const std::size_t previous_idx =
+              scalar_index(static_cast<std::size_t>(y_current_prev), static_cast<std::size_t>(x_current_prev), static_cast<std::size_t>(previous_width));
+          foreground_px = previous_foreground + rgb_pixel_base(previous_idx);
+          background_px = previous_background + rgb_pixel_base(previous_idx);
+        } else {
+          const std::size_t current_idx =
+              scalar_index(static_cast<std::size_t>(current_y), static_cast<std::size_t>(current_x), static_cast<std::size_t>(w));
+          foreground_px = foreground + rgb_pixel_base(current_idx);
+          background_px = background + rgb_pixel_base(current_idx);
+        }
 
-      if (x_left == x) {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 0) * previous_foreground(y_current_prev, x_prev, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 0) * previous_foreground(y_current_prev, x_prev, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 0) * previous_foreground(y_current_prev, x_prev, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 0) * previous_background(y_current_prev, x_prev, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 0) * previous_background(y_current_prev, x_prev, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 0) * previous_background(y_current_prev, x_prev, 2);
-      } else {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 0) * foreground(y, x_left, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 0) * foreground(y, x_left, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 0) * foreground(y, x_left, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 0) * background(y, x_left, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 0) * background(y, x_left, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 0) * background(y, x_left, 2);
-      }
+        apply_rgb([&]<std::size_t C>(std::integral_constant<std::size_t, C>) {
+          foreground_weighted_sum[C] += nw[direction] * foreground_px[C];
+          background_weighted_sum[C] += nw[direction] * background_px[C];
+        });
+      };
 
-      if (x_right == x) {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 1) * previous_foreground(y_current_prev, x_prev, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 1) * previous_foreground(y_current_prev, x_prev, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 1) * previous_foreground(y_current_prev, x_prev, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 1) * previous_background(y_current_prev, x_prev, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 1) * previous_background(y_current_prev, x_prev, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 1) * previous_background(y_current_prev, x_prev, 2);
-      } else {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 1) * foreground(y, x_right, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 1) * foreground(y, x_right, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 1) * foreground(y, x_right, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 1) * background(y, x_right, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 1) * background(y, x_right, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 1) * background(y, x_right, 2);
-      }
-
-      if (y_up == y) {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 2) * previous_foreground(y_current_prev, x_prev, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 2) * previous_foreground(y_current_prev, x_prev, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 2) * previous_foreground(y_current_prev, x_prev, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 2) * previous_background(y_current_prev, x_prev, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 2) * previous_background(y_current_prev, x_prev, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 2) * previous_background(y_current_prev, x_prev, 2);
-      } else {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 2) * foreground(y_up, x, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 2) * foreground(y_up, x, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 2) * foreground(y_up, x, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 2) * background(y_up, x, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 2) * background(y_up, x, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 2) * background(y_up, x, 2);
-      }
-
-      if (y_down == y) {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 3) * previous_foreground(y_current_prev, x_prev, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 3) * previous_foreground(y_current_prev, x_prev, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 3) * previous_foreground(y_current_prev, x_prev, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 3) * previous_background(y_current_prev, x_prev, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 3) * previous_background(y_current_prev, x_prev, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 3) * previous_background(y_current_prev, x_prev, 2);
-      } else {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 3) * foreground(y_down, x, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 3) * foreground(y_down, x, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 3) * foreground(y_down, x, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 3) * background(y_down, x, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 3) * background(y_down, x, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 3) * background(y_down, x, 2);
-      }
+      accumulate_neighbor(0, x_left == x, y, x_left);
+      accumulate_neighbor(1, x_right == x, y, x_right);
+      accumulate_neighbor(2, y_up == y, y_up, x);
+      accumulate_neighbor(3, y_down == y, y_down, x);
 
       const PixelSolutionInputs inputs {
-          .alpha = alpha(y, x),
-          .image_r = image(y, x, 0),
-          .image_g = image(y, x, 1),
-          .image_b = image(y, x, 2),
-          .foreground_weighted_sum_r = foreground_weighted_sum_r,
-          .foreground_weighted_sum_g = foreground_weighted_sum_g,
-          .foreground_weighted_sum_b = foreground_weighted_sum_b,
-          .background_weighted_sum_r = background_weighted_sum_r,
-          .background_weighted_sum_g = background_weighted_sum_g,
-          .background_weighted_sum_b = background_weighted_sum_b,
-          .inverse_weight_sum = inverse_weight_sum(y, x),
-          .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one(y, x),
-          .foreground_gain = foreground_gain(y, x),
-          .background_gain = background_gain(y, x),
+          .alpha = alpha[idx],
+          .image_r = image_px[0],
+          .image_g = image_px[1],
+          .image_b = image_px[2],
+          .foreground_weighted_sum_r = foreground_weighted_sum[0],
+          .foreground_weighted_sum_g = foreground_weighted_sum[1],
+          .foreground_weighted_sum_b = foreground_weighted_sum[2],
+          .background_weighted_sum_r = background_weighted_sum[0],
+          .background_weighted_sum_g = background_weighted_sum[1],
+          .background_weighted_sum_b = background_weighted_sum[2],
+          .inverse_weight_sum = inverse_weight_sum[idx],
+          .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one[idx],
+          .foreground_gain = foreground_gain[idx],
+          .background_gain = background_gain[idx],
       };
-      write_solution(foreground, background, static_cast<std::size_t>(y), static_cast<std::size_t>(x), inputs);
+      write_solution_buffer(foreground, background, idx, inputs);
     }
   }
+}
+
+inline void update_red_black_half_step_from_previous_level(
+    MutableImage foreground,
+    MutableImage background,
+    Image image,
+    Alpha alpha,
+    Coeff4 neighbor_weights,
+    MutableAlpha inverse_weight_sum,
+    MutableAlpha inverse_weight_sum_plus_one,
+    MutableAlpha foreground_gain,
+    MutableAlpha background_gain,
+    MutableImage previous_foreground,
+    MutableImage previous_background,
+    IndexMap x_previous_index_map,
+    IndexMap y_previous_index_map,
+    int h,
+    int w
+) {
+  update_red_black_half_step_from_previous_level_buffer<false>(
+      foreground.data(),
+      background.data(),
+      image.data(),
+      alpha.data(),
+      neighbor_weights.data(),
+      inverse_weight_sum.data(),
+      inverse_weight_sum_plus_one.data(),
+      foreground_gain.data(),
+      background_gain.data(),
+      previous_foreground.data(),
+      previous_background.data(),
+      x_previous_index_map.data(),
+      y_previous_index_map.data(),
+      h,
+      w,
+      static_cast<int>(previous_foreground.shape(1)));
 }
 
 inline void update_red_black_half_step_from_previous_level_with_boundary_fallback(
@@ -684,107 +702,23 @@ inline void update_red_black_half_step_from_previous_level_with_boundary_fallbac
     int h,
     int w
 ) {
-  for (int y = 0; y < h; ++y) {
-    const int x_start = (static_cast<int>(SweepColor::black) + y) % 2;
-    const std::int32_t y_current_prev = y_previous_index_map(y);
-    const std::int32_t y_up = y == 0 ? 0 : y - 1;
-    const std::int32_t y_down = y + 1 >= h ? h - 1 : y + 1;
-
-    for (int x = x_start; x < w; x += 2) {
-      const int x_left = x == 0 ? 0 : x - 1;
-      const int x_right = x + 1 >= w ? w - 1 : x + 1;
-      const std::int32_t x_current_prev = x_previous_index_map(x);
-
-      float foreground_weighted_sum_r = 0.0f;
-      float foreground_weighted_sum_g = 0.0f;
-      float foreground_weighted_sum_b = 0.0f;
-      float background_weighted_sum_r = 0.0f;
-      float background_weighted_sum_g = 0.0f;
-      float background_weighted_sum_b = 0.0f;
-
-      if (x_left == x) {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 0) * previous_foreground(y_current_prev, x_current_prev, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 0) * previous_foreground(y_current_prev, x_current_prev, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 0) * previous_foreground(y_current_prev, x_current_prev, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 0) * previous_background(y_current_prev, x_current_prev, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 0) * previous_background(y_current_prev, x_current_prev, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 0) * previous_background(y_current_prev, x_current_prev, 2);
-      } else {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 0) * foreground(y, x_left, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 0) * foreground(y, x_left, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 0) * foreground(y, x_left, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 0) * background(y, x_left, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 0) * background(y, x_left, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 0) * background(y, x_left, 2);
-      }
-
-      if (x_right == x) {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 1) * previous_foreground(y_current_prev, x_current_prev, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 1) * previous_foreground(y_current_prev, x_current_prev, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 1) * previous_foreground(y_current_prev, x_current_prev, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 1) * previous_background(y_current_prev, x_current_prev, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 1) * previous_background(y_current_prev, x_current_prev, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 1) * previous_background(y_current_prev, x_current_prev, 2);
-      } else {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 1) * foreground(y, x_right, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 1) * foreground(y, x_right, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 1) * foreground(y, x_right, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 1) * background(y, x_right, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 1) * background(y, x_right, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 1) * background(y, x_right, 2);
-      }
-
-      if (y_up == y) {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 2) * previous_foreground(y_current_prev, x_current_prev, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 2) * previous_foreground(y_current_prev, x_current_prev, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 2) * previous_foreground(y_current_prev, x_current_prev, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 2) * previous_background(y_current_prev, x_current_prev, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 2) * previous_background(y_current_prev, x_current_prev, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 2) * previous_background(y_current_prev, x_current_prev, 2);
-      } else {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 2) * foreground(y_up, x, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 2) * foreground(y_up, x, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 2) * foreground(y_up, x, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 2) * background(y_up, x, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 2) * background(y_up, x, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 2) * background(y_up, x, 2);
-      }
-
-      if (y_down == y) {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 3) * previous_foreground(y_current_prev, x_current_prev, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 3) * previous_foreground(y_current_prev, x_current_prev, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 3) * previous_foreground(y_current_prev, x_current_prev, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 3) * previous_background(y_current_prev, x_current_prev, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 3) * previous_background(y_current_prev, x_current_prev, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 3) * previous_background(y_current_prev, x_current_prev, 2);
-      } else {
-        foreground_weighted_sum_r += neighbor_weights(y, x, 3) * foreground(y_down, x, 0);
-        foreground_weighted_sum_g += neighbor_weights(y, x, 3) * foreground(y_down, x, 1);
-        foreground_weighted_sum_b += neighbor_weights(y, x, 3) * foreground(y_down, x, 2);
-        background_weighted_sum_r += neighbor_weights(y, x, 3) * background(y_down, x, 0);
-        background_weighted_sum_g += neighbor_weights(y, x, 3) * background(y_down, x, 1);
-        background_weighted_sum_b += neighbor_weights(y, x, 3) * background(y_down, x, 2);
-      }
-
-      const PixelSolutionInputs inputs {
-          .alpha = alpha(y, x),
-          .image_r = image(y, x, 0),
-          .image_g = image(y, x, 1),
-          .image_b = image(y, x, 2),
-          .foreground_weighted_sum_r = foreground_weighted_sum_r,
-          .foreground_weighted_sum_g = foreground_weighted_sum_g,
-          .foreground_weighted_sum_b = foreground_weighted_sum_b,
-          .background_weighted_sum_r = background_weighted_sum_r,
-          .background_weighted_sum_g = background_weighted_sum_g,
-          .background_weighted_sum_b = background_weighted_sum_b,
-          .inverse_weight_sum = inverse_weight_sum(y, x),
-          .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one(y, x),
-          .foreground_gain = foreground_gain(y, x),
-          .background_gain = background_gain(y, x),
-      };
-      write_solution(foreground, background, static_cast<std::size_t>(y), static_cast<std::size_t>(x), inputs);
-    }
-  }
+  update_red_black_half_step_from_previous_level_buffer<true>(
+      foreground.data(),
+      background.data(),
+      image.data(),
+      alpha.data(),
+      neighbor_weights.data(),
+      inverse_weight_sum.data(),
+      inverse_weight_sum_plus_one.data(),
+      foreground_gain.data(),
+      background_gain.data(),
+      previous_foreground.data(),
+      previous_background.data(),
+      x_previous_index_map.data(),
+      y_previous_index_map.data(),
+      h,
+      w,
+      static_cast<int>(previous_foreground.shape(1)));
 }
 
 }  // namespace
