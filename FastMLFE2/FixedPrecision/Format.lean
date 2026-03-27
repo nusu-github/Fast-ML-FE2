@@ -28,6 +28,15 @@ abbrev FixedUnknown (cfg : FixedFormat) := Storage cfg × Storage cfg
 def maxCode (cfg : FixedFormat) : Nat :=
   2 ^ cfg.wordWidth - 1
 
+def signedMin (cfg : FixedFormat) : Int :=
+  -((2 : Int) ^ (cfg.accWidth - 1))
+
+def signedMax (cfg : FixedFormat) : Int :=
+  (2 : Int) ^ (cfg.accWidth - 1) - 1
+
+def IntFitsAcc (cfg : FixedFormat) (z : Int) : Prop :=
+  signedMin cfg ≤ z ∧ z ≤ signedMax cfg
+
 noncomputable def decodeStorage (cfg : FixedFormat) (x : Storage cfg) : ℝ :=
   (x.toNat : ℝ) / cfg.scale
 

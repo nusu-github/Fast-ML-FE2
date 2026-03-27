@@ -33,32 +33,66 @@ noncomputable def encodedNeighborWeight (ctx : FixedLocalContext cfg ι) (j : ι
       decodeStorage cfg ctx.omega *
         |decodeStorage cfg ctx.alphaCenter - decodeStorage cfg (ctx.alphaNeighbor j)|)
 
-noncomputable def wrappedTotalWeight (ctx : FixedLocalContext cfg ι) : Accumulator cfg :=
-  ∑ j, encodedNeighborWeight ctx j
+noncomputable def unwrappedNeighborWeightInt (ctx : FixedLocalContext cfg ι) (j : ι) : Int :=
+  Int.floor
+    ((decodeStorage cfg ctx.epsilonR +
+      decodeStorage cfg ctx.omega *
+        |decodeStorage cfg ctx.alphaCenter - decodeStorage cfg (ctx.alphaNeighbor j)|) *
+      cfg.scale + (1 : ℝ) / 2)
 
-noncomputable def wrappedForegroundSum (ctx : FixedLocalContext cfg ι) : Accumulator cfg :=
-  ∑ j, wrapScaleMul cfg (encodedNeighborWeight ctx j)
-    (castStorageToAccumulator cfg (ctx.fgNeighbor j))
+noncomputable def wrappedForegroundTerm (ctx : FixedLocalContext cfg ι) (j : ι) : Accumulator cfg :=
+  BitVec.ofInt cfg.accWidth
+    ((ctx.unwrappedNeighborWeightInt j * (ctx.fgNeighbor j).toNat) / cfg.scale)
 
-noncomputable def wrappedBackgroundSum (ctx : FixedLocalContext cfg ι) : Accumulator cfg :=
-  ∑ j, wrapScaleMul cfg (encodedNeighborWeight ctx j)
-    (castStorageToAccumulator cfg (ctx.bgNeighbor j))
+noncomputable def wrappedBackgroundTerm (ctx : FixedLocalContext cfg ι) (j : ι) : Accumulator cfg :=
+  BitVec.ofInt cfg.accWidth
+    ((ctx.unwrappedNeighborWeightInt j * (ctx.bgNeighbor j).toNat) / cfg.scale)
 
 noncomputable def unwrappedTotalWeightInt (ctx : FixedLocalContext cfg ι) : Int :=
-  ∑ j, (encodedNeighborWeight ctx j).toInt
+  ∑ j, ctx.unwrappedNeighborWeightInt j
 
 noncomputable def unwrappedForegroundSumInt (ctx : FixedLocalContext cfg ι) : Int :=
-  ∑ j, (wrapScaleMul cfg (encodedNeighborWeight ctx j)
-    (castStorageToAccumulator cfg (ctx.fgNeighbor j))).toInt
+  ∑ j, (ctx.unwrappedNeighborWeightInt j * (ctx.fgNeighbor j).toNat) / cfg.scale
 
 noncomputable def unwrappedBackgroundSumInt (ctx : FixedLocalContext cfg ι) : Int :=
-  ∑ j, (wrapScaleMul cfg (encodedNeighborWeight ctx j)
-    (castStorageToAccumulator cfg (ctx.bgNeighbor j))).toInt
+  ∑ j, (ctx.unwrappedNeighborWeightInt j * (ctx.bgNeighbor j).toNat) / cfg.scale
+
+noncomputable def wrappedTotalWeight (ctx : FixedLocalContext cfg ι) : Accumulator cfg :=
+  BitVec.ofInt cfg.accWidth ctx.unwrappedTotalWeightInt
+
+noncomputable def wrappedForegroundSum (ctx : FixedLocalContext cfg ι) : Accumulator cfg :=
+  BitVec.ofInt cfg.accWidth ctx.unwrappedForegroundSumInt
+
+noncomputable def wrappedBackgroundSum (ctx : FixedLocalContext cfg ι) : Accumulator cfg :=
+  BitVec.ofInt cfg.accWidth ctx.unwrappedBackgroundSumInt
+
+structure LocalRangeCert (ctx : FixedLocalContext cfg ι) : Prop where
+  totalWeightFits : FastMLFE2.FixedPrecision.IntFitsAcc cfg ctx.unwrappedTotalWeightInt
+  foregroundSumFits : FastMLFE2.FixedPrecision.IntFitsAcc cfg ctx.unwrappedForegroundSumInt
+  backgroundSumFits : FastMLFE2.FixedPrecision.IntFitsAcc cfg ctx.unwrappedBackgroundSumInt
 
 def NoWrapLocalStep (ctx : FixedLocalContext cfg ι) : Prop :=
   (ctx.wrappedTotalWeight.toInt = ctx.unwrappedTotalWeightInt) ∧
     (ctx.wrappedForegroundSum.toInt = ctx.unwrappedForegroundSumInt) ∧
     (ctx.wrappedBackgroundSum.toInt = ctx.unwrappedBackgroundSumInt)
+
+theorem NoWrapLocalStep_of_rangeCert (ctx : FixedLocalContext cfg ι)
+    (hcfg : 0 < cfg.accWidth) (h : LocalRangeCert ctx) :
+    ctx.NoWrapLocalStep := by
+  rcases h with ⟨hW, hF, hB⟩
+  refine ⟨?_, ?_, ?_⟩
+  · exact BitVec.toInt_ofInt_eq_self hcfg hW.1 (by
+      have hs : FastMLFE2.FixedPrecision.signedMax cfg < (2 : Int) ^ (cfg.accWidth - 1) := by
+        simp [FastMLFE2.FixedPrecision.signedMax]
+      exact lt_of_le_of_lt hW.2 hs)
+  · exact BitVec.toInt_ofInt_eq_self hcfg hF.1 (by
+      have hs : FastMLFE2.FixedPrecision.signedMax cfg < (2 : Int) ^ (cfg.accWidth - 1) := by
+        simp [FastMLFE2.FixedPrecision.signedMax]
+      exact lt_of_le_of_lt hF.2 hs)
+  · exact BitVec.toInt_ofInt_eq_self hcfg hB.1 (by
+      have hs : FastMLFE2.FixedPrecision.signedMax cfg < (2 : Int) ^ (cfg.accWidth - 1) := by
+        simp [FastMLFE2.FixedPrecision.signedMax]
+      exact lt_of_le_of_lt hB.2 hs)
 
 noncomputable def quantizedMeanResidualStep (ctx : FixedLocalContext cfg ι) : FixedUnknown cfg :=
   let alpha := decodeStorage cfg ctx.alphaCenter
