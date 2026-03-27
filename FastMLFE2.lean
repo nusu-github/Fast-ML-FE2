@@ -12,6 +12,8 @@ import FastMLFE2.Canonical.LocalCommitments
 import FastMLFE2.Canonical.MultilevelSchedule
 import FastMLFE2.Evaluation.ForegroundMetrics
 import FastMLFE2.Evaluation.AdversarialFamilies
+import FastMLFE2.Evaluation.ContinuousGrad
+import FastMLFE2.Evaluation.StepEdgeFamilies
 import FastMLFE2.Approximation.BlurFusion
 import FastMLFE2.FixedPrecision.Format
 import FastMLFE2.FixedPrecision.Coefficients
@@ -63,6 +65,7 @@ import FastMLFE2.Theorems.FixedPrecisionCost
 import FastMLFE2.Theorems.FixedPrecisionMultilevel
 import FastMLFE2.Theorems.FixedPrecisionWraparound
 import FastMLFE2.Theorems.ForegroundMetrics
+import FastMLFE2.Theorems.ContinuousGrad
 
 namespace FastMLFE2
 

@@ -4,6 +4,15 @@ import Mathlib
 namespace FastMLFE2.Evaluation
 
 open FastMLFE2.Canonical
+
+/-!
+Finite-grid foreground metric semantics.
+
+This module is the canonical home for paper `SAD`, paper-weighted `MSE`, and an abstract
+finite-grid `GRAD` interface. The continuous Gaussian-window `GRAD` specialization lives in
+`FastMLFE2.Evaluation.ContinuousGrad`.
+-/
+
 abbrev GrayField (h w : Nat) := Pixel h w → ℝ
 
 abbrev RGB := Fin 3 → ℝ

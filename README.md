@@ -48,7 +48,9 @@ FastMLFE2/
 │   └── MultilevelSchedule.lean     ← level-size computation
 ├── Evaluation/
 │   ├── ForegroundMetrics.lean      ← RGB image model; paper SAD/MSE; abstract GRAD
-│   └── AdversarialFamilies.lean    ← near-opaque alpha and saturating black/white families
+│   ├── AdversarialFamilies.lean    ← near-opaque alpha and saturating black/white families
+│   ├── ContinuousGrad.lean         ← continuous Gaussian GRAD on rectangular windows
+│   └── StepEdgeFamilies.lean       ← continuous step-edge and flat-reference families
 ├── Approximation/
 │   └── BlurFusion.lean             ← idealized PhotoRoom Blur-Fusion surrogate
 ├── Assumptions/
@@ -90,7 +92,8 @@ FastMLFE2/
     ├── GridLocal.lean              ← closed-form theorems on GridPixelData.localCtx
     ├── InteriorKernel.lean         ← closed-form theorems on interior-pixel context
     ├── CanonicalBuilder.lean       ← field-correctness for canonical builders
-    └── ForegroundMetrics.lean      ← SAD/MSE bounds and adversarial-family equalities
+    ├── ForegroundMetrics.lean      ← SAD/MSE bounds and adversarial-family equalities
+    └── ContinuousGrad.lean         ← continuous GRAD bounds for vertical step-edge families
 ```
 
 Experimental modules (not part of the default umbrella import):

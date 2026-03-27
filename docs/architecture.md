@@ -74,6 +74,10 @@ principle.
 │  │  InteriorKernel · ClampPlacement               │ │
 │  │  LocalCommitments · MultilevelSchedule         │ │
 │  ├────────────────────────────────────────────────┤ │
+│  │  Evaluation                                    │ │
+│  │  ForegroundMetrics · AdversarialFamilies       │ │
+│  │  ContinuousGrad · StepEdgeFamilies             │ │
+│  ├────────────────────────────────────────────────┤ │
 │  │  Approximation                                 │ │
 │  │  BlurFusion surrogate semantics                │ │
 │  ├────────────────────────────────────────────────┤ │
@@ -138,6 +142,19 @@ the canonical Germer objective.
 - **BlurFusion** — Idealized real-valued PhotoRoom-style Blur-Fusion semantics: masked weighted
   means, separated surrogate costs, the sequential foreground correction, and induced
   builder-level `x1`/`x2`/`xk` update maps.
+
+### Evaluation (`FastMLFE2.Evaluation`)
+
+Metric semantics and adversarial test families used to stress foreground-estimation outputs.
+
+- **ForegroundMetrics** — finite-grid RGB image model, translucent support, paper-weighted
+  `SAD` / `MSE`, and an abstract `GRAD` operator interface.
+- **AdversarialFamilies** — near-opaque alpha fields together with saturating black/white
+  foreground pairs that witness the `SAD` / `MSE` supremum family.
+- **ContinuousGrad** — continuous-window Gaussian `GRAD` semantics specialized to vertical
+  step edges on `ℝ × ℝ`.
+- **StepEdgeFamilies** — canonical continuous black/white edge, flat reference, and shifted-edge
+  families aligned with the `ContinuousGrad` theorem layer.
 
 ### Assumptions (`FastMLFE2.Assumptions`)
 
@@ -212,6 +229,10 @@ Machine-checked results under explicit assumptions.
   stage-two surrogate; exact joint minimizer vs sequential stage-two output gap quantified.
 - **BlurFusionFixedPoint** — Counterexample showing the Blur-Fusion `x1` update is generally
   not a fixed point and differs from the canonical closed-form Jacobi step.
+- **ForegroundMetrics** — finite-grid `SAD` / paper `MSE` upper bounds together with exact
+  values on saturating black/white adversarial families and supremum-attainment lemmas.
+- **ContinuousGrad** — positivity and symmetry facts for the continuous Gaussian kernel plus
+  lower-bound theorems for vertical `GRAD` on binary edge-vs-flat and shifted-edge families.
 - **Jacobi** — pointwise lifting theorems showing each simultaneous Jacobi-updated pixel is
   a closed-form local solution, solves the local normal equation, and is cost-stationary.
 - **Locality** — proves that builder locality lifts to `jacobiUpdateAt` and `jacobiStep`.
