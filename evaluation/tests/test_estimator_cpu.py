@@ -291,6 +291,16 @@ class TestCPUProperties:
         result = estimate_foreground(image, alpha, backend="cpu", return_background=True)
         assert isinstance(result, tuple) and len(result) == 2
 
+    def test_odd_shaped_image_stays_finite_and_bounded(self):
+        image, alpha, _, _ = _make_composited(h=17, w=19, seed=7)
+        F, B = estimate_foreground(image, alpha, backend="cpu", return_background=True)
+        assert F.shape == image.shape
+        assert B.shape == image.shape
+        assert np.all(np.isfinite(F))
+        assert np.all(np.isfinite(B))
+        assert np.all(F >= 0.0) and np.all(F <= 1.0)
+        assert np.all(B >= 0.0) and np.all(B <= 1.0)
+
     def test_cpu_backend_rejects_non_float32_inputs(self):
         image_u8, alpha_u8 = _make_quantized_pattern(16, 16)
 

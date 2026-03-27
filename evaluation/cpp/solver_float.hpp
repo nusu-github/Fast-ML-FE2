@@ -6,6 +6,10 @@
 
 namespace {
 
+inline float fmadd(float a, float b, float c) {
+  return std::fmaf(a, b, c);
+}
+
 struct NearestScalarInputRef {
   std::span<const float> data;
   int src_width;
@@ -85,9 +89,9 @@ inline void write_solution(
   const float mu_B1 = inputs.background_weighted_sum_g * inputs.inverse_weight_sum;
   const float mu_B2 = inputs.background_weighted_sum_b * inputs.inverse_weight_sum;
 
-  const float r0 = inputs.image_r - inputs.alpha * mu_F0 - alpha1 * mu_B0;
-  const float r1 = inputs.image_g - inputs.alpha * mu_F1 - alpha1 * mu_B1;
-  const float r2 = inputs.image_b - inputs.alpha * mu_F2 - alpha1 * mu_B2;
+  const float r0 = fmadd(-alpha1, mu_B0, fmadd(-inputs.alpha, mu_F0, inputs.image_r));
+  const float r1 = fmadd(-alpha1, mu_B1, fmadd(-inputs.alpha, mu_F1, inputs.image_g));
+  const float r2 = fmadd(-alpha1, mu_B2, fmadd(-inputs.alpha, mu_F2, inputs.image_b));
 
   float *foreground_px = foreground.pixel(idx);
   float *background_px = background.pixel(idx);
@@ -96,23 +100,23 @@ inline void write_solution(
     foreground_px[0] = clamp01(mu_F0);
     foreground_px[1] = clamp01(mu_F1);
     foreground_px[2] = clamp01(mu_F2);
-    background_px[0] = clamp01(mu_B0 + r0 * inputs.inverse_weight_sum_plus_one);
-    background_px[1] = clamp01(mu_B1 + r1 * inputs.inverse_weight_sum_plus_one);
-    background_px[2] = clamp01(mu_B2 + r2 * inputs.inverse_weight_sum_plus_one);
+    background_px[0] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r0, mu_B0));
+    background_px[1] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r1, mu_B1));
+    background_px[2] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r2, mu_B2));
   } else if (inputs.alpha > kAlphaHighThreshold) {
-    foreground_px[0] = clamp01(mu_F0 + r0 * inputs.inverse_weight_sum_plus_one);
-    foreground_px[1] = clamp01(mu_F1 + r1 * inputs.inverse_weight_sum_plus_one);
-    foreground_px[2] = clamp01(mu_F2 + r2 * inputs.inverse_weight_sum_plus_one);
+    foreground_px[0] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r0, mu_F0));
+    foreground_px[1] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r1, mu_F1));
+    foreground_px[2] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r2, mu_F2));
     background_px[0] = clamp01(mu_B0);
     background_px[1] = clamp01(mu_B1);
     background_px[2] = clamp01(mu_B2);
   } else {
-    foreground_px[0] = clamp01(mu_F0 + inputs.foreground_gain * r0);
-    foreground_px[1] = clamp01(mu_F1 + inputs.foreground_gain * r1);
-    foreground_px[2] = clamp01(mu_F2 + inputs.foreground_gain * r2);
-    background_px[0] = clamp01(mu_B0 + inputs.background_gain * r0);
-    background_px[1] = clamp01(mu_B1 + inputs.background_gain * r1);
-    background_px[2] = clamp01(mu_B2 + inputs.background_gain * r2);
+    foreground_px[0] = clamp01(fmadd(inputs.foreground_gain, r0, mu_F0));
+    foreground_px[1] = clamp01(fmadd(inputs.foreground_gain, r1, mu_F1));
+    foreground_px[2] = clamp01(fmadd(inputs.foreground_gain, r2, mu_F2));
+    background_px[0] = clamp01(fmadd(inputs.background_gain, r0, mu_B0));
+    background_px[1] = clamp01(fmadd(inputs.background_gain, r1, mu_B1));
+    background_px[2] = clamp01(fmadd(inputs.background_gain, r2, mu_B2));
   }
 }
 
@@ -359,31 +363,31 @@ inline void write_solution_planar(
   const float mu_B1 = inputs.background_weighted_sum_g * inputs.inverse_weight_sum;
   const float mu_B2 = inputs.background_weighted_sum_b * inputs.inverse_weight_sum;
 
-  const float r0 = inputs.image_r - inputs.alpha * mu_F0 - alpha1 * mu_B0;
-  const float r1 = inputs.image_g - inputs.alpha * mu_F1 - alpha1 * mu_B1;
-  const float r2 = inputs.image_b - inputs.alpha * mu_F2 - alpha1 * mu_B2;
+  const float r0 = fmadd(-alpha1, mu_B0, fmadd(-inputs.alpha, mu_F0, inputs.image_r));
+  const float r1 = fmadd(-alpha1, mu_B1, fmadd(-inputs.alpha, mu_F1, inputs.image_g));
+  const float r2 = fmadd(-alpha1, mu_B2, fmadd(-inputs.alpha, mu_F2, inputs.image_b));
 
   if (inputs.alpha < kAlphaLowThreshold) {
     foreground(y, x, 0) = clamp01(mu_F0);
     foreground(y, x, 1) = clamp01(mu_F1);
     foreground(y, x, 2) = clamp01(mu_F2);
-    background(y, x, 0) = clamp01(mu_B0 + r0 * inputs.inverse_weight_sum_plus_one);
-    background(y, x, 1) = clamp01(mu_B1 + r1 * inputs.inverse_weight_sum_plus_one);
-    background(y, x, 2) = clamp01(mu_B2 + r2 * inputs.inverse_weight_sum_plus_one);
+    background(y, x, 0) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r0, mu_B0));
+    background(y, x, 1) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r1, mu_B1));
+    background(y, x, 2) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r2, mu_B2));
   } else if (inputs.alpha > kAlphaHighThreshold) {
-    foreground(y, x, 0) = clamp01(mu_F0 + r0 * inputs.inverse_weight_sum_plus_one);
-    foreground(y, x, 1) = clamp01(mu_F1 + r1 * inputs.inverse_weight_sum_plus_one);
-    foreground(y, x, 2) = clamp01(mu_F2 + r2 * inputs.inverse_weight_sum_plus_one);
+    foreground(y, x, 0) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r0, mu_F0));
+    foreground(y, x, 1) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r1, mu_F1));
+    foreground(y, x, 2) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r2, mu_F2));
     background(y, x, 0) = clamp01(mu_B0);
     background(y, x, 1) = clamp01(mu_B1);
     background(y, x, 2) = clamp01(mu_B2);
   } else {
-    foreground(y, x, 0) = clamp01(mu_F0 + inputs.foreground_gain * r0);
-    foreground(y, x, 1) = clamp01(mu_F1 + inputs.foreground_gain * r1);
-    foreground(y, x, 2) = clamp01(mu_F2 + inputs.foreground_gain * r2);
-    background(y, x, 0) = clamp01(mu_B0 + inputs.background_gain * r0);
-    background(y, x, 1) = clamp01(mu_B1 + inputs.background_gain * r1);
-    background(y, x, 2) = clamp01(mu_B2 + inputs.background_gain * r2);
+    foreground(y, x, 0) = clamp01(fmadd(inputs.foreground_gain, r0, mu_F0));
+    foreground(y, x, 1) = clamp01(fmadd(inputs.foreground_gain, r1, mu_F1));
+    foreground(y, x, 2) = clamp01(fmadd(inputs.foreground_gain, r2, mu_F2));
+    background(y, x, 0) = clamp01(fmadd(inputs.background_gain, r0, mu_B0));
+    background(y, x, 1) = clamp01(fmadd(inputs.background_gain, r1, mu_B1));
+    background(y, x, 2) = clamp01(fmadd(inputs.background_gain, r2, mu_B2));
   }
 }
 
@@ -422,7 +426,7 @@ inline void build_level_solver_coefficients_planar(
       coeffs.inverse_weight_sum[idx] = 1.0f / W;
       coeffs.inverse_weight_sum_plus_one[idx] = 1.0f / (W + 1.0f);
 
-      const float D = W + alpha0 * alpha0 + alpha1 * alpha1;
+      const float D = fmadd(alpha1, alpha1, fmadd(alpha0, alpha0, W));
       const float inv_D = 1.0f / D;
       coeffs.foreground_gain[idx] = alpha0 * inv_D;
       coeffs.background_gain[idx] = alpha1 * inv_D;
@@ -489,6 +493,7 @@ inline void update_red_black_half_step_planar(
         accumulate_boundary_sums(foreground, background, coeffs, h, w, y, x, fg_sum, bg_sum);
         const std::size_t idx =
             scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(coeffs.stride));
+        const auto image_px = image.pixel(y, x);
         write_solution_planar(
             foreground,
             background,
@@ -496,9 +501,9 @@ inline void update_red_black_half_step_planar(
             x,
             PixelSolutionInputs {
                 .alpha = coeffs.alpha[idx],
-                .image_r = image.pixel(y, x)[0],
-                .image_g = image.pixel(y, x)[1],
-                .image_b = image.pixel(y, x)[2],
+                .image_r = image_px[0],
+                .image_g = image_px[1],
+                .image_b = image_px[2],
                 .foreground_weighted_sum_r = fg_sum[0],
                 .foreground_weighted_sum_g = fg_sum[1],
                 .foreground_weighted_sum_b = fg_sum[2],
@@ -520,6 +525,7 @@ inline void update_red_black_half_step_planar(
       accumulate_boundary_sums(foreground, background, coeffs, h, w, y, 0, fg_sum, bg_sum);
       const std::size_t idx =
           scalar_index(static_cast<std::size_t>(y), 0, static_cast<std::size_t>(coeffs.stride));
+      const auto image_px = image.pixel(y, 0);
       write_solution_planar(
           foreground,
           background,
@@ -527,9 +533,9 @@ inline void update_red_black_half_step_planar(
           0,
           PixelSolutionInputs {
               .alpha = coeffs.alpha[idx],
-              .image_r = image.pixel(y, 0)[0],
-              .image_g = image.pixel(y, 0)[1],
-              .image_b = image.pixel(y, 0)[2],
+              .image_r = image_px[0],
+              .image_g = image_px[1],
+              .image_b = image_px[2],
               .foreground_weighted_sum_r = fg_sum[0],
               .foreground_weighted_sum_g = fg_sum[1],
               .foreground_weighted_sum_b = fg_sum[2],
@@ -554,14 +560,25 @@ inline void update_red_black_half_step_planar(
       float bg_sum[kChannels] {};
       for (int c : kChannelIndices) {
         const std::size_t channel = static_cast<std::size_t>(c);
-        fg_sum[c] = w_left * foreground(y, x - 1, channel) + w_right * foreground(y, x + 1, channel) +
-                    w_up * foreground(y - 1, x, channel) + w_down * foreground(y + 1, x, channel);
-        bg_sum[c] = w_left * background(y, x - 1, channel) + w_right * background(y, x + 1, channel) +
-                    w_up * background(y - 1, x, channel) + w_down * background(y + 1, x, channel);
+        fg_sum[c] = fmadd(
+            w_down,
+            foreground(y + 1, x, channel),
+            fmadd(
+                w_up,
+                foreground(y - 1, x, channel),
+                fmadd(w_right, foreground(y, x + 1, channel), w_left * foreground(y, x - 1, channel))));
+        bg_sum[c] = fmadd(
+            w_down,
+            background(y + 1, x, channel),
+            fmadd(
+                w_up,
+                background(y - 1, x, channel),
+                fmadd(w_right, background(y, x + 1, channel), w_left * background(y, x - 1, channel))));
       }
 
       const std::size_t idx =
           scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(coeffs.stride));
+      const auto image_px = image.pixel(y, x);
       write_solution_planar(
           foreground,
           background,
@@ -569,9 +586,9 @@ inline void update_red_black_half_step_planar(
           x,
           PixelSolutionInputs {
               .alpha = coeffs.alpha[idx],
-              .image_r = image.pixel(y, x)[0],
-              .image_g = image.pixel(y, x)[1],
-              .image_b = image.pixel(y, x)[2],
+              .image_r = image_px[0],
+              .image_g = image_px[1],
+              .image_b = image_px[2],
               .foreground_weighted_sum_r = fg_sum[0],
               .foreground_weighted_sum_g = fg_sum[1],
               .foreground_weighted_sum_b = fg_sum[2],
@@ -592,6 +609,7 @@ inline void update_red_black_half_step_planar(
       accumulate_boundary_sums(foreground, background, coeffs, h, w, y, x, fg_sum, bg_sum);
       const std::size_t idx =
           scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(coeffs.stride));
+      const auto image_px = image.pixel(y, x);
       write_solution_planar(
           foreground,
           background,
@@ -599,9 +617,9 @@ inline void update_red_black_half_step_planar(
           x,
           PixelSolutionInputs {
               .alpha = coeffs.alpha[idx],
-              .image_r = image.pixel(y, x)[0],
-              .image_g = image.pixel(y, x)[1],
-              .image_b = image.pixel(y, x)[2],
+              .image_r = image_px[0],
+              .image_g = image_px[1],
+              .image_b = image_px[2],
               .foreground_weighted_sum_r = fg_sum[0],
               .foreground_weighted_sum_g = fg_sum[1],
               .foreground_weighted_sum_b = fg_sum[2],

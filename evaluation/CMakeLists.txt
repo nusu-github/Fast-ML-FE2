@@ -24,4 +24,10 @@ nanobind_add_module(_cpu_impl cpp/cpu_impl.cpp)
 target_compile_features(_cpu_impl PUBLIC cxx_std_20)
 set_target_properties(_cpu_impl PROPERTIES CXX_EXTENSIONS OFF)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(_cpu_impl PRIVATE -ffp-contract=fast -mfma)
+elseif(MSVC)
+    target_compile_options(_cpu_impl PRIVATE /fp:contract)
+endif()
+
 install(TARGETS _cpu_impl LIBRARY DESTINATION fastmlfe2_eval/estimator)
