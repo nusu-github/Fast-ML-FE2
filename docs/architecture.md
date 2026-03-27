@@ -77,6 +77,7 @@ principle.
 │  │  Evaluation                                    │ │
 │  │  ForegroundMetrics · AdversarialFamilies       │ │
 │  │  ContinuousGrad · StepEdgeFamilies             │ │
+│  │  DiscreteGrad · DiscreteGradFamilies           │ │
 │  ├────────────────────────────────────────────────┤ │
 │  │  Approximation                                 │ │
 │  │  BlurFusion surrogate semantics                │ │
@@ -155,6 +156,10 @@ Metric semantics and adversarial test families used to stress foreground-estimat
   step edges on `ℝ × ℝ`.
 - **StepEdgeFamilies** — canonical continuous black/white edge, flat reference, and shifted-edge
   families aligned with the `ContinuousGrad` theorem layer.
+- **DiscreteGrad** — exact discrete `GRAD` semantics matching the Python evaluation kernel at
+  default `sigma = 1.4`, including sampled kernels, reflect padding, and separable correlation.
+- **DiscreteGradFamilies** — discrete witness families for step-pattern stress tests that mirror
+  the Python-side synthetic generators.
 
 ### Assumptions (`FastMLFE2.Assumptions`)
 
@@ -233,6 +238,8 @@ Machine-checked results under explicit assumptions.
   values on saturating black/white adversarial families and supremum-attainment lemmas.
 - **ContinuousGrad** — positivity and symmetry facts for the continuous Gaussian kernel plus
   lower-bound theorems for vertical `GRAD` on binary edge-vs-flat and shifted-edge families.
+- **DiscreteGrad** — positivity, normalization, and odd-symmetry facts for the exact Python
+  discrete kernel, together with step-family witness coefficients and nontriviality certificates.
 - **Jacobi** — pointwise lifting theorems showing each simultaneous Jacobi-updated pixel is
   a closed-form local solution, solves the local normal equation, and is cost-stationary.
 - **Locality** — proves that builder locality lifts to `jacobiUpdateAt` and `jacobiStep`.

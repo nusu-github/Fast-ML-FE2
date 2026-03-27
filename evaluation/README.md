@@ -4,6 +4,8 @@ Evaluation harness for the proof implementations in [Fast-ML-FE2](../).
 
 Computes error metrics (SAD, MSE, GRAD) that correspond to the quantities
 formalized in the Lean proofs, against reference foreground estimation results.
+For GRAD, the Lean canonical semantics matches the default Python kernel
+configuration `sigma = 1.4`.
 
 Originally derived from [pymatting/foreground-estimation-evaluation](https://github.com/pymatting/foreground-estimation-evaluation).
 

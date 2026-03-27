@@ -50,7 +50,9 @@ FastMLFE2/
 │   ├── ForegroundMetrics.lean      ← RGB image model; paper SAD/MSE; abstract GRAD
 │   ├── AdversarialFamilies.lean    ← near-opaque alpha and saturating black/white families
 │   ├── ContinuousGrad.lean         ← continuous Gaussian GRAD on rectangular windows
-│   └── StepEdgeFamilies.lean       ← continuous step-edge and flat-reference families
+│   ├── StepEdgeFamilies.lean       ← continuous step-edge and flat-reference families
+│   ├── DiscreteGrad.lean           ← Python-exact discrete GRAD semantics at default sigma
+│   └── DiscreteGradFamilies.lean   ← discrete step-pattern and witness-family definitions
 ├── Approximation/
 │   └── BlurFusion.lean             ← idealized PhotoRoom Blur-Fusion surrogate
 ├── Assumptions/
@@ -93,7 +95,8 @@ FastMLFE2/
     ├── InteriorKernel.lean         ← closed-form theorems on interior-pixel context
     ├── CanonicalBuilder.lean       ← field-correctness for canonical builders
     ├── ForegroundMetrics.lean      ← SAD/MSE bounds and adversarial-family equalities
-    └── ContinuousGrad.lean         ← continuous GRAD bounds for vertical step-edge families
+    ├── ContinuousGrad.lean         ← continuous GRAD bounds for vertical step-edge families
+    └── DiscreteGrad.lean           ← discrete GRAD kernel facts and step-family certificates
 ```
 
 Experimental modules (not part of the default umbrella import):
@@ -139,10 +142,12 @@ pipeline stages:
 - **Compositing Error** — `|compose α F B − compose α F' B'| ≤ |α|·|F−F'| + |1−α|·|B−B'|`;
   authored corollary with simplified weights when `0 ≤ α ≤ 1`.
 - **Foreground Metrics** — Paper `SAD` and weighted-sum `MSE` on RGB images over the
-  translucent region, plus an abstract `GRAD` interface for later Gaussian-derivative
-  instantiation.
+  translucent region, plus an abstract finite-grid `GRAD` interface.
 - **Adversarial Metric Families** — Near-opaque alpha support families and saturating
   black/white RGB witnesses; exact `SAD`/`MSE` values and near-attainment lemmas.
+- **Discrete GRAD Canonicalization** — Exact Lean model of the Python evaluation kernel at
+  default `sigma = 1.4`: sampled Gaussian / derivative kernels, `ℓ₂` normalization, reflect
+  padding, separable correlation, and discrete witness coefficients for step families.
 - **MeanResidualBounds** — `|meanResidual| ≤ 1` under boxed inputs; foreground/background
   correction bounds.
 - **ResidualCompositeBounds** — exact compositing error in terms of `meanResidual`; finite-family

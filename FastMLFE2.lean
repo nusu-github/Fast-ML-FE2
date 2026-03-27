@@ -14,6 +14,8 @@ import FastMLFE2.Evaluation.ForegroundMetrics
 import FastMLFE2.Evaluation.AdversarialFamilies
 import FastMLFE2.Evaluation.ContinuousGrad
 import FastMLFE2.Evaluation.StepEdgeFamilies
+import FastMLFE2.Evaluation.DiscreteGrad
+import FastMLFE2.Evaluation.DiscreteGradFamilies
 import FastMLFE2.Approximation.BlurFusion
 import FastMLFE2.FixedPrecision.Format
 import FastMLFE2.FixedPrecision.Coefficients
@@ -66,6 +68,7 @@ import FastMLFE2.Theorems.FixedPrecisionMultilevel
 import FastMLFE2.Theorems.FixedPrecisionWraparound
 import FastMLFE2.Theorems.ForegroundMetrics
 import FastMLFE2.Theorems.ContinuousGrad
+import FastMLFE2.Theorems.DiscreteGrad
 
 namespace FastMLFE2
 
