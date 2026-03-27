@@ -5,12 +5,11 @@
 
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
-#include <limits>
-#include <span>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 namespace nb = nanobind;
@@ -21,10 +20,6 @@ using Alpha = nb::ndarray<const float, nb::numpy, nb::shape<-1, -1>, nb::c_conti
 using MutableAlpha = nb::ndarray<float, nb::numpy, nb::shape<-1, -1>, nb::c_contig>;
 using Coeff4 = nb::ndarray<float, nb::numpy, nb::shape<-1, -1, 4>, nb::c_contig>;
 using IndexMap = nb::ndarray<const std::int32_t, nb::numpy, nb::shape<-1>, nb::c_contig>;
-using ImageU8 = nb::ndarray<const std::uint8_t, nb::numpy, nb::shape<-1, -1, 3>, nb::c_contig>;
-using MutableImageU8 = nb::ndarray<std::uint8_t, nb::numpy, nb::shape<-1, -1, 3>, nb::c_contig>;
-using AlphaU8 = nb::ndarray<const std::uint8_t, nb::numpy, nb::shape<-1, -1>, nb::c_contig>;
-using MutableAlphaU8 = nb::ndarray<std::uint8_t, nb::numpy, nb::shape<-1, -1>, nb::c_contig>;
 
 struct PixelSolutionInputs {
   float alpha;
@@ -41,20 +36,6 @@ struct PixelSolutionInputs {
   float inverse_weight_sum_plus_one;
   float foreground_gain;
   float background_gain;
-};
-
-struct ResizeIndexMap {
-  explicit ResizeIndexMap(int dst_size) : indices(static_cast<std::size_t>(dst_size)) {}
-  ResizeIndexMap() = default;
-
-  std::span<int> mutable_span() { return indices; }
-  std::span<const int> span() const { return indices; }
-  int *data() { return indices.data(); }
-  const int *data() const { return indices.data(); }
-  void resize(int dst_size) { indices.resize(static_cast<std::size_t>(dst_size)); }
-
-private:
-  std::vector<int> indices;
 };
 
 struct FloatWorkspace {
@@ -85,72 +66,56 @@ struct FloatWorkspace {
   }
 };
 
-struct U8Workspace {
-  std::vector<std::uint8_t> previous_foreground_storage;
-  std::vector<std::uint8_t> previous_background_storage;
-  std::vector<std::uint8_t> current_foreground_storage;
-  std::vector<std::uint8_t> current_background_storage;
-  std::vector<std::uint8_t> image;
-  std::vector<std::uint8_t> alpha;
-  std::vector<float> neighbor_weights;
-  std::vector<float> inverse_weight_sum;
-  std::vector<float> inverse_weight_sum_plus_one;
-  std::vector<float> foreground_gain;
-  std::vector<float> background_gain;
-  std::vector<std::uint32_t> weight_lut;
-  std::array<float, 256> u8_to_f32 {};
-  ResizeIndexMap x_index_map;
-  ResizeIndexMap y_index_map;
-  ResizeIndexMap previous_x_index_map;
-  ResizeIndexMap previous_y_index_map;
-  std::uint32_t lut_regularization_bits = 0;
-  std::uint32_t lut_gradient_weight_bits = 0;
-  bool lut_initialized = false;
+constinit inline thread_local FloatWorkspace *g_thread_workspace = nullptr;
 
-  U8Workspace() : weight_lut(256u * 256u) {
-    constexpr float inv255 = 1.0f / 255.0f;
-    for (int i = 0; i < 256; ++i) {
-      u8_to_f32[static_cast<std::size_t>(i)] = static_cast<float>(i) * inv255;
-    }
+inline FloatWorkspace &thread_workspace() {
+  thread_local FloatWorkspace workspace_storage;
+  if (g_thread_workspace == nullptr) {
+    g_thread_workspace = &workspace_storage;
   }
+  return *g_thread_workspace;
+}
 
-  void ensure_capacity(std::size_t max_pixels) {
-    previous_foreground_storage.resize(max_pixels * 3);
-    previous_background_storage.resize(max_pixels * 3);
-    current_foreground_storage.resize(max_pixels * 3);
-    current_background_storage.resize(max_pixels * 3);
-    image.resize(max_pixels * 3);
-    alpha.resize(max_pixels);
-    neighbor_weights.resize(max_pixels * 4);
-    inverse_weight_sum.resize(max_pixels);
-    inverse_weight_sum_plus_one.resize(max_pixels);
-    foreground_gain.resize(max_pixels);
-    background_gain.resize(max_pixels);
-  }
-
-  bool needs_weight_lut_refresh(float regularization, float gradient_weight) const {
-    return !lut_initialized || lut_regularization_bits != std::bit_cast<std::uint32_t>(regularization) ||
-        lut_gradient_weight_bits != std::bit_cast<std::uint32_t>(gradient_weight);
-  }
-
-  void mark_weight_lut_ready(float regularization, float gradient_weight) {
-    lut_initialized = true;
-    lut_regularization_bits = std::bit_cast<std::uint32_t>(regularization);
-    lut_gradient_weight_bits = std::bit_cast<std::uint32_t>(gradient_weight);
-  }
+struct NeighborOffset {
+  int dy;
+  int dx;
 };
 
-inline float clamp01(float value) {
-  return std::clamp(value, 0.0f, 1.0f);
+enum class SweepColor : int {
+  red = 0,
+  black = 1,
+};
+
+template <std::size_t N>
+consteval std::array<int, N> make_dense_indices() {
+  std::array<int, N> indices {};
+  for (std::size_t i = 0; i < N; ++i) {
+    indices[i] = static_cast<int>(i);
+  }
+  return indices;
 }
 
-inline std::uint8_t quantize01_to_u8(float value) {
-  const int quantized = std::clamp(static_cast<int>(value * 255.0f + 0.5f), 0, 255);
-  return static_cast<std::uint8_t>(quantized);
+consteval std::array<NeighborOffset, 4> make_neighbor_offsets() {
+  return {{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}};
 }
 
-inline std::uint32_t div255_fast(std::uint32_t x) {
-  return (x + ((x + 257u) >> 8)) >> 8;
+inline constexpr int kChannels = 3;
+inline constexpr int kNeighborCount = 4;
+inline constexpr float kAlphaLowThreshold = 0.01f;
+inline constexpr float kAlphaHighThreshold = 0.99f;
+inline constexpr float kInitialForegroundThreshold = 0.9f;
+inline constexpr float kInitialBackgroundThreshold = 0.1f;
+inline constexpr auto kChannelIndices = make_dense_indices<kChannels>();
+inline constexpr auto kNeighborIndices = make_dense_indices<kNeighborCount>();
+inline constexpr auto kNeighborOffsets = make_neighbor_offsets();
+
+template <typename T>
+inline constexpr T clamp01(T value) {
+  return std::clamp(value, static_cast<T>(0), static_cast<T>(1));
+}
+
+inline constexpr int clamp_index(int value, int upper_bound) {
+  return std::clamp(value, 0, upper_bound);
 }
 
 inline std::size_t scalar_index(std::size_t y, std::size_t x, std::size_t w) {
@@ -158,26 +123,39 @@ inline std::size_t scalar_index(std::size_t y, std::size_t x, std::size_t w) {
 }
 
 inline std::size_t rgb_index(std::size_t y, std::size_t x, std::size_t w) {
-  return (y * w + x) * 3;
+  return (y * w + x) * kChannels;
 }
+
+template <typename T>
+struct BufferScalarView {
+  T *data;
+  int width;
+
+  decltype(auto) operator()(int y, int x) const { return data[scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(width))]; }
+};
+
+template <typename T, std::size_t Channels>
+struct BufferTensorView {
+  T *data;
+  int width;
+
+  decltype(auto) operator()(int y, int x, std::size_t c) const {
+    return data[(scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(width)) * Channels) + c];
+  }
+
+  T *pixel(std::size_t idx) const { return data + idx * Channels; }
+};
+
+using ConstScalarView = BufferScalarView<const float>;
+using MutableScalarView = BufferScalarView<float>;
+using ConstRgbView = BufferTensorView<const float, kChannels>;
+using MutableRgbView = BufferTensorView<float, kChannels>;
+using MutableCoeffView = BufferTensorView<float, kNeighborCount>;
 
 inline void validate_float_outputs(MutableImage foreground_output, MutableImage background_output, int h0, int w0) {
   if (static_cast<int>(foreground_output.shape(0)) != h0 || static_cast<int>(foreground_output.shape(1)) != w0 ||
-      static_cast<int>(foreground_output.shape(2)) != 3 || static_cast<int>(background_output.shape(0)) != h0 ||
-      static_cast<int>(background_output.shape(1)) != w0 || static_cast<int>(background_output.shape(2)) != 3) {
+      static_cast<int>(foreground_output.shape(2)) != kChannels || static_cast<int>(background_output.shape(0)) != h0 ||
+      static_cast<int>(background_output.shape(1)) != w0 || static_cast<int>(background_output.shape(2)) != kChannels) {
     throw std::runtime_error("estimate_multilevel_foreground_background: output shapes must match the input image");
-  }
-}
-
-inline void validate_u8_outputs(
-    MutableImageU8 foreground_output,
-    MutableImageU8 background_output,
-    int h0,
-    int w0
-) {
-  if (static_cast<int>(foreground_output.shape(0)) != h0 || static_cast<int>(foreground_output.shape(1)) != w0 ||
-      static_cast<int>(foreground_output.shape(2)) != 3 || static_cast<int>(background_output.shape(0)) != h0 ||
-      static_cast<int>(background_output.shape(1)) != w0 || static_cast<int>(background_output.shape(2)) != 3) {
-    throw std::runtime_error("estimate_multilevel_foreground_background_u8: output shapes must match the input image");
   }
 }

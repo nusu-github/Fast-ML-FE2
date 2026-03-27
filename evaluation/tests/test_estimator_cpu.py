@@ -32,17 +32,8 @@ def _build_cached_kernel_inputs(alpha, eps, omega):
     return neighbor_weights, inverse_weight_sum, inverse_weight_sum_plus_one, foreground_gain, background_gain
 
 
-def test_cpu_backend_reexports_native_helpers():
-    expected = {
-        "_build_level_solver_coefficients",
-        "_resize_nearest_rgb",
-        "_resize_nearest_scalar",
-        "_update_red_black_half_step",
-        "_update_red_black_half_step_from_previous_level",
-        "_update_red_black_half_step_from_previous_level_with_boundary_fallback",
-        "estimate_multilevel_foreground_background",
-    }
-    assert expected.issubset(set(cpu_backend.__all__))
+def test_cpu_backend_public_surface_is_minimal():
+    assert cpu_backend.__all__ == ["estimate_multilevel_foreground_background"]
 
 
 class TestResizeNearest:

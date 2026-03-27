@@ -2,119 +2,62 @@
 
 #include "common.hpp"
 
-inline void build_resize_index_map_buffer(int src_size, int dst_size, int *index_map) {
-  for (int i_dst = 0; i_dst < dst_size; ++i_dst) {
-    index_map[i_dst] = std::min(src_size - 1, i_dst * src_size / dst_size);
-  }
-}
+template <typename DstView, typename SrcView, std::size_t Channels>
+inline void resize_nearest_buffer(DstView dst, SrcView src, int h_src, int w_src, int h_dst, int w_dst) {
+  const int src_h_max = h_src - 1;
+  const int src_w_max = w_src - 1;
 
-inline void build_resize_index_map_buffer(int src_size, ResizeIndexMap &index_map) {
-  build_resize_index_map_buffer(src_size, static_cast<int>(index_map.mutable_span().size()), index_map.data());
-}
-
-inline void resize_nearest_rgb_buffer(
-    float *dst,
-    const float *src,
-    int h_src,
-    int w_src,
-    int h_dst,
-    int w_dst
-) {
   for (int y_dst = 0; y_dst < h_dst; ++y_dst) {
-    const int y_src = std::min(h_src - 1, y_dst * h_src / h_dst);
-    const float *src_row = src + static_cast<std::size_t>(y_src) * w_src * 3;
-    float *dst_row = dst + static_cast<std::size_t>(y_dst) * w_dst * 3;
+    const int y_src = clamp_index((y_dst * h_src) / h_dst, src_h_max);
     for (int x_dst = 0; x_dst < w_dst; ++x_dst) {
-      const int x_src = std::min(w_src - 1, x_dst * w_src / w_dst);
-      const float *src_px = src_row + static_cast<std::size_t>(x_src) * 3;
-      float *dst_px = dst_row + static_cast<std::size_t>(x_dst) * 3;
-      dst_px[0] = src_px[0];
-      dst_px[1] = src_px[1];
-      dst_px[2] = src_px[2];
-    }
-  }
-}
-
-inline void resize_nearest_scalar_buffer(float *dst, const float *src, int h_src, int w_src, int h_dst, int w_dst) {
-  for (int y_dst = 0; y_dst < h_dst; ++y_dst) {
-    const int y_src = std::min(h_src - 1, y_dst * h_src / h_dst);
-    const float *src_row = src + static_cast<std::size_t>(y_src) * w_src;
-    float *dst_row = dst + static_cast<std::size_t>(y_dst) * w_dst;
-    for (int x_dst = 0; x_dst < w_dst; ++x_dst) {
-      const int x_src = std::min(w_src - 1, x_dst * w_src / w_dst);
-      dst_row[x_dst] = src_row[x_src];
-    }
-  }
-}
-
-inline void resize_nearest_rgb_u8_buffer(
-    std::uint8_t *dst,
-    const std::uint8_t *src,
-    const int *x_index_map,
-    const int *y_index_map,
-    int w_src,
-    int h_dst,
-    int w_dst
-) {
-  for (int y_dst = 0; y_dst < h_dst; ++y_dst) {
-    const std::uint8_t *src_row = src + static_cast<std::size_t>(y_index_map[y_dst]) * w_src * 3;
-    std::uint8_t *dst_row = dst + static_cast<std::size_t>(y_dst) * w_dst * 3;
-    for (int x_dst = 0; x_dst < w_dst; ++x_dst) {
-      const std::uint8_t *src_px = src_row + static_cast<std::size_t>(x_index_map[x_dst]) * 3;
-      std::uint8_t *dst_px = dst_row + static_cast<std::size_t>(x_dst) * 3;
-      dst_px[0] = src_px[0];
-      dst_px[1] = src_px[1];
-      dst_px[2] = src_px[2];
-    }
-  }
-}
-
-inline void resize_nearest_scalar_u8_buffer(
-    std::uint8_t *dst,
-    const std::uint8_t *src,
-    const int *x_index_map,
-    const int *y_index_map,
-    int w_src,
-    int h_dst,
-    int w_dst
-) {
-  for (int y_dst = 0; y_dst < h_dst; ++y_dst) {
-    const std::uint8_t *src_row = src + static_cast<std::size_t>(y_index_map[y_dst]) * w_src;
-    std::uint8_t *dst_row = dst + static_cast<std::size_t>(y_dst) * w_dst;
-    for (int x_dst = 0; x_dst < w_dst; ++x_dst) {
-      dst_row[x_dst] = src_row[x_index_map[x_dst]];
-    }
-  }
-}
-
-inline void resize_nearest_rgb(MutableImage dst, Image src) {
-  const std::size_t h_src = src.shape(0);
-  const std::size_t w_src = src.shape(1);
-  const std::size_t h_dst = dst.shape(0);
-  const std::size_t w_dst = dst.shape(1);
-
-  for (std::size_t y_dst = 0; y_dst < h_dst; ++y_dst) {
-    const std::size_t y_src = std::min(h_src - 1, y_dst * h_src / h_dst);
-    for (std::size_t x_dst = 0; x_dst < w_dst; ++x_dst) {
-      const std::size_t x_src = std::min(w_src - 1, x_dst * w_src / w_dst);
-      for (std::size_t c = 0; c < 3; ++c) {
-        dst(y_dst, x_dst, c) = src(y_src, x_src, c);
+      const int x_src = clamp_index((x_dst * w_src) / w_dst, src_w_max);
+      if constexpr (Channels == 1) {
+        dst(y_dst, x_dst) = src(y_src, x_src);
+      } else {
+        for (int c : kChannelIndices) {
+          dst(y_dst, x_dst, static_cast<std::size_t>(c)) = src(y_src, x_src, static_cast<std::size_t>(c));
+        }
       }
     }
   }
 }
 
-inline void resize_nearest_scalar(MutableAlpha dst, Alpha src) {
-  const std::size_t h_src = src.shape(0);
-  const std::size_t w_src = src.shape(1);
-  const std::size_t h_dst = dst.shape(0);
-  const std::size_t w_dst = dst.shape(1);
+inline void resize_nearest_rgb_buffer(float *dst, const float *src, int h_src, int w_src, int h_dst, int w_dst) {
+  resize_nearest_buffer<MutableRgbView, ConstRgbView, kChannels>(
+      MutableRgbView {.data = dst, .width = w_dst},
+      ConstRgbView {.data = src, .width = w_src},
+      h_src,
+      w_src,
+      h_dst,
+      w_dst);
+}
 
-  for (std::size_t y_dst = 0; y_dst < h_dst; ++y_dst) {
-    const std::size_t y_src = std::min(h_src - 1, y_dst * h_src / h_dst);
-    for (std::size_t x_dst = 0; x_dst < w_dst; ++x_dst) {
-      const std::size_t x_src = std::min(w_src - 1, x_dst * w_src / w_dst);
-      dst(y_dst, x_dst) = src(y_src, x_src);
-    }
-  }
+inline void resize_nearest_scalar_buffer(float *dst, const float *src, int h_src, int w_src, int h_dst, int w_dst) {
+  resize_nearest_buffer<MutableScalarView, ConstScalarView, 1>(
+      MutableScalarView {.data = dst, .width = w_dst},
+      ConstScalarView {.data = src, .width = w_src},
+      h_src,
+      w_src,
+      h_dst,
+      w_dst);
+}
+
+inline void resize_nearest_rgb(MutableImage dst, Image src) {
+  resize_nearest_rgb_buffer(
+      dst.data(),
+      src.data(),
+      static_cast<int>(src.shape(0)),
+      static_cast<int>(src.shape(1)),
+      static_cast<int>(dst.shape(0)),
+      static_cast<int>(dst.shape(1)));
+}
+
+inline void resize_nearest_scalar(MutableAlpha dst, Alpha src) {
+  resize_nearest_scalar_buffer(
+      dst.data(),
+      src.data(),
+      static_cast<int>(src.shape(0)),
+      static_cast<int>(src.shape(1)),
+      static_cast<int>(dst.shape(0)),
+      static_cast<int>(dst.shape(1)));
 }

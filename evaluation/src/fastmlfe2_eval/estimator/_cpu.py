@@ -22,13 +22,6 @@ if TYPE_CHECKING:
     from fastmlfe2_eval.estimator._types import EstimatorParams
 
 __all__ = [
-    "_build_level_solver_coefficients",
-    "_resize_index_map",
-    "_resize_nearest_scalar",
-    "_resize_nearest_rgb",
-    "_update_red_black_half_step",
-    "_update_red_black_half_step_from_previous_level",
-    "_update_red_black_half_step_from_previous_level_with_boundary_fallback",
     "estimate_multilevel_foreground_background",
 ]
 
