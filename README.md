@@ -46,6 +46,9 @@ FastMLFE2/
 │   ├── ClampPlacement.lean         ← projection variants (raw / inside-clamped / end-clamped)
 │   ├── LocalCommitments.lean       ← stencil, resize rule, iteration semantics
 │   └── MultilevelSchedule.lean     ← level-size computation
+├── Evaluation/
+│   ├── ForegroundMetrics.lean      ← RGB image model; paper SAD/MSE; abstract GRAD
+│   └── AdversarialFamilies.lean    ← near-opaque alpha and saturating black/white families
 ├── Approximation/
 │   └── BlurFusion.lean             ← idealized PhotoRoom Blur-Fusion surrogate
 ├── Assumptions/
@@ -86,7 +89,8 @@ FastMLFE2/
     ├── GridAssumptions.lean        ← GridMathAssumptions → CoreMathAssumptions bridge
     ├── GridLocal.lean              ← closed-form theorems on GridPixelData.localCtx
     ├── InteriorKernel.lean         ← closed-form theorems on interior-pixel context
-    └── CanonicalBuilder.lean       ← field-correctness for canonical builders
+    ├── CanonicalBuilder.lean       ← field-correctness for canonical builders
+    └── ForegroundMetrics.lean      ← SAD/MSE bounds and adversarial-family equalities
 ```
 
 Experimental modules (not part of the default umbrella import):
@@ -131,6 +135,11 @@ pipeline stages:
   across same-weight contexts. Formally guarantees shared-matrix reuse in RGB processing.
 - **Compositing Error** — `|compose α F B − compose α F' B'| ≤ |α|·|F−F'| + |1−α|·|B−B'|`;
   authored corollary with simplified weights when `0 ≤ α ≤ 1`.
+- **Foreground Metrics** — Paper `SAD` and weighted-sum `MSE` on RGB images over the
+  translucent region, plus an abstract `GRAD` interface for later Gaussian-derivative
+  instantiation.
+- **Adversarial Metric Families** — Near-opaque alpha support families and saturating
+  black/white RGB witnesses; exact `SAD`/`MSE` values and near-attainment lemmas.
 - **MeanResidualBounds** — `|meanResidual| ≤ 1` under boxed inputs; foreground/background
   correction bounds.
 - **ResidualCompositeBounds** — exact compositing error in terms of `meanResidual`; finite-family
