@@ -5,6 +5,14 @@
 
 namespace {
 
+#if defined(__GNUC__) || defined(__clang__)
+#define FX_ALWAYS_INLINE inline __attribute__((always_inline))
+#define FX_RESTRICT __restrict__
+#else
+#define FX_ALWAYS_INLINE inline
+#define FX_RESTRICT
+#endif
+
 constexpr std::uint32_t kFxWeightScale = 1u << 16;
 constexpr std::uint32_t kFxRecipFracBits = 24;
 constexpr std::uint64_t kFxRecipScale = 1ull << kFxRecipFracBits;
@@ -16,14 +24,50 @@ constexpr std::uint32_t kFxStateScale = 1u << kFxStateFracBits;
 constexpr std::uint32_t kFxStateMax = kAlphaCodeScale * kFxStateScale;
 constexpr std::uint8_t kAlphaLowThreshold = 2;
 constexpr std::uint8_t kAlphaHighThreshold = 253;
+constexpr std::uint8_t kBranchLow = 0;
+constexpr std::uint8_t kBranchInterior = 1;
+constexpr std::uint8_t kBranchHigh = 2;
+constexpr std::uint32_t kMaxTotalWeight = 4u * std::numeric_limits<std::uint16_t>::max();
+constexpr std::uint64_t kGainSumNumerator = static_cast<std::uint64_t>(kAlphaCodeScale) * kFxCodeRecipNumerator;
+
+inline std::uint32_t div_round_u64_to_u32(std::uint64_t numerator, std::uint64_t denominator);
+
+struct FxCoefficientTables {
+  std::vector<std::uint32_t> inverse_weight_sum;
+  std::vector<std::uint32_t> inverse_weight_sum_plus_one;
+  std::array<std::uint32_t, 256> alpha_quad {};
+
+  FxCoefficientTables()
+      : inverse_weight_sum(static_cast<std::size_t>(kMaxTotalWeight) + 1u),
+        inverse_weight_sum_plus_one(static_cast<std::size_t>(kMaxTotalWeight) + 1u) {
+    inverse_weight_sum[0] = 0;
+    inverse_weight_sum_plus_one[0] = 0;
+    for (std::uint32_t W = 1; W <= kMaxTotalWeight; ++W) {
+      inverse_weight_sum[W] = div_round_u64_to_u32(kFxRecipScale, W);
+      inverse_weight_sum_plus_one[W] = div_round_u64_to_u32(
+          kFxCodeRecipNumerator,
+          static_cast<std::uint64_t>(kAlphaCodeScale) * (static_cast<std::uint64_t>(W) + kFxWeightScale));
+    }
+    for (std::uint32_t a0 = 0; a0 < 256u; ++a0) {
+      const std::uint32_t alpha_comp = kAlphaCodeScale - a0;
+      alpha_quad[a0] = a0 * a0 + alpha_comp * alpha_comp;
+    }
+  }
+};
+
+FX_ALWAYS_INLINE const FxCoefficientTables &fx_coefficient_tables() {
+  static const FxCoefficientTables tables;
+  return tables;
+}
 
 struct FxU8Workspace {
-  std::vector<std::uint16_t> previous_foreground_storage;
-  std::vector<std::uint16_t> previous_background_storage;
-  std::vector<std::uint16_t> current_foreground_storage;
-  std::vector<std::uint16_t> current_background_storage;
-  std::vector<std::uint8_t> image;
+  std::array<std::vector<std::uint16_t>, 3> previous_foreground_storage;
+  std::array<std::vector<std::uint16_t>, 3> previous_background_storage;
+  std::array<std::vector<std::uint16_t>, 3> current_foreground_storage;
+  std::array<std::vector<std::uint16_t>, 3> current_background_storage;
+  std::array<std::vector<std::uint32_t>, 3> image_term;
   std::vector<std::uint8_t> alpha;
+  std::vector<std::uint8_t> branch_mode;
   std::vector<std::uint16_t> neighbor_weights;
   std::vector<std::uint32_t> inverse_weight_sum;
   std::vector<std::uint32_t> inverse_weight_sum_plus_one;
@@ -41,13 +85,16 @@ struct FxU8Workspace {
   FxU8Workspace() : weight_lut(256u * 256u) {}
 
   void ensure_capacity(std::size_t max_pixels) {
-    previous_foreground_storage.resize(max_pixels * 3);
-    previous_background_storage.resize(max_pixels * 3);
-    current_foreground_storage.resize(max_pixels * 3);
-    current_background_storage.resize(max_pixels * 3);
-    image.resize(max_pixels * 3);
+    for (int c = 0; c < 3; ++c) {
+      previous_foreground_storage[c].resize(max_pixels);
+      previous_background_storage[c].resize(max_pixels);
+      current_foreground_storage[c].resize(max_pixels);
+      current_background_storage[c].resize(max_pixels);
+      image_term[c].resize(max_pixels);
+    }
     alpha.resize(max_pixels);
-    neighbor_weights.resize(max_pixels * 4);
+    branch_mode.resize(max_pixels);
+    neighbor_weights.resize(max_pixels * 4u);
     inverse_weight_sum.resize(max_pixels);
     inverse_weight_sum_plus_one.resize(max_pixels);
     foreground_gain.resize(max_pixels);
@@ -66,17 +113,17 @@ struct FxU8Workspace {
   }
 };
 
-inline std::uint8_t clamp_u8_from_int(int value) {
+FX_ALWAYS_INLINE std::uint8_t clamp_u8_from_int(int value) {
   return static_cast<std::uint8_t>(std::clamp(value, 0, 255));
 }
 
-inline std::uint16_t clamp_state_from_int(int value) {
+FX_ALWAYS_INLINE std::uint16_t clamp_state_from_int(int value) {
   return static_cast<std::uint16_t>(std::clamp(value, 0, static_cast<int>(kFxStateMax)));
 }
 
-inline std::uint8_t quantize_state_to_u8(std::uint16_t state_code) {
-  return clamp_u8_from_int((static_cast<int>(state_code) + static_cast<int>(kFxStateScale / 2u)) >>
-                           kFxStateFracBits);
+FX_ALWAYS_INLINE std::uint8_t quantize_state_to_u8(std::uint16_t state_code) {
+  return clamp_u8_from_int(
+      (static_cast<int>(state_code) + static_cast<int>(kFxStateScale / 2u)) >> kFxStateFracBits);
 }
 
 inline std::uint16_t quantize_q16_checked(double value, const char *name) {
@@ -105,25 +152,36 @@ inline std::uint16_t quantize_gradient_step_q16_checked(double gradient_weight) 
   return static_cast<std::uint16_t>(quantized);
 }
 
-inline std::uint32_t div_round_u64_to_u32(std::uint64_t numerator, std::uint64_t denominator) {
+FX_ALWAYS_INLINE std::uint32_t div_round_u64_to_u32(std::uint64_t numerator, std::uint64_t denominator) {
   return static_cast<std::uint32_t>((numerator + denominator / 2u) / denominator);
 }
 
-inline std::int64_t mul_q24_round_signed_i64(std::int64_t value, std::uint32_t coeff_q24) {
-  const std::int64_t product = value * static_cast<std::int64_t>(coeff_q24);
-  const std::int64_t bias = static_cast<std::int64_t>(1) << (kFxRecipFracBits - 1);
-  if (product >= 0) {
-    return (product + bias) >> kFxRecipFracBits;
-  }
-  return -(((-product) + bias) >> kFxRecipFracBits);
+FX_ALWAYS_INLINE std::uint32_t div_round_u32_by_255(std::uint32_t value) {
+  return (value + 127u) / kAlphaCodeScale;
 }
 
-inline int round_q24_to_int(std::int64_t value_q24) {
+FX_ALWAYS_INLINE std::int64_t mul_q24_round_signed_i64(std::int64_t value, std::uint32_t coeff_q24) {
+  const std::int64_t product = value * static_cast<std::int64_t>(coeff_q24);
   const std::int64_t bias = static_cast<std::int64_t>(1) << (kFxRecipFracBits - 1);
-  if (value_q24 >= 0) {
-    return static_cast<int>((value_q24 + bias) >> kFxRecipFracBits);
-  }
-  return -static_cast<int>(((-value_q24) + bias) >> kFxRecipFracBits);
+  return product >= 0 ? ((product + bias) >> kFxRecipFracBits) : -(((-product) + bias) >> kFxRecipFracBits);
+}
+
+FX_ALWAYS_INLINE int round_q24_to_int(std::int64_t value_q24) {
+  const std::int64_t bias = static_cast<std::int64_t>(1) << (kFxRecipFracBits - 1);
+  return value_q24 >= 0 ? static_cast<int>((value_q24 + bias) >> kFxRecipFracBits)
+                        : -static_cast<int>(((-value_q24) + bias) >> kFxRecipFracBits);
+}
+
+FX_ALWAYS_INLINE std::uint16_t corrected_state_from_q24(
+    std::int64_t mean_q24,
+    std::int64_t residual_q24,
+    std::uint32_t coeff_q24
+) {
+  return clamp_state_from_int(round_q24_to_int(mean_q24 + mul_q24_round_signed_i64(residual_q24, coeff_q24)));
+}
+
+FX_ALWAYS_INLINE std::uint16_t mean_state_from_q24(std::int64_t mean_q24) {
+  return clamp_state_from_int(round_q24_to_int(mean_q24));
 }
 
 inline void compute_initial_means_fx_u8_buffer(
@@ -144,7 +202,7 @@ inline void compute_initial_means_fx_u8_buffer(
       const std::size_t idx =
           scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
       const std::uint8_t a0 = alpha[idx];
-      const std::uint8_t *px = image + idx * 3;
+      const std::uint8_t *px = image + idx * 3u;
       if (a0 >= 230) {
         fg_sum[0] += px[0];
         fg_sum[1] += px[1];
@@ -189,7 +247,31 @@ inline void build_weight_lut_fx_u8_buffer(
   workspace.mark_weight_lut_ready(regularization_q16, gradient_step_q16);
 }
 
-inline void resize_nearest_rgb_u16_buffer(
+inline void resize_nearest_rgb_u8_to_image_terms(
+    std::uint32_t *dst_r,
+    std::uint32_t *dst_g,
+    std::uint32_t *dst_b,
+    const std::uint8_t *src,
+    const int *x_index_map,
+    const int *y_index_map,
+    int w_src,
+    int h_dst,
+    int w_dst
+) {
+  for (int y_dst = 0; y_dst < h_dst; ++y_dst) {
+    const std::uint8_t *src_row = src + static_cast<std::size_t>(y_index_map[y_dst]) * w_src * 3u;
+    const std::size_t dst_row_offset = static_cast<std::size_t>(y_dst) * static_cast<std::size_t>(w_dst);
+    for (int x_dst = 0; x_dst < w_dst; ++x_dst) {
+      const std::uint8_t *src_px = src_row + static_cast<std::size_t>(x_index_map[x_dst]) * 3u;
+      const std::size_t dst_idx = dst_row_offset + static_cast<std::size_t>(x_dst);
+      dst_r[dst_idx] = kAlphaCodeScale * static_cast<std::uint32_t>(src_px[0]) * kFxStateScale;
+      dst_g[dst_idx] = kAlphaCodeScale * static_cast<std::uint32_t>(src_px[1]) * kFxStateScale;
+      dst_b[dst_idx] = kAlphaCodeScale * static_cast<std::uint32_t>(src_px[2]) * kFxStateScale;
+    }
+  }
+}
+
+inline void resize_nearest_planar_u16_buffer(
     std::uint16_t *dst,
     const std::uint16_t *src,
     const int *x_index_map,
@@ -199,54 +281,39 @@ inline void resize_nearest_rgb_u16_buffer(
     int w_dst
 ) {
   for (int y_dst = 0; y_dst < h_dst; ++y_dst) {
-    const std::uint16_t *src_row = src + static_cast<std::size_t>(y_index_map[y_dst]) * w_src * 3;
-    std::uint16_t *dst_row = dst + static_cast<std::size_t>(y_dst) * w_dst * 3;
+    const std::uint16_t *src_row = src + static_cast<std::size_t>(y_index_map[y_dst]) * static_cast<std::size_t>(w_src);
+    std::uint16_t *dst_row = dst + static_cast<std::size_t>(y_dst) * static_cast<std::size_t>(w_dst);
     for (int x_dst = 0; x_dst < w_dst; ++x_dst) {
-      const std::uint16_t *src_px = src_row + static_cast<std::size_t>(x_index_map[x_dst]) * 3;
-      std::uint16_t *dst_px = dst_row + static_cast<std::size_t>(x_dst) * 3;
-      dst_px[0] = src_px[0];
-      dst_px[1] = src_px[1];
-      dst_px[2] = src_px[2];
+      dst_row[x_dst] = src_row[x_index_map[x_dst]];
     }
   }
 }
 
 inline void build_level_solver_coefficients_fx_u8_buffer(FxU8Workspace &workspace, int h, int w) {
+  const FxCoefficientTables &tables = fx_coefficient_tables();
   for (int y = 0; y < h; ++y) {
+    const std::size_t row_offset = static_cast<std::size_t>(y) * static_cast<std::size_t>(w);
+    const int y_up = y == 0 ? 0 : y - 1;
+    const int y_down = y + 1 >= h ? h - 1 : y + 1;
     for (int x = 0; x < w; ++x) {
-      const std::size_t idx =
-          scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
+      const std::size_t idx = row_offset + static_cast<std::size_t>(x);
       const std::uint8_t a0 = workspace.alpha[idx];
       const int x_left = x == 0 ? 0 : x - 1;
       const int x_right = x + 1 >= w ? w - 1 : x + 1;
-      const int y_up = y == 0 ? 0 : y - 1;
-      const int y_down = y + 1 >= h ? h - 1 : y + 1;
 
-      const std::uint16_t w0 =
-          workspace.weight_lut[static_cast<std::size_t>(a0) * 256u + workspace.alpha[scalar_index(
-                                                                                static_cast<std::size_t>(y),
-                                                                                static_cast<std::size_t>(x_left),
-                                                                                static_cast<std::size_t>(w))]];
-      const std::uint16_t w1 =
-          workspace.weight_lut[static_cast<std::size_t>(a0) * 256u + workspace.alpha[scalar_index(
-                                                                                static_cast<std::size_t>(y),
-                                                                                static_cast<std::size_t>(x_right),
-                                                                                static_cast<std::size_t>(w))]];
-      const std::uint16_t w2 =
-          workspace.weight_lut[static_cast<std::size_t>(a0) * 256u + workspace.alpha[scalar_index(
-                                                                                static_cast<std::size_t>(y_up),
-                                                                                static_cast<std::size_t>(x),
-                                                                                static_cast<std::size_t>(w))]];
-      const std::uint16_t w3 =
-          workspace.weight_lut[static_cast<std::size_t>(a0) * 256u + workspace.alpha[scalar_index(
-                                                                                static_cast<std::size_t>(y_down),
-                                                                                static_cast<std::size_t>(x),
-                                                                                static_cast<std::size_t>(w))]];
+      const std::uint16_t w0 = workspace.weight_lut[static_cast<std::size_t>(a0) * 256u +
+          workspace.alpha[scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x_left), static_cast<std::size_t>(w))]];
+      const std::uint16_t w1 = workspace.weight_lut[static_cast<std::size_t>(a0) * 256u +
+          workspace.alpha[scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x_right), static_cast<std::size_t>(w))]];
+      const std::uint16_t w2 = workspace.weight_lut[static_cast<std::size_t>(a0) * 256u +
+          workspace.alpha[scalar_index(static_cast<std::size_t>(y_up), static_cast<std::size_t>(x), static_cast<std::size_t>(w))]];
+      const std::uint16_t w3 = workspace.weight_lut[static_cast<std::size_t>(a0) * 256u +
+          workspace.alpha[scalar_index(static_cast<std::size_t>(y_down), static_cast<std::size_t>(x), static_cast<std::size_t>(w))]];
 
-      workspace.neighbor_weights[idx * 4 + 0] = w0;
-      workspace.neighbor_weights[idx * 4 + 1] = w1;
-      workspace.neighbor_weights[idx * 4 + 2] = w2;
-      workspace.neighbor_weights[idx * 4 + 3] = w3;
+      workspace.neighbor_weights[idx * 4u + 0] = w0;
+      workspace.neighbor_weights[idx * 4u + 1] = w1;
+      workspace.neighbor_weights[idx * 4u + 2] = w2;
+      workspace.neighbor_weights[idx * 4u + 3] = w3;
 
       const std::uint32_t W =
           static_cast<std::uint32_t>(w0) + static_cast<std::uint32_t>(w1) + static_cast<std::uint32_t>(w2) +
@@ -256,34 +323,145 @@ inline void build_level_solver_coefficients_fx_u8_buffer(FxU8Workspace &workspac
             "estimate_multilevel_foreground_background_fx_u8: zero total weight is unsupported");
       }
 
-      workspace.inverse_weight_sum[idx] = div_round_u64_to_u32(kFxRecipScale, W);
-      workspace.inverse_weight_sum_plus_one[idx] =
-          div_round_u64_to_u32(kFxCodeRecipNumerator, static_cast<std::uint64_t>(kAlphaCodeScale) * (W + kFxWeightScale));
+      workspace.inverse_weight_sum[idx] = tables.inverse_weight_sum[W];
+      workspace.inverse_weight_sum_plus_one[idx] = tables.inverse_weight_sum_plus_one[W];
 
-      const std::uint32_t alpha_comp = kAlphaCodeScale - a0;
-      const std::uint32_t alpha_quad =
-          static_cast<std::uint32_t>(a0) * static_cast<std::uint32_t>(a0) + alpha_comp * alpha_comp;
+      const std::uint32_t alpha_quad = tables.alpha_quad[a0];
       const std::uint64_t gain_denominator =
           static_cast<std::uint64_t>(kAlphaSquareDenom) * W +
           static_cast<std::uint64_t>(kFxWeightScale) * alpha_quad;
+      const std::uint32_t gain_sum = div_round_u64_to_u32(kGainSumNumerator, gain_denominator);
       workspace.foreground_gain[idx] =
-          div_round_u64_to_u32(static_cast<std::uint64_t>(a0) * kFxCodeRecipNumerator, gain_denominator);
-      workspace.background_gain[idx] =
-          div_round_u64_to_u32(static_cast<std::uint64_t>(alpha_comp) * kFxCodeRecipNumerator, gain_denominator);
+          div_round_u32_by_255(static_cast<std::uint32_t>(gain_sum * static_cast<std::uint32_t>(a0)));
+      workspace.background_gain[idx] = gain_sum - workspace.foreground_gain[idx];
+
+      workspace.branch_mode[idx] = a0 <= kAlphaLowThreshold ? kBranchLow
+                                  : (a0 >= kAlphaHighThreshold ? kBranchHigh : kBranchInterior);
     }
   }
 }
 
+FX_ALWAYS_INLINE void update_pixel_fx_u8(
+    std::size_t idx,
+    std::size_t idx_left,
+    std::size_t idx_right,
+    std::size_t idx_up,
+    std::size_t idx_down,
+    std::uint16_t *FX_RESTRICT fg_r,
+    std::uint16_t *FX_RESTRICT fg_g,
+    std::uint16_t *FX_RESTRICT fg_b,
+    std::uint16_t *FX_RESTRICT bg_r,
+    std::uint16_t *FX_RESTRICT bg_g,
+    std::uint16_t *FX_RESTRICT bg_b,
+    const std::uint32_t *FX_RESTRICT image_r,
+    const std::uint32_t *FX_RESTRICT image_g,
+    const std::uint32_t *FX_RESTRICT image_b,
+    const std::uint8_t *FX_RESTRICT alpha,
+    const std::uint8_t *FX_RESTRICT branch_mode,
+    const std::uint16_t *FX_RESTRICT neighbor_weights,
+    const std::uint32_t *FX_RESTRICT inverse_weight_sum,
+    const std::uint32_t *FX_RESTRICT inverse_weight_sum_plus_one,
+    const std::uint32_t *FX_RESTRICT foreground_gain,
+    const std::uint32_t *FX_RESTRICT background_gain
+) {
+  const std::uint16_t *weights = neighbor_weights + idx * 4u;
+  const std::uint32_t w0 = weights[0];
+  const std::uint32_t w1 = weights[1];
+  const std::uint32_t w2 = weights[2];
+  const std::uint32_t w3 = weights[3];
+
+  const std::uint64_t fg_sum_r = static_cast<std::uint64_t>(w0) * fg_r[idx_left] +
+      static_cast<std::uint64_t>(w1) * fg_r[idx_right] + static_cast<std::uint64_t>(w2) * fg_r[idx_up] +
+      static_cast<std::uint64_t>(w3) * fg_r[idx_down];
+  const std::uint64_t fg_sum_g = static_cast<std::uint64_t>(w0) * fg_g[idx_left] +
+      static_cast<std::uint64_t>(w1) * fg_g[idx_right] + static_cast<std::uint64_t>(w2) * fg_g[idx_up] +
+      static_cast<std::uint64_t>(w3) * fg_g[idx_down];
+  const std::uint64_t fg_sum_b = static_cast<std::uint64_t>(w0) * fg_b[idx_left] +
+      static_cast<std::uint64_t>(w1) * fg_b[idx_right] + static_cast<std::uint64_t>(w2) * fg_b[idx_up] +
+      static_cast<std::uint64_t>(w3) * fg_b[idx_down];
+  const std::uint64_t bg_sum_r = static_cast<std::uint64_t>(w0) * bg_r[idx_left] +
+      static_cast<std::uint64_t>(w1) * bg_r[idx_right] + static_cast<std::uint64_t>(w2) * bg_r[idx_up] +
+      static_cast<std::uint64_t>(w3) * bg_r[idx_down];
+  const std::uint64_t bg_sum_g = static_cast<std::uint64_t>(w0) * bg_g[idx_left] +
+      static_cast<std::uint64_t>(w1) * bg_g[idx_right] + static_cast<std::uint64_t>(w2) * bg_g[idx_up] +
+      static_cast<std::uint64_t>(w3) * bg_g[idx_down];
+  const std::uint64_t bg_sum_b = static_cast<std::uint64_t>(w0) * bg_b[idx_left] +
+      static_cast<std::uint64_t>(w1) * bg_b[idx_right] + static_cast<std::uint64_t>(w2) * bg_b[idx_up] +
+      static_cast<std::uint64_t>(w3) * bg_b[idx_down];
+
+  const std::uint32_t inv_w = inverse_weight_sum[idx];
+  const std::int64_t mu_f_r_q24 = static_cast<std::int64_t>(fg_sum_r) * static_cast<std::int64_t>(inv_w);
+  const std::int64_t mu_f_g_q24 = static_cast<std::int64_t>(fg_sum_g) * static_cast<std::int64_t>(inv_w);
+  const std::int64_t mu_f_b_q24 = static_cast<std::int64_t>(fg_sum_b) * static_cast<std::int64_t>(inv_w);
+  const std::int64_t mu_b_r_q24 = static_cast<std::int64_t>(bg_sum_r) * static_cast<std::int64_t>(inv_w);
+  const std::int64_t mu_b_g_q24 = static_cast<std::int64_t>(bg_sum_g) * static_cast<std::int64_t>(inv_w);
+  const std::int64_t mu_b_b_q24 = static_cast<std::int64_t>(bg_sum_b) * static_cast<std::int64_t>(inv_w);
+
+  const int alpha_code = static_cast<int>(alpha[idx]);
+  const int alpha_comp_code = static_cast<int>(kAlphaCodeScale - alpha[idx]);
+  const std::int64_t image_r_q24 = static_cast<std::int64_t>(image_r[idx]) << kFxRecipFracBits;
+  const std::int64_t image_g_q24 = static_cast<std::int64_t>(image_g[idx]) << kFxRecipFracBits;
+  const std::int64_t image_b_q24 = static_cast<std::int64_t>(image_b[idx]) << kFxRecipFracBits;
+
+  const std::int64_t residual_r_q24 =
+      image_r_q24 - static_cast<std::int64_t>(alpha_code) * mu_f_r_q24 -
+      static_cast<std::int64_t>(alpha_comp_code) * mu_b_r_q24;
+  const std::int64_t residual_g_q24 =
+      image_g_q24 - static_cast<std::int64_t>(alpha_code) * mu_f_g_q24 -
+      static_cast<std::int64_t>(alpha_comp_code) * mu_b_g_q24;
+  const std::int64_t residual_b_q24 =
+      image_b_q24 - static_cast<std::int64_t>(alpha_code) * mu_f_b_q24 -
+      static_cast<std::int64_t>(alpha_comp_code) * mu_b_b_q24;
+
+  if (branch_mode[idx] == kBranchLow) {
+    fg_r[idx] = mean_state_from_q24(mu_f_r_q24);
+    fg_g[idx] = mean_state_from_q24(mu_f_g_q24);
+    fg_b[idx] = mean_state_from_q24(mu_f_b_q24);
+    const std::uint32_t coeff = inverse_weight_sum_plus_one[idx];
+    bg_r[idx] = corrected_state_from_q24(mu_b_r_q24, residual_r_q24, coeff);
+    bg_g[idx] = corrected_state_from_q24(mu_b_g_q24, residual_g_q24, coeff);
+    bg_b[idx] = corrected_state_from_q24(mu_b_b_q24, residual_b_q24, coeff);
+    return;
+  }
+
+  if (branch_mode[idx] == kBranchHigh) {
+    const std::uint32_t coeff = inverse_weight_sum_plus_one[idx];
+    fg_r[idx] = corrected_state_from_q24(mu_f_r_q24, residual_r_q24, coeff);
+    fg_g[idx] = corrected_state_from_q24(mu_f_g_q24, residual_g_q24, coeff);
+    fg_b[idx] = corrected_state_from_q24(mu_f_b_q24, residual_b_q24, coeff);
+    bg_r[idx] = mean_state_from_q24(mu_b_r_q24);
+    bg_g[idx] = mean_state_from_q24(mu_b_g_q24);
+    bg_b[idx] = mean_state_from_q24(mu_b_b_q24);
+    return;
+  }
+
+  const std::uint32_t fg_coeff = foreground_gain[idx];
+  const std::uint32_t bg_coeff = background_gain[idx];
+  fg_r[idx] = corrected_state_from_q24(mu_f_r_q24, residual_r_q24, fg_coeff);
+  fg_g[idx] = corrected_state_from_q24(mu_f_g_q24, residual_g_q24, fg_coeff);
+  fg_b[idx] = corrected_state_from_q24(mu_f_b_q24, residual_b_q24, fg_coeff);
+  bg_r[idx] = corrected_state_from_q24(mu_b_r_q24, residual_r_q24, bg_coeff);
+  bg_g[idx] = corrected_state_from_q24(mu_b_g_q24, residual_g_q24, bg_coeff);
+  bg_b[idx] = corrected_state_from_q24(mu_b_b_q24, residual_b_q24, bg_coeff);
+}
+
 inline void update_red_black_half_step_fx_u8_buffer(
-    std::uint16_t *foreground,
-    std::uint16_t *background,
-    const std::uint8_t *image,
-    const std::uint8_t *alpha,
-    const std::uint16_t *neighbor_weights,
-    const std::uint32_t *inverse_weight_sum,
-    const std::uint32_t *inverse_weight_sum_plus_one,
-    const std::uint32_t *foreground_gain,
-    const std::uint32_t *background_gain,
+    std::uint16_t *FX_RESTRICT fg_r,
+    std::uint16_t *FX_RESTRICT fg_g,
+    std::uint16_t *FX_RESTRICT fg_b,
+    std::uint16_t *FX_RESTRICT bg_r,
+    std::uint16_t *FX_RESTRICT bg_g,
+    std::uint16_t *FX_RESTRICT bg_b,
+    const std::uint32_t *FX_RESTRICT image_r,
+    const std::uint32_t *FX_RESTRICT image_g,
+    const std::uint32_t *FX_RESTRICT image_b,
+    const std::uint8_t *FX_RESTRICT alpha,
+    const std::uint8_t *FX_RESTRICT branch_mode,
+    const std::uint16_t *FX_RESTRICT neighbor_weights,
+    const std::uint32_t *FX_RESTRICT inverse_weight_sum,
+    const std::uint32_t *FX_RESTRICT inverse_weight_sum_plus_one,
+    const std::uint32_t *FX_RESTRICT foreground_gain,
+    const std::uint32_t *FX_RESTRICT background_gain,
     int h,
     int w,
     int color
@@ -292,138 +470,38 @@ inline void update_red_black_half_step_fx_u8_buffer(
     return;
   }
 
-  auto weighted_mean_state_q24 = [](std::uint64_t weighted_sum, std::uint32_t inverse_weight_sum_q24) {
-    return static_cast<std::int64_t>(weighted_sum) * static_cast<std::int64_t>(inverse_weight_sum_q24);
-  };
-
-  auto process_pixel = [&](int y, int x) {
-    const std::size_t idx =
-        scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
-    const std::uint8_t alpha0 = alpha[idx];
-    const int x_left = x == 0 ? 0 : x - 1;
-    const int x_right = x + 1 >= w ? w - 1 : x + 1;
-    const int y_up = y == 0 ? 0 : y - 1;
-    const int y_down = y + 1 >= h ? h - 1 : y + 1;
-
-    const std::size_t idx_left =
-        scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x_left), static_cast<std::size_t>(w));
-    const std::size_t idx_right =
-        scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x_right), static_cast<std::size_t>(w));
-    const std::size_t idx_up =
-        scalar_index(static_cast<std::size_t>(y_up), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
-    const std::size_t idx_down =
-        scalar_index(static_cast<std::size_t>(y_down), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
-
-    const std::uint32_t w0 = neighbor_weights[idx * 4 + 0];
-    const std::uint32_t w1 = neighbor_weights[idx * 4 + 1];
-    const std::uint32_t w2 = neighbor_weights[idx * 4 + 2];
-    const std::uint32_t w3 = neighbor_weights[idx * 4 + 3];
-
-    const std::uint64_t fg_sum_r = static_cast<std::uint64_t>(w0) * foreground[idx_left * 3 + 0] +
-        static_cast<std::uint64_t>(w1) * foreground[idx_right * 3 + 0] +
-        static_cast<std::uint64_t>(w2) * foreground[idx_up * 3 + 0] +
-        static_cast<std::uint64_t>(w3) * foreground[idx_down * 3 + 0];
-    const std::uint64_t fg_sum_g = static_cast<std::uint64_t>(w0) * foreground[idx_left * 3 + 1] +
-        static_cast<std::uint64_t>(w1) * foreground[idx_right * 3 + 1] +
-        static_cast<std::uint64_t>(w2) * foreground[idx_up * 3 + 1] +
-        static_cast<std::uint64_t>(w3) * foreground[idx_down * 3 + 1];
-    const std::uint64_t fg_sum_b = static_cast<std::uint64_t>(w0) * foreground[idx_left * 3 + 2] +
-        static_cast<std::uint64_t>(w1) * foreground[idx_right * 3 + 2] +
-        static_cast<std::uint64_t>(w2) * foreground[idx_up * 3 + 2] +
-        static_cast<std::uint64_t>(w3) * foreground[idx_down * 3 + 2];
-    const std::uint64_t bg_sum_r = static_cast<std::uint64_t>(w0) * background[idx_left * 3 + 0] +
-        static_cast<std::uint64_t>(w1) * background[idx_right * 3 + 0] +
-        static_cast<std::uint64_t>(w2) * background[idx_up * 3 + 0] +
-        static_cast<std::uint64_t>(w3) * background[idx_down * 3 + 0];
-    const std::uint64_t bg_sum_g = static_cast<std::uint64_t>(w0) * background[idx_left * 3 + 1] +
-        static_cast<std::uint64_t>(w1) * background[idx_right * 3 + 1] +
-        static_cast<std::uint64_t>(w2) * background[idx_up * 3 + 1] +
-        static_cast<std::uint64_t>(w3) * background[idx_down * 3 + 1];
-    const std::uint64_t bg_sum_b = static_cast<std::uint64_t>(w0) * background[idx_left * 3 + 2] +
-        static_cast<std::uint64_t>(w1) * background[idx_right * 3 + 2] +
-        static_cast<std::uint64_t>(w2) * background[idx_up * 3 + 2] +
-        static_cast<std::uint64_t>(w3) * background[idx_down * 3 + 2];
-
-    const std::int64_t mu_f_r_q24 = weighted_mean_state_q24(fg_sum_r, inverse_weight_sum[idx]);
-    const std::int64_t mu_f_g_q24 = weighted_mean_state_q24(fg_sum_g, inverse_weight_sum[idx]);
-    const std::int64_t mu_f_b_q24 = weighted_mean_state_q24(fg_sum_b, inverse_weight_sum[idx]);
-    const std::int64_t mu_b_r_q24 = weighted_mean_state_q24(bg_sum_r, inverse_weight_sum[idx]);
-    const std::int64_t mu_b_g_q24 = weighted_mean_state_q24(bg_sum_g, inverse_weight_sum[idx]);
-    const std::int64_t mu_b_b_q24 = weighted_mean_state_q24(bg_sum_b, inverse_weight_sum[idx]);
-
-    const std::size_t image_idx = idx * 3;
-    const int alpha_code = static_cast<int>(alpha0);
-    const int alpha_comp_code = static_cast<int>(kAlphaCodeScale - alpha0);
-    const int image_r = image[image_idx + 0];
-    const int image_g = image[image_idx + 1];
-    const int image_b = image[image_idx + 2];
-
-    const std::int64_t image_r_q24 = static_cast<std::int64_t>(kAlphaCodeScale) * image_r *
-        static_cast<std::int64_t>(kFxStateScale) * static_cast<std::int64_t>(kFxRecipScale);
-    const std::int64_t image_g_q24 = static_cast<std::int64_t>(kAlphaCodeScale) * image_g *
-        static_cast<std::int64_t>(kFxStateScale) * static_cast<std::int64_t>(kFxRecipScale);
-    const std::int64_t image_b_q24 = static_cast<std::int64_t>(kAlphaCodeScale) * image_b *
-        static_cast<std::int64_t>(kFxStateScale) * static_cast<std::int64_t>(kFxRecipScale);
-
-    const std::int64_t residual_r_q24 =
-        image_r_q24 - static_cast<std::int64_t>(alpha_code) * mu_f_r_q24 -
-        static_cast<std::int64_t>(alpha_comp_code) * mu_b_r_q24;
-    const std::int64_t residual_g_q24 =
-        image_g_q24 - static_cast<std::int64_t>(alpha_code) * mu_f_g_q24 -
-        static_cast<std::int64_t>(alpha_comp_code) * mu_b_g_q24;
-    const std::int64_t residual_b_q24 =
-        image_b_q24 - static_cast<std::int64_t>(alpha_code) * mu_f_b_q24 -
-        static_cast<std::int64_t>(alpha_comp_code) * mu_b_b_q24;
-
-    std::uint16_t *foreground_px = foreground + idx * 3;
-    std::uint16_t *background_px = background + idx * 3;
-
-    if (alpha0 <= kAlphaLowThreshold) {
-      foreground_px[0] = clamp_state_from_int(round_q24_to_int(mu_f_r_q24));
-      foreground_px[1] = clamp_state_from_int(round_q24_to_int(mu_f_g_q24));
-      foreground_px[2] = clamp_state_from_int(round_q24_to_int(mu_f_b_q24));
-      background_px[0] = clamp_state_from_int(
-          round_q24_to_int(mu_b_r_q24 + mul_q24_round_signed_i64(residual_r_q24, inverse_weight_sum_plus_one[idx])));
-      background_px[1] = clamp_state_from_int(
-          round_q24_to_int(mu_b_g_q24 + mul_q24_round_signed_i64(residual_g_q24, inverse_weight_sum_plus_one[idx])));
-      background_px[2] = clamp_state_from_int(
-          round_q24_to_int(mu_b_b_q24 + mul_q24_round_signed_i64(residual_b_q24, inverse_weight_sum_plus_one[idx])));
-      return;
-    }
-
-    if (alpha0 >= kAlphaHighThreshold) {
-      foreground_px[0] = clamp_state_from_int(
-          round_q24_to_int(mu_f_r_q24 + mul_q24_round_signed_i64(residual_r_q24, inverse_weight_sum_plus_one[idx])));
-      foreground_px[1] = clamp_state_from_int(
-          round_q24_to_int(mu_f_g_q24 + mul_q24_round_signed_i64(residual_g_q24, inverse_weight_sum_plus_one[idx])));
-      foreground_px[2] = clamp_state_from_int(
-          round_q24_to_int(mu_f_b_q24 + mul_q24_round_signed_i64(residual_b_q24, inverse_weight_sum_plus_one[idx])));
-      background_px[0] = clamp_state_from_int(round_q24_to_int(mu_b_r_q24));
-      background_px[1] = clamp_state_from_int(round_q24_to_int(mu_b_g_q24));
-      background_px[2] = clamp_state_from_int(round_q24_to_int(mu_b_b_q24));
-      return;
-    }
-
-    foreground_px[0] =
-        clamp_state_from_int(round_q24_to_int(mu_f_r_q24 + mul_q24_round_signed_i64(residual_r_q24, foreground_gain[idx])));
-    foreground_px[1] =
-        clamp_state_from_int(round_q24_to_int(mu_f_g_q24 + mul_q24_round_signed_i64(residual_g_q24, foreground_gain[idx])));
-    foreground_px[2] =
-        clamp_state_from_int(round_q24_to_int(mu_f_b_q24 + mul_q24_round_signed_i64(residual_b_q24, foreground_gain[idx])));
-    background_px[0] =
-        clamp_state_from_int(round_q24_to_int(mu_b_r_q24 + mul_q24_round_signed_i64(residual_r_q24, background_gain[idx])));
-    background_px[1] =
-        clamp_state_from_int(round_q24_to_int(mu_b_g_q24 + mul_q24_round_signed_i64(residual_g_q24, background_gain[idx])));
-    background_px[2] =
-        clamp_state_from_int(round_q24_to_int(mu_b_b_q24 + mul_q24_round_signed_i64(residual_b_q24, background_gain[idx])));
-  };
-
   if (h > 2 && w > 2) {
     for (int y = 1; y < h - 1; ++y) {
+      const std::size_t row_offset = static_cast<std::size_t>(y) * static_cast<std::size_t>(w);
       int x_start = (color + y) % 2;
       x_start = x_start == 0 ? 2 : 1;
+      #if defined(__GNUC__) || defined(__clang__)
+      #pragma GCC ivdep
+      #endif
       for (int x = x_start; x < w - 1; x += 2) {
-        process_pixel(y, x);
+        const std::size_t idx = row_offset + static_cast<std::size_t>(x);
+        update_pixel_fx_u8(
+            idx,
+            idx - 1u,
+            idx + 1u,
+            idx - static_cast<std::size_t>(w),
+            idx + static_cast<std::size_t>(w),
+            fg_r,
+            fg_g,
+            fg_b,
+            bg_r,
+            bg_g,
+            bg_b,
+            image_r,
+            image_g,
+            image_b,
+            alpha,
+            branch_mode,
+            neighbor_weights,
+            inverse_weight_sum,
+            inverse_weight_sum_plus_one,
+            foreground_gain,
+            background_gain);
       }
     }
   }
@@ -434,16 +512,89 @@ inline void update_red_black_half_step_fx_u8_buffer(
     }
     const int x_start = (color + y) % 2;
     for (int x = x_start; x < w; x += 2) {
-      process_pixel(y, x);
+      const int x_left = x == 0 ? 0 : x - 1;
+      const int x_right = x + 1 >= w ? w - 1 : x + 1;
+      const int y_up = y == 0 ? 0 : y - 1;
+      const int y_down = y + 1 >= h ? h - 1 : y + 1;
+      const std::size_t idx = scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
+      update_pixel_fx_u8(
+          idx,
+          scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x_left), static_cast<std::size_t>(w)),
+          scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x_right), static_cast<std::size_t>(w)),
+          scalar_index(static_cast<std::size_t>(y_up), static_cast<std::size_t>(x), static_cast<std::size_t>(w)),
+          scalar_index(static_cast<std::size_t>(y_down), static_cast<std::size_t>(x), static_cast<std::size_t>(w)),
+          fg_r,
+          fg_g,
+          fg_b,
+          bg_r,
+          bg_g,
+          bg_b,
+          image_r,
+          image_g,
+          image_b,
+          alpha,
+          branch_mode,
+          neighbor_weights,
+          inverse_weight_sum,
+          inverse_weight_sum_plus_one,
+          foreground_gain,
+          background_gain);
     }
   }
 
   for (int y = 1; y < h - 1; ++y) {
+    const int y_up = y - 1;
+    const int y_down = y + 1;
     if (((color + y) % 2) == 0) {
-      process_pixel(y, 0);
+      const std::size_t idx = scalar_index(static_cast<std::size_t>(y), 0u, static_cast<std::size_t>(w));
+      update_pixel_fx_u8(
+          idx,
+          idx,
+          idx + 1u,
+          scalar_index(static_cast<std::size_t>(y_up), 0u, static_cast<std::size_t>(w)),
+          scalar_index(static_cast<std::size_t>(y_down), 0u, static_cast<std::size_t>(w)),
+          fg_r,
+          fg_g,
+          fg_b,
+          bg_r,
+          bg_g,
+          bg_b,
+          image_r,
+          image_g,
+          image_b,
+          alpha,
+          branch_mode,
+          neighbor_weights,
+          inverse_weight_sum,
+          inverse_weight_sum_plus_one,
+          foreground_gain,
+          background_gain);
     }
     if (w > 1 && ((w - 1 + y) % 2) == color) {
-      process_pixel(y, w - 1);
+      const std::size_t idx =
+          scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(w - 1), static_cast<std::size_t>(w));
+      update_pixel_fx_u8(
+          idx,
+          idx - 1u,
+          idx,
+          scalar_index(static_cast<std::size_t>(y_up), static_cast<std::size_t>(w - 1), static_cast<std::size_t>(w)),
+          scalar_index(static_cast<std::size_t>(y_down), static_cast<std::size_t>(w - 1), static_cast<std::size_t>(w)),
+          fg_r,
+          fg_g,
+          fg_b,
+          bg_r,
+          bg_g,
+          bg_b,
+          image_r,
+          image_g,
+          image_b,
+          alpha,
+          branch_mode,
+          neighbor_weights,
+          inverse_weight_sum,
+          inverse_weight_sum_plus_one,
+          foreground_gain,
+          background_gain);
     }
   }
 }
@@ -492,12 +643,10 @@ inline void estimate_multilevel_foreground_background_fx_u8(
   std::uint8_t bg_mean[3];
   compute_initial_means_fx_u8_buffer(input_image_ptr, input_alpha_ptr, h0, w0, fg_mean, bg_mean);
 
-  workspace.previous_foreground_storage[0] = static_cast<std::uint16_t>(fg_mean[0]) << kFxStateFracBits;
-  workspace.previous_foreground_storage[1] = static_cast<std::uint16_t>(fg_mean[1]) << kFxStateFracBits;
-  workspace.previous_foreground_storage[2] = static_cast<std::uint16_t>(fg_mean[2]) << kFxStateFracBits;
-  workspace.previous_background_storage[0] = static_cast<std::uint16_t>(bg_mean[0]) << kFxStateFracBits;
-  workspace.previous_background_storage[1] = static_cast<std::uint16_t>(bg_mean[1]) << kFxStateFracBits;
-  workspace.previous_background_storage[2] = static_cast<std::uint16_t>(bg_mean[2]) << kFxStateFracBits;
+  for (int c = 0; c < 3; ++c) {
+    workspace.previous_foreground_storage[c][0] = static_cast<std::uint16_t>(fg_mean[c]) << kFxStateFracBits;
+    workspace.previous_background_storage[c][0] = static_cast<std::uint16_t>(bg_mean[c]) << kFxStateFracBits;
+  }
 
   int prev_h = 1;
   int prev_w = 1;
@@ -525,8 +674,10 @@ inline void estimate_multilevel_foreground_background_fx_u8(
     workspace.y_index_map.resize(h);
     build_resize_index_map_buffer(w0, workspace.x_index_map);
     build_resize_index_map_buffer(h0, workspace.y_index_map);
-    resize_nearest_rgb_u8_buffer(
-        workspace.image.data(),
+    resize_nearest_rgb_u8_to_image_terms(
+        workspace.image_term[0].data(),
+        workspace.image_term[1].data(),
+        workspace.image_term[2].data(),
         input_image_ptr,
         workspace.x_index_map.data(),
         workspace.y_index_map.data(),
@@ -542,39 +693,47 @@ inline void estimate_multilevel_foreground_background_fx_u8(
         h,
         w);
 
-    build_level_solver_coefficients_fx_u8_buffer(workspace, h, w);
+    const std::size_t pixel_count = static_cast<std::size_t>(h) * static_cast<std::size_t>(w);
 
-    std::uint16_t *current_foreground = workspace.current_foreground_storage.data();
-    std::uint16_t *current_background = workspace.current_background_storage.data();
+    build_level_solver_coefficients_fx_u8_buffer(workspace, h, w);
 
     workspace.previous_x_index_map.resize(w);
     workspace.previous_y_index_map.resize(h);
     build_resize_index_map_buffer(prev_w, workspace.previous_x_index_map);
     build_resize_index_map_buffer(prev_h, workspace.previous_y_index_map);
 
-    resize_nearest_rgb_u16_buffer(
-        current_foreground,
-        workspace.previous_foreground_storage.data(),
-        workspace.previous_x_index_map.data(),
-        workspace.previous_y_index_map.data(),
-        prev_w,
-        h,
-        w);
-    resize_nearest_rgb_u16_buffer(
-        current_background,
-        workspace.previous_background_storage.data(),
-        workspace.previous_x_index_map.data(),
-        workspace.previous_y_index_map.data(),
-        prev_w,
-        h,
-        w);
+    for (int c = 0; c < 3; ++c) {
+      resize_nearest_planar_u16_buffer(
+          workspace.current_foreground_storage[c].data(),
+          workspace.previous_foreground_storage[c].data(),
+          workspace.previous_x_index_map.data(),
+          workspace.previous_y_index_map.data(),
+          prev_w,
+          h,
+          w);
+      resize_nearest_planar_u16_buffer(
+          workspace.current_background_storage[c].data(),
+          workspace.previous_background_storage[c].data(),
+          workspace.previous_x_index_map.data(),
+          workspace.previous_y_index_map.data(),
+          prev_w,
+          h,
+          w);
+    }
 
     for (int i_iter = 0; i_iter < n_iter; ++i_iter) {
       update_red_black_half_step_fx_u8_buffer(
-          current_foreground,
-          current_background,
-          workspace.image.data(),
+          workspace.current_foreground_storage[0].data(),
+          workspace.current_foreground_storage[1].data(),
+          workspace.current_foreground_storage[2].data(),
+          workspace.current_background_storage[0].data(),
+          workspace.current_background_storage[1].data(),
+          workspace.current_background_storage[2].data(),
+          workspace.image_term[0].data(),
+          workspace.image_term[1].data(),
+          workspace.image_term[2].data(),
           workspace.alpha.data(),
+          workspace.branch_mode.data(),
           workspace.neighbor_weights.data(),
           workspace.inverse_weight_sum.data(),
           workspace.inverse_weight_sum_plus_one.data(),
@@ -584,10 +743,17 @@ inline void estimate_multilevel_foreground_background_fx_u8(
           w,
           0);
       update_red_black_half_step_fx_u8_buffer(
-          current_foreground,
-          current_background,
-          workspace.image.data(),
+          workspace.current_foreground_storage[0].data(),
+          workspace.current_foreground_storage[1].data(),
+          workspace.current_foreground_storage[2].data(),
+          workspace.current_background_storage[0].data(),
+          workspace.current_background_storage[1].data(),
+          workspace.current_background_storage[2].data(),
+          workspace.image_term[0].data(),
+          workspace.image_term[1].data(),
+          workspace.image_term[2].data(),
           workspace.alpha.data(),
+          workspace.branch_mode.data(),
           workspace.neighbor_weights.data(),
           workspace.inverse_weight_sum.data(),
           workspace.inverse_weight_sum_plus_one.data(),
@@ -599,10 +765,15 @@ inline void estimate_multilevel_foreground_background_fx_u8(
     }
 
     if (i_level == n_levels) {
-      const std::size_t pixel_count = static_cast<std::size_t>(h) * static_cast<std::size_t>(w);
-      for (std::size_t i = 0; i < pixel_count * 3u; ++i) {
-        foreground_out.data()[i] = quantize_state_to_u8(current_foreground[i]);
-        background_out.data()[i] = quantize_state_to_u8(current_background[i]);
+      auto *foreground_ptr = foreground_out.data();
+      auto *background_ptr = background_out.data();
+      for (std::size_t i = 0; i < pixel_count; ++i) {
+        foreground_ptr[i * 3u + 0] = quantize_state_to_u8(workspace.current_foreground_storage[0][i]);
+        foreground_ptr[i * 3u + 1] = quantize_state_to_u8(workspace.current_foreground_storage[1][i]);
+        foreground_ptr[i * 3u + 2] = quantize_state_to_u8(workspace.current_foreground_storage[2][i]);
+        background_ptr[i * 3u + 0] = quantize_state_to_u8(workspace.current_background_storage[0][i]);
+        background_ptr[i * 3u + 1] = quantize_state_to_u8(workspace.current_background_storage[1][i]);
+        background_ptr[i * 3u + 2] = quantize_state_to_u8(workspace.current_background_storage[2][i]);
       }
     } else {
       std::swap(workspace.previous_foreground_storage, workspace.current_foreground_storage);
@@ -614,3 +785,6 @@ inline void estimate_multilevel_foreground_background_fx_u8(
 }
 
 }  // namespace
+
+#undef FX_ALWAYS_INLINE
+#undef FX_RESTRICT
