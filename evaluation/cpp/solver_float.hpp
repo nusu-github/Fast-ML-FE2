@@ -193,6 +193,20 @@ inline void build_level_solver_coefficients_buffer(
     float *inverse_weight_sum_plus_one,
     float *foreground_gain,
     float *background_gain
+);
+
+template <bool InteriorOnly>
+inline void build_level_solver_coefficients_region_buffer(
+    const float *alpha,
+    int h,
+    int w,
+    float regularization,
+    float gradient_weight,
+    float *neighbor_weights,
+    float *inverse_weight_sum,
+    float *inverse_weight_sum_plus_one,
+    float *foreground_gain,
+    float *background_gain
 ) {
   if (h <= 0 || w <= 0) {
     return;
@@ -202,15 +216,21 @@ inline void build_level_solver_coefficients_buffer(
     const std::size_t idx = scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
     const float alpha0 = alpha[idx];
     const float alpha1 = 1.0f - alpha0;
-    const int x_left = x == 0 ? 0 : x - 1;
-    const int x_right = std::min(w - 1, x + 1);
-    const int y_up = y == 0 ? 0 : y - 1;
-    const int y_down = std::min(h - 1, y + 1);
+    const std::size_t idx_left =
+        InteriorOnly ? idx - 1 : scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x == 0 ? 0 : x - 1), static_cast<std::size_t>(w));
+    const std::size_t idx_right =
+        InteriorOnly ? idx + 1 : scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(std::min(w - 1, x + 1)), static_cast<std::size_t>(w));
+    const std::size_t idx_up =
+        InteriorOnly ? idx - static_cast<std::size_t>(w)
+                     : scalar_index(static_cast<std::size_t>(y == 0 ? 0 : y - 1), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
+    const std::size_t idx_down =
+        InteriorOnly ? idx + static_cast<std::size_t>(w)
+                     : scalar_index(static_cast<std::size_t>(std::min(h - 1, y + 1)), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
 
-    const float w0 = regularization + gradient_weight * std::fabs(alpha0 - alpha[scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x_left), static_cast<std::size_t>(w))]);
-    const float w1 = regularization + gradient_weight * std::fabs(alpha0 - alpha[scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x_right), static_cast<std::size_t>(w))]);
-    const float w2 = regularization + gradient_weight * std::fabs(alpha0 - alpha[scalar_index(static_cast<std::size_t>(y_up), static_cast<std::size_t>(x), static_cast<std::size_t>(w))]);
-    const float w3 = regularization + gradient_weight * std::fabs(alpha0 - alpha[scalar_index(static_cast<std::size_t>(y_down), static_cast<std::size_t>(x), static_cast<std::size_t>(w))]);
+    const float w0 = regularization + gradient_weight * std::fabs(alpha0 - alpha[idx_left]);
+    const float w1 = regularization + gradient_weight * std::fabs(alpha0 - alpha[idx_right]);
+    const float w2 = regularization + gradient_weight * std::fabs(alpha0 - alpha[idx_up]);
+    const float w3 = regularization + gradient_weight * std::fabs(alpha0 - alpha[idx_down]);
 
     float *nw = neighbor_weights + idx * kNeighborCount;
     nw[0] = w0;
@@ -228,11 +248,68 @@ inline void build_level_solver_coefficients_buffer(
     background_gain[idx] = alpha1 * inv_D;
   };
 
-  for (int y = 0; y < h; ++y) {
-    for (int x = 0; x < w; ++x) {
-      process_pixel(y, x);
+  if constexpr (InteriorOnly) {
+    if (h <= 2 || w <= 2) {
+      return;
+    }
+    for (int y = 1; y < h - 1; ++y) {
+      for (int x = 1; x < w - 1; ++x) {
+        process_pixel(y, x);
+      }
+    }
+  } else {
+    for (int y = 0; y < h; ++y) {
+      if (y != 0 && y + 1 < h) {
+        continue;
+      }
+      for (int x = 0; x < w; ++x) {
+        process_pixel(y, x);
+      }
+    }
+
+    for (int y = 1; y < h - 1; ++y) {
+      process_pixel(y, 0);
+      if (w > 1) {
+        process_pixel(y, w - 1);
+      }
     }
   }
+}
+
+inline void build_level_solver_coefficients_buffer(
+    const float *alpha,
+    int h,
+    int w,
+    float regularization,
+    float gradient_weight,
+    float *neighbor_weights,
+    float *inverse_weight_sum,
+    float *inverse_weight_sum_plus_one,
+    float *foreground_gain,
+    float *background_gain
+) {
+  build_level_solver_coefficients_region_buffer<true>(
+      alpha,
+      h,
+      w,
+      regularization,
+      gradient_weight,
+      neighbor_weights,
+      inverse_weight_sum,
+      inverse_weight_sum_plus_one,
+      foreground_gain,
+      background_gain);
+  build_level_solver_coefficients_region_buffer<false>(
+      alpha,
+      h,
+      w,
+      regularization,
+      gradient_weight,
+      neighbor_weights,
+      inverse_weight_sum,
+      inverse_weight_sum_plus_one,
+      foreground_gain,
+      background_gain);
 }
 
 inline void build_level_solver_coefficients(
@@ -431,18 +508,18 @@ inline void estimate_multilevel_foreground_background(
 
   const std::size_t max_pixels = static_cast<std::size_t>(h0) * static_cast<std::size_t>(w0);
   FloatWorkspace &workspace = thread_workspace();
-  workspace.ensure_capacity(max_pixels, w0, h0);
+  workspace.ensure_pixel_capacity(max_pixels);
 
   float fg_mean[kChannels] {};
   float bg_mean[kChannels] {};
   compute_initial_means_buffer(input_image_ptr, input_alpha_ptr, h0, w0, fg_mean, bg_mean);
 
-  workspace.previous_foreground_storage[0] = fg_mean[0];
-  workspace.previous_foreground_storage[1] = fg_mean[1];
-  workspace.previous_foreground_storage[2] = fg_mean[2];
-  workspace.previous_background_storage[0] = bg_mean[0];
-  workspace.previous_background_storage[1] = bg_mean[1];
-  workspace.previous_background_storage[2] = bg_mean[2];
+  workspace.state.previous_foreground[0] = fg_mean[0];
+  workspace.state.previous_foreground[1] = fg_mean[1];
+  workspace.state.previous_foreground[2] = fg_mean[2];
+  workspace.state.previous_background[0] = bg_mean[0];
+  workspace.state.previous_background[1] = bg_mean[1];
+  workspace.state.previous_background[2] = bg_mean[2];
 
   int prev_h = 1;
   int prev_w = 1;
@@ -455,59 +532,59 @@ inline void estimate_multilevel_foreground_background(
     const int w = level_shapes[shape_base + 1];
     const int n_iter = level_shapes[shape_base + 2];
 
-    resize_nearest_rgb_buffer(workspace.image.data(), input_image_ptr, h0, w0, h, w);
-    resize_nearest_scalar_buffer(workspace.alpha.data(), input_alpha_ptr, h0, w0, h, w);
+    resize_nearest_rgb_buffer(workspace.input.image.data(), input_image_ptr, h0, w0, h, w);
+    resize_nearest_scalar_buffer(workspace.input.alpha.data(), input_alpha_ptr, h0, w0, h, w);
     build_level_solver_coefficients_buffer(
-        workspace.alpha.data(),
+        workspace.input.alpha.data(),
         h,
         w,
         regularization,
         gradient_weight,
-        workspace.neighbor_weights.data(),
-        workspace.inverse_weight_sum.data(),
-        workspace.inverse_weight_sum_plus_one.data(),
-        workspace.foreground_gain.data(),
-        workspace.background_gain.data());
+        workspace.coeff.neighbor_weights.data(),
+        workspace.coeff.inverse_weight_sum.data(),
+        workspace.coeff.inverse_weight_sum_plus_one.data(),
+        workspace.coeff.foreground_gain.data(),
+        workspace.coeff.background_gain.data());
 
     const bool final_level = i_level == n_levels;
-    float *current_foreground = final_level ? foreground_out.data() : workspace.current_foreground_storage.data();
-    float *current_background = final_level ? background_out.data() : workspace.current_background_storage.data();
+    float *current_foreground = final_level ? foreground_out.data() : workspace.state.current_foreground.data();
+    float *current_background = final_level ? background_out.data() : workspace.state.current_background.data();
 
-    resize_nearest_rgb_buffer(current_foreground, workspace.previous_foreground_storage.data(), prev_h, prev_w, h, w);
-    resize_nearest_rgb_buffer(current_background, workspace.previous_background_storage.data(), prev_h, prev_w, h, w);
+    resize_nearest_rgb_buffer(current_foreground, workspace.state.previous_foreground.data(), prev_h, prev_w, h, w);
+    resize_nearest_rgb_buffer(current_background, workspace.state.previous_background.data(), prev_h, prev_w, h, w);
 
     for (int i_iter = 0; i_iter < n_iter; ++i_iter) {
       update_red_black_half_step_buffer(
           current_foreground,
           current_background,
-          workspace.image.data(),
-          workspace.alpha.data(),
-          workspace.neighbor_weights.data(),
-          workspace.inverse_weight_sum.data(),
-          workspace.inverse_weight_sum_plus_one.data(),
-          workspace.foreground_gain.data(),
-          workspace.background_gain.data(),
+          workspace.input.image.data(),
+          workspace.input.alpha.data(),
+          workspace.coeff.neighbor_weights.data(),
+          workspace.coeff.inverse_weight_sum.data(),
+          workspace.coeff.inverse_weight_sum_plus_one.data(),
+          workspace.coeff.foreground_gain.data(),
+          workspace.coeff.background_gain.data(),
           h,
           w,
           static_cast<int>(SweepColor::red));
       update_red_black_half_step_buffer(
           current_foreground,
           current_background,
-          workspace.image.data(),
-          workspace.alpha.data(),
-          workspace.neighbor_weights.data(),
-          workspace.inverse_weight_sum.data(),
-          workspace.inverse_weight_sum_plus_one.data(),
-          workspace.foreground_gain.data(),
-          workspace.background_gain.data(),
+          workspace.input.image.data(),
+          workspace.input.alpha.data(),
+          workspace.coeff.neighbor_weights.data(),
+          workspace.coeff.inverse_weight_sum.data(),
+          workspace.coeff.inverse_weight_sum_plus_one.data(),
+          workspace.coeff.foreground_gain.data(),
+          workspace.coeff.background_gain.data(),
           h,
           w,
           static_cast<int>(SweepColor::black));
     }
 
     if (!final_level) {
-      std::swap(workspace.previous_foreground_storage, workspace.current_foreground_storage);
-      std::swap(workspace.previous_background_storage, workspace.current_background_storage);
+      std::swap(workspace.state.previous_foreground, workspace.state.current_foreground);
+      std::swap(workspace.state.previous_background, workspace.state.current_background);
       prev_h = h;
       prev_w = w;
     }

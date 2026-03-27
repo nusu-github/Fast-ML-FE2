@@ -365,6 +365,66 @@ class TestMeanResidualKernel:
         np.testing.assert_allclose(direct_foreground, identity_foreground, atol=1e-6)
         np.testing.assert_allclose(direct_background, identity_background, atol=1e-6)
 
+
+class TestCoefficientBuild:
+    def test_coefficients_match_hand_computed_corner_edge_and_interior(self):
+        alpha = np.array(
+            [
+                [0.10, 0.20, 0.30],
+                [0.40, 0.50, 0.60],
+                [0.70, 0.80, 0.90],
+            ],
+            dtype=np.float32,
+        )
+        eps = np.float32(0.1)
+        omega = np.float32(0.5)
+        (
+            neighbor_weights,
+            inverse_weight_sum,
+            inverse_weight_sum_plus_one,
+            foreground_gain,
+            background_gain,
+        ) = _build_cached_kernel_inputs(alpha, eps, omega)
+
+        def expected(y: int, x: int):
+            a0 = float(alpha[y, x])
+            a1 = 1.0 - a0
+            x_left = max(0, x - 1)
+            x_right = min(alpha.shape[1] - 1, x + 1)
+            y_up = max(0, y - 1)
+            y_down = min(alpha.shape[0] - 1, y + 1)
+            weights = np.array(
+                [
+                    float(eps + omega * abs(a0 - float(alpha[y, x_left]))),
+                    float(eps + omega * abs(a0 - float(alpha[y, x_right]))),
+                    float(eps + omega * abs(a0 - float(alpha[y_up, x]))),
+                    float(eps + omega * abs(a0 - float(alpha[y_down, x]))),
+                ],
+                dtype=np.float32,
+            )
+            W = float(weights.sum())
+            D = W + a0 * a0 + a1 * a1
+            return weights, 1.0 / W, 1.0 / (W + 1.0), a0 / D, a1 / D
+
+        for y, x in [(0, 0), (0, 1), (1, 1)]:
+            exp_weights, exp_inv, exp_invp1, exp_fg, exp_bg = expected(y, x)
+            np.testing.assert_allclose(neighbor_weights[y, x], exp_weights, atol=1e-6)
+            np.testing.assert_allclose(inverse_weight_sum[y, x], exp_inv, atol=1e-6)
+            np.testing.assert_allclose(inverse_weight_sum_plus_one[y, x], exp_invp1, atol=1e-6)
+            np.testing.assert_allclose(foreground_gain[y, x], exp_fg, atol=1e-6)
+            np.testing.assert_allclose(background_gain[y, x], exp_bg, atol=1e-6)
+
+    def test_coefficients_stay_finite_on_degenerate_small_shapes(self):
+        for alpha in (
+            np.array([[0.5]], dtype=np.float32),
+            np.array([[0.1, 0.9]], dtype=np.float32),
+            np.array([[0.1], [0.9]], dtype=np.float32),
+            np.array([[0.2, 0.4, 0.6], [0.8, 0.3, 0.5]], dtype=np.float32),
+        ):
+            coeffs = _build_cached_kernel_inputs(alpha, 5e-3, 0.1)
+            for coeff in coeffs:
+                assert np.all(np.isfinite(coeff))
+
     def test_direct_black_update_matches_boundary_fallback_identity_map(self):
         rng = np.random.default_rng(22)
         h, w = 5, 7
