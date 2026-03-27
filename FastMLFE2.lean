@@ -16,6 +16,7 @@ import FastMLFE2.FixedPrecision.Coefficients
 import FastMLFE2.FixedPrecision.LocalSolver
 import FastMLFE2.FixedPrecision.Jacobi
 import FastMLFE2.FixedPrecision.Cost
+import FastMLFE2.FixedPrecision.Multilevel
 import FastMLFE2.Assumptions.Bundles
 import FastMLFE2.Assumptions.Grid
 import FastMLFE2.Theorems.Invertibility
@@ -57,6 +58,7 @@ import FastMLFE2.Theorems.CanonicalBuilder
 import FastMLFE2.Theorems.FixedPrecisionLocal
 import FastMLFE2.Theorems.FixedPrecisionJacobi
 import FastMLFE2.Theorems.FixedPrecisionCost
+import FastMLFE2.Theorems.FixedPrecisionMultilevel
 import FastMLFE2.Theorems.FixedPrecisionWraparound
 
 namespace FastMLFE2
