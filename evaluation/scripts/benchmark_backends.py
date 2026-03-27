@@ -7,6 +7,7 @@ import time
 import numpy as np
 
 from fastmlfe2_eval.estimator import estimate_foreground
+from fastmlfe2_eval.metrics import gradient_error, mse_error, sad_error
 from fastmlfe2_eval.patterns import make_pattern_case
 
 INV_255 = 1.0 / 255.0
@@ -78,39 +79,41 @@ def summarize_times(name: str, timings: list[float]) -> None:
     print(f"[{name}] mean={mean:.6f}s median={median:.6f}s std={std:.6f}s", flush=True)
 
 
-def compare_cpu_and_u8_backend(
+def _normalize_foreground(result: tuple[np.ndarray, np.ndarray]) -> np.ndarray:
+    foreground, _background = result
+    if np.issubdtype(foreground.dtype, np.integer):
+        return foreground.astype(np.float32) * INV_255
+    return foreground.astype(np.float32, copy=False)
+
+
+def compare_backend_metrics(
     cpu_result: tuple[np.ndarray, np.ndarray],
-    u8_result: tuple[np.ndarray, np.ndarray],
+    backend_result: tuple[np.ndarray, np.ndarray],
+    weights: np.ndarray,
+    mask: np.ndarray,
+) -> dict[str, float]:
+    cpu_foreground = _normalize_foreground(cpu_result)
+    backend_foreground = _normalize_foreground(backend_result)
+    return {
+        "sad": sad_error(backend_foreground, cpu_foreground, weights, mask),
+        "mse": mse_error(backend_foreground, cpu_foreground, weights, mask),
+        "grad": gradient_error(backend_foreground, cpu_foreground, weights, mask),
+    }
+
+
+def print_backend_metrics(
+    cpu_result: tuple[np.ndarray, np.ndarray],
+    backend_result: tuple[np.ndarray, np.ndarray],
+    weights: np.ndarray,
+    mask: np.ndarray,
     label: str,
 ) -> None:
-    cpu_f, cpu_b = cpu_result
-    u8_f, u8_b = u8_result
-    u8_f32 = u8_f.astype(np.float32) * INV_255
-    u8_b32 = u8_b.astype(np.float32) * INV_255
-    abs_diff_f = np.abs(u8_f32 - cpu_f)
-    abs_diff_b = np.abs(u8_b32 - cpu_b)
-    mean_abs = float((abs_diff_f.mean() + abs_diff_b.mean()) / 2.0)
-    max_abs = float(max(abs_diff_f.max(), abs_diff_b.max()))
+    metrics = compare_backend_metrics(cpu_result, backend_result, weights, mask)
     print(
-        f"[{label} vs cpu] mean_abs={mean_abs:.8f} ({mean_abs * 255.0:.4f} LSB) "
-        f"max_abs={max_abs:.8f} ({max_abs * 255.0:.4f} LSB)",
-        flush=True,
-    )
-
-
-def compare_cpu_and_gpu(
-    cpu_result: tuple[np.ndarray, np.ndarray],
-    gpu_result: tuple[np.ndarray, np.ndarray],
-) -> None:
-    cpu_f, cpu_b = cpu_result
-    gpu_f, gpu_b = gpu_result
-    abs_diff_f = np.abs(cpu_f - gpu_f)
-    abs_diff_b = np.abs(cpu_b - gpu_b)
-    mean_abs = float((abs_diff_f.mean() + abs_diff_b.mean()) / 2.0)
-    max_abs = float(max(abs_diff_f.max(), abs_diff_b.max()))
-    print(
-        f"[cpu vs gpu] mean_abs={mean_abs:.8f} ({mean_abs * 255.0:.4f} LSB) "
-        f"max_abs={max_abs:.8f} ({max_abs * 255.0:.4f} LSB)",
+        f"[{label} vs cpu] "
+        f"SAD={metrics['sad']:.8f} "
+        f"MSE={metrics['mse']:.8f} "
+        f"GRAD={metrics['grad']:.8f}",
         flush=True,
     )
 
@@ -209,7 +212,7 @@ def main() -> int:
             args.idle_seconds,
         )
         summarize_times("cpu_u8", cpu_u8_times)
-        compare_cpu_and_u8_backend(cpu_result, cpu_u8_result, "cpu_u8")
+        print_backend_metrics(cpu_result, cpu_u8_result, case.weights, case.mask, "cpu_u8")
 
         cpu_fx_u8_times, cpu_fx_u8_result = timed_batch(
             image_u8,
@@ -219,7 +222,7 @@ def main() -> int:
             args.idle_seconds,
         )
         summarize_times("cpu_fx_u8", cpu_fx_u8_times)
-        compare_cpu_and_u8_backend(cpu_result, cpu_fx_u8_result, "cpu_fx_u8")
+        print_backend_metrics(cpu_result, cpu_fx_u8_result, case.weights, case.mask, "cpu_fx_u8")
 
         if HAS_CUPY:
             try:
@@ -234,7 +237,7 @@ def main() -> int:
                 print(f"[gpu] benchmark skipped: {exc!r}", flush=True)
             else:
                 summarize_times("gpu", gpu_times)
-                compare_cpu_and_gpu(cpu_result, gpu_result)
+                print_backend_metrics(cpu_result, gpu_result, case.weights, case.mask, "gpu")
                 print(
                     f"[speed] cpu_u8/cpu mean ratio="
                     f"{stats.mean(cpu_u8_times) / stats.mean(cpu_times):.3f}x "
