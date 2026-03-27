@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common.hpp"
+
 #include <vector>
 
 struct FloatWorkspace {
@@ -18,13 +20,13 @@ struct FloatWorkspace {
   std::vector<std::int32_t> y_index_map;
 
   void ensure_capacity(std::size_t max_pixels, int max_width, int max_height) {
-    previous_foreground_storage.resize(max_pixels * 3);
-    previous_background_storage.resize(max_pixels * 3);
-    current_foreground_storage.resize(max_pixels * 3);
-    current_background_storage.resize(max_pixels * 3);
-    image.resize(max_pixels * 3);
+    previous_foreground_storage.resize(max_pixels * kChannels);
+    previous_background_storage.resize(max_pixels * kChannels);
+    current_foreground_storage.resize(max_pixels * kChannels);
+    current_background_storage.resize(max_pixels * kChannels);
+    image.resize(max_pixels * kChannels);
     alpha.resize(max_pixels);
-    neighbor_weights.resize(max_pixels * 4);
+    neighbor_weights.resize(max_pixels * kNeighborCount);
     inverse_weight_sum.resize(max_pixels);
     inverse_weight_sum_plus_one.resize(max_pixels);
     foreground_gain.resize(max_pixels);

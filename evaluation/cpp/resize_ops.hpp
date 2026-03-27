@@ -26,9 +26,9 @@ inline void resize_nearest_rgb_buffer(
       const int x_src = std::min(w_src - 1, x_dst * w_src / w_dst);
       const float *src_px = src_row + static_cast<std::size_t>(x_src) * kChannels;
       float *dst_px = dst_row + static_cast<std::size_t>(x_dst) * kChannels;
-      dst_px[0] = src_px[0];
-      dst_px[1] = src_px[1];
-      dst_px[2] = src_px[2];
+      apply_rgb([&]<std::size_t C>(std::integral_constant<std::size_t, C>) {
+        dst_px[C] = src_px[C];
+      });
     }
   }
 }

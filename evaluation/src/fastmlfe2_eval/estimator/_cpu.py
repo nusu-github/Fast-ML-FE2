@@ -23,6 +23,7 @@ _update_red_black_half_step_from_previous_level_with_boundary_fallback = (
 )
 _estimate_multilevel_foreground_background = _cpu_impl.estimate_multilevel_foreground_background
 _build_resize_index_map = _cpu_impl._build_resize_index_map
+_build_multilevel_shapes_flat = _cpu_impl._build_multilevel_shapes_flat
 
 __all__ = [
     "estimate_multilevel_foreground_background",
@@ -33,6 +34,25 @@ __all__ = [
 def _resize_index_map(src_size: int, dst_size: int) -> np.ndarray:
     coords = np.arange(dst_size, dtype=np.int32)
     return np.minimum(src_size - 1, coords * src_size // dst_size).astype(np.int32)
+
+
+def _build_multilevel_shapes(
+    height: int,
+    width: int,
+    small_size: int,
+    n_small_iterations: int,
+    n_big_iterations: int,
+) -> np.ndarray:
+    return np.asarray(
+        _build_multilevel_shapes_flat(
+            int(height),
+            int(width),
+            int(small_size),
+            int(n_small_iterations),
+            int(n_big_iterations),
+        ),
+        dtype=np.int32,
+    ).reshape(-1, 3)
 
 
 def _require_cpu_float32_c_contiguous(

@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace nb = nanobind;
@@ -42,6 +43,12 @@ struct PixelSolutionInputs {
 struct NeighborOffset {
   int dy;
   int dx;
+};
+
+enum class AlphaRegion : int {
+  low = 0,
+  middle = 1,
+  high = 2,
 };
 
 enum class SweepColor : int {
@@ -81,12 +88,57 @@ inline constexpr int clamp_index(int value, int upper_bound) {
   return std::clamp(value, 0, upper_bound);
 }
 
-inline std::size_t scalar_index(std::size_t y, std::size_t x, std::size_t w) {
+inline constexpr AlphaRegion classify_alpha_region(float alpha) {
+  if (alpha < kAlphaLowThreshold) {
+    return AlphaRegion::low;
+  }
+  if (alpha > kAlphaHighThreshold) {
+    return AlphaRegion::high;
+  }
+  return AlphaRegion::middle;
+}
+
+inline constexpr int parity_of(int y, SweepColor color) {
+  return (static_cast<int>(color) + y) & 1;
+}
+
+inline constexpr int interior_x_start(int y, SweepColor color) {
+  return parity_of(y, color) == 0 ? 2 : 1;
+}
+
+inline constexpr int ceil_log2_int(int value) {
+  if (value <= 1) {
+    return 0;
+  }
+  int result = 0;
+  int current = 1;
+  while (current < value) {
+    current <<= 1;
+    ++result;
+  }
+  return result;
+}
+
+inline constexpr std::size_t scalar_index(std::size_t y, std::size_t x, std::size_t w) {
   return y * w + x;
 }
 
-inline std::size_t rgb_index(std::size_t y, std::size_t x, std::size_t w) {
+inline constexpr std::size_t rgb_index(std::size_t y, std::size_t x, std::size_t w) {
   return (y * w + x) * kChannels;
+}
+
+inline constexpr std::size_t rgb_pixel_base(std::size_t idx) {
+  return idx * kChannels;
+}
+
+template <typename Fn, std::size_t... Cs>
+inline constexpr void apply_rgb_impl(Fn &&fn, std::index_sequence<Cs...>) {
+  (fn(std::integral_constant<std::size_t, Cs> {}), ...);
+}
+
+template <typename Fn>
+inline constexpr void apply_rgb(Fn &&fn) {
+  apply_rgb_impl(std::forward<Fn>(fn), std::make_index_sequence<kChannels> {});
 }
 
 template <typename T>

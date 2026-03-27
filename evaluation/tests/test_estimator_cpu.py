@@ -5,6 +5,7 @@ from fastmlfe2_eval.estimator import _cpu as cpu_backend
 from fastmlfe2_eval.estimator import estimate_foreground
 from fastmlfe2_eval.estimator._cpu import (
     _build_level_solver_coefficients,
+    _build_multilevel_shapes,
     _build_resize_index_map,
     _resize_nearest_rgb,
     _resize_nearest_scalar,
@@ -40,6 +41,24 @@ def _build_cached_kernel_inputs(alpha, eps, omega):
     )
 
 
+def _python_multilevel_shapes(h0: int, w0: int, small_size: int, n_small: int, n_big: int):
+    max_dim = max(h0, w0)
+    n_levels = 0 if max_dim <= 1 else int(np.ceil(np.log2(float(max_dim))))
+    result = []
+    for i_level in range(n_levels + 1):
+        if max_dim <= 1:
+            w = 1
+            h = 1
+            n_iter = n_small
+        else:
+            ratio = i_level / n_levels
+            w = int(np.rint(np.power(float(w0), ratio)))
+            h = int(np.rint(np.power(float(h0), ratio)))
+            n_iter = n_small if w <= small_size and h <= small_size else n_big
+        result.append((h, w, n_iter))
+    return np.asarray(result, dtype=np.int32)
+
+
 def test_cpu_backend_public_surface_is_minimal():
     assert cpu_backend.__all__ == [
         "estimate_multilevel_foreground_background",
@@ -48,6 +67,20 @@ def test_cpu_backend_public_surface_is_minimal():
 
 
 class TestResizeNearest:
+    def test_multilevel_shapes_match_current_policy(self):
+        np.testing.assert_array_equal(
+            _build_multilevel_shapes(17, 19, 32, 10, 2),
+            _python_multilevel_shapes(17, 19, 32, 10, 2),
+        )
+        np.testing.assert_array_equal(
+            _build_multilevel_shapes(1024, 1536, 32, 10, 2),
+            _python_multilevel_shapes(1024, 1536, 32, 10, 2),
+        )
+        np.testing.assert_array_equal(
+            _build_multilevel_shapes(1, 1, 32, 10, 2),
+            _python_multilevel_shapes(1, 1, 32, 10, 2),
+        )
+
     def test_resize_index_map_matches_python_helper(self):
         np.testing.assert_array_equal(
             _build_resize_index_map(7, 5),

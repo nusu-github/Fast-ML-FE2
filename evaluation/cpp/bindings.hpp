@@ -19,6 +19,14 @@ inline void bind_cpu_impl(nb::module_ &m) {
   m.def("_resize_nearest_scalar", &resize_nearest_scalar, nb::arg("dst"), nb::arg("src"));
   m.def("_build_resize_index_map", &build_resize_index_map, nb::arg("src_size"), nb::arg("dst_size"));
   m.def(
+      "_build_multilevel_shapes_flat",
+      &build_multilevel_shapes_flat,
+      nb::arg("height"),
+      nb::arg("width"),
+      nb::arg("small_size"),
+      nb::arg("n_small_iterations"),
+      nb::arg("n_big_iterations"));
+  m.def(
       "_build_level_solver_coefficients",
       &build_level_solver_coefficients,
       nb::arg("alpha"),

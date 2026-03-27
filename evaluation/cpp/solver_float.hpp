@@ -1,13 +1,76 @@
 #pragma once
 
+#include "aos_workspace.hpp"
 #include "common.hpp"
 #include "resize_ops.hpp"
-#include "soa_workspace.hpp"
 
 namespace {
 
 inline float fmadd(float a, float b, float c) {
   return std::fmaf(a, b, c);
+}
+
+template <AlphaRegion Region, typename WritePixel>
+inline void write_solution_channels(const PixelSolutionInputs &inputs, WritePixel &&write_pixel) {
+  const float alpha1 = 1.0f - inputs.alpha;
+  const float mu_F0 = inputs.foreground_weighted_sum_r * inputs.inverse_weight_sum;
+  const float mu_F1 = inputs.foreground_weighted_sum_g * inputs.inverse_weight_sum;
+  const float mu_F2 = inputs.foreground_weighted_sum_b * inputs.inverse_weight_sum;
+  const float mu_B0 = inputs.background_weighted_sum_r * inputs.inverse_weight_sum;
+  const float mu_B1 = inputs.background_weighted_sum_g * inputs.inverse_weight_sum;
+  const float mu_B2 = inputs.background_weighted_sum_b * inputs.inverse_weight_sum;
+
+  const float r0 = fmadd(-alpha1, mu_B0, fmadd(-inputs.alpha, mu_F0, inputs.image_r));
+  const float r1 = fmadd(-alpha1, mu_B1, fmadd(-inputs.alpha, mu_F1, inputs.image_g));
+  const float r2 = fmadd(-alpha1, mu_B2, fmadd(-inputs.alpha, mu_F2, inputs.image_b));
+
+  const float mu_F[kChannels] {mu_F0, mu_F1, mu_F2};
+  const float mu_B[kChannels] {mu_B0, mu_B1, mu_B2};
+  const float residual[kChannels] {r0, r1, r2};
+
+  apply_rgb([&]<std::size_t C>(std::integral_constant<std::size_t, C>) {
+    if constexpr (Region == AlphaRegion::low) {
+      write_pixel(true, C, clamp01(mu_F[C]));
+      write_pixel(false, C, clamp01(fmadd(inputs.inverse_weight_sum_plus_one, residual[C], mu_B[C])));
+    } else if constexpr (Region == AlphaRegion::high) {
+      write_pixel(true, C, clamp01(fmadd(inputs.inverse_weight_sum_plus_one, residual[C], mu_F[C])));
+      write_pixel(false, C, clamp01(mu_B[C]));
+    } else {
+      write_pixel(true, C, clamp01(fmadd(inputs.foreground_gain, residual[C], mu_F[C])));
+      write_pixel(false, C, clamp01(fmadd(inputs.background_gain, residual[C], mu_B[C])));
+    }
+  });
+}
+
+inline auto build_multilevel_shapes_flat(int h0, int w0, int small_size, int n_small_iterations, int n_big_iterations)
+    -> std::vector<std::int32_t> {
+  const int max_dim = std::max(h0, w0);
+  const int n_levels = ceil_log2_int(max_dim);
+  std::vector<std::int32_t> flat_shapes(static_cast<std::size_t>(n_levels + 1) * 3);
+
+  for (int i_level = 0; i_level <= n_levels; ++i_level) {
+    int h;
+    int w;
+    int n_iter;
+
+    if (max_dim <= 1) {
+      h = 1;
+      w = 1;
+      n_iter = n_small_iterations;
+    } else {
+      const double ratio = static_cast<double>(i_level) / static_cast<double>(n_levels);
+      w = static_cast<int>(std::nearbyint(std::pow(static_cast<double>(w0), ratio)));
+      h = static_cast<int>(std::nearbyint(std::pow(static_cast<double>(h0), ratio)));
+      n_iter = (w <= small_size && h <= small_size) ? n_small_iterations : n_big_iterations;
+    }
+
+    const std::size_t base = static_cast<std::size_t>(i_level) * 3;
+    flat_shapes[base + 0] = h;
+    flat_shapes[base + 1] = w;
+    flat_shapes[base + 2] = n_iter;
+  }
+
+  return flat_shapes;
 }
 
 inline void write_solution(
@@ -17,79 +80,45 @@ inline void write_solution(
     std::size_t x,
     const PixelSolutionInputs &inputs
 ) {
-  const float alpha1 = 1.0f - inputs.alpha;
-  const float mu_F0 = inputs.foreground_weighted_sum_r * inputs.inverse_weight_sum;
-  const float mu_F1 = inputs.foreground_weighted_sum_g * inputs.inverse_weight_sum;
-  const float mu_F2 = inputs.foreground_weighted_sum_b * inputs.inverse_weight_sum;
-  const float mu_B0 = inputs.background_weighted_sum_r * inputs.inverse_weight_sum;
-  const float mu_B1 = inputs.background_weighted_sum_g * inputs.inverse_weight_sum;
-  const float mu_B2 = inputs.background_weighted_sum_b * inputs.inverse_weight_sum;
-
-  const float r0 = fmadd(-alpha1, mu_B0, fmadd(-inputs.alpha, mu_F0, inputs.image_r));
-  const float r1 = fmadd(-alpha1, mu_B1, fmadd(-inputs.alpha, mu_F1, inputs.image_g));
-  const float r2 = fmadd(-alpha1, mu_B2, fmadd(-inputs.alpha, mu_F2, inputs.image_b));
-
-  if (inputs.alpha < kAlphaLowThreshold) {
-    foreground(y, x, 0) = clamp01(mu_F0);
-    foreground(y, x, 1) = clamp01(mu_F1);
-    foreground(y, x, 2) = clamp01(mu_F2);
-    background(y, x, 0) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r0, mu_B0));
-    background(y, x, 1) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r1, mu_B1));
-    background(y, x, 2) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r2, mu_B2));
-  } else if (inputs.alpha > kAlphaHighThreshold) {
-    foreground(y, x, 0) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r0, mu_F0));
-    foreground(y, x, 1) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r1, mu_F1));
-    foreground(y, x, 2) = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r2, mu_F2));
-    background(y, x, 0) = clamp01(mu_B0);
-    background(y, x, 1) = clamp01(mu_B1);
-    background(y, x, 2) = clamp01(mu_B2);
-  } else {
-    foreground(y, x, 0) = clamp01(fmadd(inputs.foreground_gain, r0, mu_F0));
-    foreground(y, x, 1) = clamp01(fmadd(inputs.foreground_gain, r1, mu_F1));
-    foreground(y, x, 2) = clamp01(fmadd(inputs.foreground_gain, r2, mu_F2));
-    background(y, x, 0) = clamp01(fmadd(inputs.background_gain, r0, mu_B0));
-    background(y, x, 1) = clamp01(fmadd(inputs.background_gain, r1, mu_B1));
-    background(y, x, 2) = clamp01(fmadd(inputs.background_gain, r2, mu_B2));
+  switch (classify_alpha_region(inputs.alpha)) {
+    case AlphaRegion::low:
+      write_solution_channels<AlphaRegion::low>(inputs, [&](bool is_foreground, std::size_t c, float value) {
+        (is_foreground ? foreground : background)(y, x, c) = value;
+      });
+      break;
+    case AlphaRegion::high:
+      write_solution_channels<AlphaRegion::high>(inputs, [&](bool is_foreground, std::size_t c, float value) {
+        (is_foreground ? foreground : background)(y, x, c) = value;
+      });
+      break;
+    case AlphaRegion::middle:
+      write_solution_channels<AlphaRegion::middle>(inputs, [&](bool is_foreground, std::size_t c, float value) {
+        (is_foreground ? foreground : background)(y, x, c) = value;
+      });
+      break;
   }
 }
 
 inline void write_solution_buffer(float *foreground, float *background, std::size_t idx, const PixelSolutionInputs &inputs) {
-  const float alpha1 = 1.0f - inputs.alpha;
-  const float mu_F0 = inputs.foreground_weighted_sum_r * inputs.inverse_weight_sum;
-  const float mu_F1 = inputs.foreground_weighted_sum_g * inputs.inverse_weight_sum;
-  const float mu_F2 = inputs.foreground_weighted_sum_b * inputs.inverse_weight_sum;
-  const float mu_B0 = inputs.background_weighted_sum_r * inputs.inverse_weight_sum;
-  const float mu_B1 = inputs.background_weighted_sum_g * inputs.inverse_weight_sum;
-  const float mu_B2 = inputs.background_weighted_sum_b * inputs.inverse_weight_sum;
+  float *foreground_px = foreground + rgb_pixel_base(idx);
+  float *background_px = background + rgb_pixel_base(idx);
 
-  const float r0 = fmadd(-alpha1, mu_B0, fmadd(-inputs.alpha, mu_F0, inputs.image_r));
-  const float r1 = fmadd(-alpha1, mu_B1, fmadd(-inputs.alpha, mu_F1, inputs.image_g));
-  const float r2 = fmadd(-alpha1, mu_B2, fmadd(-inputs.alpha, mu_F2, inputs.image_b));
-
-  float *foreground_px = foreground + idx * kChannels;
-  float *background_px = background + idx * kChannels;
-
-  if (inputs.alpha < kAlphaLowThreshold) {
-    foreground_px[0] = clamp01(mu_F0);
-    foreground_px[1] = clamp01(mu_F1);
-    foreground_px[2] = clamp01(mu_F2);
-    background_px[0] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r0, mu_B0));
-    background_px[1] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r1, mu_B1));
-    background_px[2] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r2, mu_B2));
-  } else if (inputs.alpha > kAlphaHighThreshold) {
-    foreground_px[0] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r0, mu_F0));
-    foreground_px[1] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r1, mu_F1));
-    foreground_px[2] = clamp01(fmadd(inputs.inverse_weight_sum_plus_one, r2, mu_F2));
-    background_px[0] = clamp01(mu_B0);
-    background_px[1] = clamp01(mu_B1);
-    background_px[2] = clamp01(mu_B2);
-  } else {
-    foreground_px[0] = clamp01(fmadd(inputs.foreground_gain, r0, mu_F0));
-    foreground_px[1] = clamp01(fmadd(inputs.foreground_gain, r1, mu_F1));
-    foreground_px[2] = clamp01(fmadd(inputs.foreground_gain, r2, mu_F2));
-    background_px[0] = clamp01(fmadd(inputs.background_gain, r0, mu_B0));
-    background_px[1] = clamp01(fmadd(inputs.background_gain, r1, mu_B1));
-    background_px[2] = clamp01(fmadd(inputs.background_gain, r2, mu_B2));
+  switch (classify_alpha_region(inputs.alpha)) {
+    case AlphaRegion::low:
+      write_solution_channels<AlphaRegion::low>(inputs, [&](bool is_foreground, std::size_t c, float value) {
+        (is_foreground ? foreground_px : background_px)[c] = value;
+      });
+      break;
+    case AlphaRegion::high:
+      write_solution_channels<AlphaRegion::high>(inputs, [&](bool is_foreground, std::size_t c, float value) {
+        (is_foreground ? foreground_px : background_px)[c] = value;
+      });
+      break;
+    case AlphaRegion::middle:
+      write_solution_channels<AlphaRegion::middle>(inputs, [&](bool is_foreground, std::size_t c, float value) {
+        (is_foreground ? foreground_px : background_px)[c] = value;
+      });
+      break;
   }
 }
 
@@ -105,15 +134,15 @@ inline void compute_initial_means_buffer(const float *image, const float *alpha,
       const float alpha0 = alpha[idx];
       const float *px = image + idx * kChannels;
       if (alpha0 > kInitialForegroundThreshold) {
-        fg_sum[0] += px[0];
-        fg_sum[1] += px[1];
-        fg_sum[2] += px[2];
+        apply_rgb([&]<std::size_t C>(std::integral_constant<std::size_t, C>) {
+          fg_sum[C] += px[C];
+        });
         ++fg_count;
       }
       if (alpha0 < kInitialBackgroundThreshold) {
-        bg_sum[0] += px[0];
-        bg_sum[1] += px[1];
-        bg_sum[2] += px[2];
+        apply_rgb([&]<std::size_t C>(std::integral_constant<std::size_t, C>) {
+          bg_sum[C] += px[C];
+        });
         ++bg_count;
       }
     }
@@ -216,47 +245,64 @@ inline void update_red_black_half_step_buffer(
     int h,
     int w,
     int color
+);
+
+template <bool InteriorOnly>
+inline void update_red_black_half_step_region_buffer(
+    float *foreground,
+    float *background,
+    const float *image,
+    const float *alpha,
+    const float *neighbor_weights,
+    const float *inverse_weight_sum,
+    const float *inverse_weight_sum_plus_one,
+    const float *foreground_gain,
+    const float *background_gain,
+    int h,
+    int w,
+    int color
 ) {
   if (h <= 0 || w <= 0) {
     return;
   }
 
+  const SweepColor sweep_color = static_cast<SweepColor>(color);
+
   auto process_pixel = [&](int y, int x) {
     const std::size_t idx = scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
-    const int x_left = x == 0 ? 0 : x - 1;
-    const int x_right = x + 1 >= w ? w - 1 : x + 1;
-    const int y_up = y == 0 ? 0 : y - 1;
-    const int y_down = y + 1 >= h ? h - 1 : y + 1;
+    const int x_left = InteriorOnly ? x - 1 : (x == 0 ? 0 : x - 1);
+    const int x_right = InteriorOnly ? x + 1 : (x + 1 >= w ? w - 1 : x + 1);
+    const int y_up = InteriorOnly ? y - 1 : (y == 0 ? 0 : y - 1);
+    const int y_down = InteriorOnly ? y + 1 : (y + 1 >= h ? h - 1 : y + 1);
     const std::size_t idx_left = scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x_left), static_cast<std::size_t>(w));
     const std::size_t idx_right = scalar_index(static_cast<std::size_t>(y), static_cast<std::size_t>(x_right), static_cast<std::size_t>(w));
     const std::size_t idx_up = scalar_index(static_cast<std::size_t>(y_up), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
     const std::size_t idx_down = scalar_index(static_cast<std::size_t>(y_down), static_cast<std::size_t>(x), static_cast<std::size_t>(w));
     const float *nw = neighbor_weights + idx * kNeighborCount;
-    const std::size_t image_idx = idx * kChannels;
+    const std::size_t image_idx = rgb_pixel_base(idx);
+    float foreground_weighted_sum[kChannels] {};
+    float background_weighted_sum[kChannels] {};
+
+    apply_rgb([&]<std::size_t C>(std::integral_constant<std::size_t, C>) {
+      foreground_weighted_sum[C] =
+          nw[0] * foreground[rgb_pixel_base(idx_left) + C] + nw[1] * foreground[rgb_pixel_base(idx_right) + C] +
+          nw[2] * foreground[rgb_pixel_base(idx_up) + C] + nw[3] * foreground[rgb_pixel_base(idx_down) + C];
+      background_weighted_sum[C] =
+          nw[0] * background[rgb_pixel_base(idx_left) + C] + nw[1] * background[rgb_pixel_base(idx_right) + C] +
+          nw[2] * background[rgb_pixel_base(idx_up) + C] + nw[3] * background[rgb_pixel_base(idx_down) + C];
+    });
 
     const PixelSolutionInputs inputs {
         .alpha = alpha[idx],
         .image_r = image[image_idx + 0],
         .image_g = image[image_idx + 1],
         .image_b = image[image_idx + 2],
-        .foreground_weighted_sum_r =
-            nw[0] * foreground[idx_left * kChannels + 0] + nw[1] * foreground[idx_right * kChannels + 0] +
-            nw[2] * foreground[idx_up * kChannels + 0] + nw[3] * foreground[idx_down * kChannels + 0],
-        .foreground_weighted_sum_g =
-            nw[0] * foreground[idx_left * kChannels + 1] + nw[1] * foreground[idx_right * kChannels + 1] +
-            nw[2] * foreground[idx_up * kChannels + 1] + nw[3] * foreground[idx_down * kChannels + 1],
-        .foreground_weighted_sum_b =
-            nw[0] * foreground[idx_left * kChannels + 2] + nw[1] * foreground[idx_right * kChannels + 2] +
-            nw[2] * foreground[idx_up * kChannels + 2] + nw[3] * foreground[idx_down * kChannels + 2],
-        .background_weighted_sum_r =
-            nw[0] * background[idx_left * kChannels + 0] + nw[1] * background[idx_right * kChannels + 0] +
-            nw[2] * background[idx_up * kChannels + 0] + nw[3] * background[idx_down * kChannels + 0],
-        .background_weighted_sum_g =
-            nw[0] * background[idx_left * kChannels + 1] + nw[1] * background[idx_right * kChannels + 1] +
-            nw[2] * background[idx_up * kChannels + 1] + nw[3] * background[idx_down * kChannels + 1],
-        .background_weighted_sum_b =
-            nw[0] * background[idx_left * kChannels + 2] + nw[1] * background[idx_right * kChannels + 2] +
-            nw[2] * background[idx_up * kChannels + 2] + nw[3] * background[idx_down * kChannels + 2],
+        .foreground_weighted_sum_r = foreground_weighted_sum[0],
+        .foreground_weighted_sum_g = foreground_weighted_sum[1],
+        .foreground_weighted_sum_b = foreground_weighted_sum[2],
+        .background_weighted_sum_r = background_weighted_sum[0],
+        .background_weighted_sum_g = background_weighted_sum[1],
+        .background_weighted_sum_b = background_weighted_sum[2],
         .inverse_weight_sum = inverse_weight_sum[idx],
         .inverse_weight_sum_plus_one = inverse_weight_sum_plus_one[idx],
         .foreground_gain = foreground_gain[idx],
@@ -265,34 +311,78 @@ inline void update_red_black_half_step_buffer(
     write_solution_buffer(foreground, background, idx, inputs);
   };
 
-  if (h > 2 && w > 2) {
+  if constexpr (InteriorOnly) {
+    if (h <= 2 || w <= 2) {
+      return;
+    }
     for (int y = 1; y < h - 1; ++y) {
-      int x_start = (color + y) % 2;
-      x_start = x_start == 0 ? 2 : 1;
+      const int x_start = interior_x_start(y, sweep_color);
       for (int x = x_start; x < w - 1; x += 2) {
         process_pixel(y, x);
       }
     }
-  }
+  } else {
+    for (int y = 0; y < h; ++y) {
+      if (y != 0 && y + 1 < h) {
+        continue;
+      }
+      const int x_start = parity_of(y, sweep_color);
+      for (int x = x_start; x < w; x += 2) {
+        process_pixel(y, x);
+      }
+    }
 
-  for (int y = 0; y < h; ++y) {
-    if (y != 0 && y + 1 < h) {
-      continue;
-    }
-    const int x_start = (color + y) % 2;
-    for (int x = x_start; x < w; x += 2) {
-      process_pixel(y, x);
+    for (int y = 1; y < h - 1; ++y) {
+      if (parity_of(y, sweep_color) == 0) {
+        process_pixel(y, 0);
+      }
+      if (w > 1 && parity_of(y + w - 1, sweep_color) == 0) {
+        process_pixel(y, w - 1);
+      }
     }
   }
+}
 
-  for (int y = 1; y < h - 1; ++y) {
-    if (((color + y) % 2) == 0) {
-      process_pixel(y, 0);
-    }
-    if (w > 1 && ((w - 1 + y) % 2) == color) {
-      process_pixel(y, w - 1);
-    }
-  }
+inline void update_red_black_half_step_buffer(
+    float *foreground,
+    float *background,
+    const float *image,
+    const float *alpha,
+    const float *neighbor_weights,
+    const float *inverse_weight_sum,
+    const float *inverse_weight_sum_plus_one,
+    const float *foreground_gain,
+    const float *background_gain,
+    int h,
+    int w,
+    int color
+) {
+  update_red_black_half_step_region_buffer<true>(
+      foreground,
+      background,
+      image,
+      alpha,
+      neighbor_weights,
+      inverse_weight_sum,
+      inverse_weight_sum_plus_one,
+      foreground_gain,
+      background_gain,
+      h,
+      w,
+      color);
+  update_red_black_half_step_region_buffer<false>(
+      foreground,
+      background,
+      image,
+      alpha,
+      neighbor_weights,
+      inverse_weight_sum,
+      inverse_weight_sum_plus_one,
+      foreground_gain,
+      background_gain,
+      h,
+      w,
+      color);
 }
 
 inline void estimate_multilevel_foreground_background(
@@ -335,25 +425,14 @@ inline void estimate_multilevel_foreground_background(
 
   int prev_h = 1;
   int prev_w = 1;
-
-  const int max_dim = std::max(h0, w0);
-  const int n_levels = (max_dim <= 1) ? 0 : static_cast<int>(std::ceil(std::log2(static_cast<double>(max_dim))));
+  const auto level_shapes = build_multilevel_shapes_flat(h0, w0, small_size, n_small_iterations, n_big_iterations);
+  const int n_levels = static_cast<int>(level_shapes.size() / 3) - 1;
 
   for (int i_level = 0; i_level <= n_levels; ++i_level) {
-    int w;
-    int h;
-    int n_iter;
-
-    if (max_dim <= 1) {
-      w = 1;
-      h = 1;
-      n_iter = n_small_iterations;
-    } else {
-      const double ratio = static_cast<double>(i_level) / static_cast<double>(n_levels);
-      w = static_cast<int>(std::nearbyint(std::pow(static_cast<double>(w0), ratio)));
-      h = static_cast<int>(std::nearbyint(std::pow(static_cast<double>(h0), ratio)));
-      n_iter = (w <= small_size && h <= small_size) ? n_small_iterations : n_big_iterations;
-    }
+    const std::size_t shape_base = static_cast<std::size_t>(i_level) * 3;
+    const int h = level_shapes[shape_base + 0];
+    const int w = level_shapes[shape_base + 1];
+    const int n_iter = level_shapes[shape_base + 2];
 
     resize_nearest_rgb_buffer(workspace.image.data(), input_image_ptr, h0, w0, h, w);
     resize_nearest_scalar_buffer(workspace.alpha.data(), input_alpha_ptr, h0, w0, h, w);
