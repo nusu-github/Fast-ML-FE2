@@ -1,3 +1,4 @@
+import FastMLFE2.Core.ClosedForm
 import FastMLFE2.Core.LocalSemantics
 import FastMLFE2.Theorems.Invertibility
 import FastMLFE2.Theorems.CostToNormalEquation
@@ -5,13 +6,20 @@ import FastMLFE2.Theorems.CostToNormalEquation
 namespace FastMLFE2.Theorems
 
 /-!
-Initial closed-form equivalence theorems for the local theory kernel.
+Closed-form correctness theorems for the 2×2 local normal equation.
+
+The definitions (`closedFormSolution`, `closedFormDenom`, etc.) live in `Core.ClosedForm`.
+This file proves they actually solve the normal equation and are cost-stationary.
 -/
 
 open FastMLFE2.Core
 open FastMLFE2.Assumptions
 
 namespace LocalContext
+
+export FastMLFE2.Core.LocalContext (closedFormDenom closedFormForegroundNumerator
+  closedFormBackgroundNumerator closedFormSolution inverseSolution
+  foreground_closedFormSolution background_closedFormSolution)
 
 variable {ι : Type*} [Fintype ι]
 
@@ -29,43 +37,9 @@ private theorem solve2x2_background
         a11 * ((a00 * b1 - a01 * b0) / det) = b1 := by
   field_simp [hdet0]; rw [hdet]; ring
 
-def closedFormDenom (ctx : LocalContext ι) : ℝ :=
-  ctx.totalWeight * ctx.weightedMeanDenom
-
-def closedFormForegroundNumerator (ctx : LocalContext ι) : ℝ :=
-  ((1 - ctx.alphaCenter) ^ 2 + ctx.totalWeight) * foreground ctx.rhs -
-    ctx.alphaCenter * (1 - ctx.alphaCenter) * background ctx.rhs
-
-def closedFormBackgroundNumerator (ctx : LocalContext ι) : ℝ :=
-  (ctx.alphaCenter ^ 2 + ctx.totalWeight) * background ctx.rhs -
-    ctx.alphaCenter * (1 - ctx.alphaCenter) * foreground ctx.rhs
-
-noncomputable def closedFormSolution (ctx : LocalContext ι) : LocalUnknown :=
-  let b := ctx.rhs
-  let det := closedFormDenom ctx
-  ![
-    (((1 - ctx.alphaCenter) ^ 2 + ctx.totalWeight) * foreground b -
-      ctx.alphaCenter * (1 - ctx.alphaCenter) * background b) / det,
-    ((ctx.alphaCenter ^ 2 + ctx.totalWeight) * background b -
-      ctx.alphaCenter * (1 - ctx.alphaCenter) * foreground b) / det
-  ]
-
-noncomputable def inverseSolution (ctx : LocalContext ι) : LocalUnknown :=
-  (ctx.normalMatrix⁻¹).mulVec ctx.rhs
-
 theorem closedFormDenom_eq_det (ctx : LocalContext ι) :
     closedFormDenom ctx = ctx.normalMatrix.det := by
   simpa [closedFormDenom] using (normalMatrix_det ctx).symm
-
-@[simp] theorem foreground_closedFormSolution (ctx : LocalContext ι) :
-    foreground (closedFormSolution ctx) =
-      closedFormForegroundNumerator ctx / closedFormDenom ctx := by
-  simp [closedFormSolution, closedFormForegroundNumerator, foreground, background]
-
-@[simp] theorem background_closedFormSolution (ctx : LocalContext ι) :
-    background (closedFormSolution ctx) =
-      closedFormBackgroundNumerator ctx / closedFormDenom ctx := by
-  simp [closedFormSolution, closedFormBackgroundNumerator, foreground, background]
 
 theorem closedFormDenom_pos (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     0 < closedFormDenom ctx := by

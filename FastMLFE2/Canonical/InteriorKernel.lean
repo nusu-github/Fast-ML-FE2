@@ -94,7 +94,7 @@ noncomputable def interiorClosedFormSolution
     (p : Pixel h w)
     (state : PixelState (Pixel h w))
     (hInterior : IsInterior p) : LocalUnknown :=
-  FastMLFE2.Theorems.LocalContext.closedFormSolution
+  FastMLFE2.Core.LocalContext.closedFormSolution
     (interiorLocalCtx data p state hInterior)
 
 end GridPixelData

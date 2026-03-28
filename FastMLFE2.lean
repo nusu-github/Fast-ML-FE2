@@ -1,5 +1,6 @@
 import FastMLFE2.Core.LocalEquation
 import FastMLFE2.Core.LocalSemantics
+import FastMLFE2.Core.ClosedForm
 import FastMLFE2.Compositing.OneChannel
 import FastMLFE2.Level.Jacobi
 import FastMLFE2.Level.Locality

@@ -1,9 +1,6 @@
 import FastMLFE2.FixedPrecision.Format
-import FastMLFE2.Theorems.QuantizationBounds
 
 namespace FastMLFE2.FixedPrecision
-
-open FastMLFE2.Theorems
 
 variable {cfg : FixedFormat}
 

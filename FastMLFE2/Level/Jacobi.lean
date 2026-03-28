@@ -1,4 +1,4 @@
-import FastMLFE2.Theorems.ClosedForm
+import FastMLFE2.Core.ClosedForm
 
 namespace FastMLFE2.Level
 
@@ -21,7 +21,7 @@ noncomputable def jacobiUpdateAt
     (builder : LocalContextBuilder κ η)
     (state : PixelState κ)
     (p : κ) : LocalUnknown :=
-  FastMLFE2.Theorems.LocalContext.closedFormSolution (builder.build p state)
+  LocalContext.closedFormSolution (builder.build p state)
 
 noncomputable def jacobiStep
     (builder : LocalContextBuilder κ η)
@@ -33,7 +33,7 @@ noncomputable def jacobiStep
     (state : PixelState κ)
     (p : κ) :
     builder.jacobiUpdateAt state p =
-      FastMLFE2.Theorems.LocalContext.closedFormSolution (builder.build p state) := rfl
+      LocalContext.closedFormSolution (builder.build p state) := rfl
 
 @[simp] theorem jacobiStep_apply
     (builder : LocalContextBuilder κ η)

@@ -1,6 +1,5 @@
 import FastMLFE2.FixedPrecision.Format
 import FastMLFE2.FixedPrecision.Coefficients
-import FastMLFE2.Theorems.ClosedFormMeanResidual
 
 namespace FastMLFE2.FixedPrecision
 
