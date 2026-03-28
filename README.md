@@ -1,7 +1,7 @@
 # Fast-ML-FE2
 
 A formalization of Germer et al.'s
-[Fast Multi-Level Foreground Estimation](https://doi.org/10.1109/ICIP46576.2022.9897331)
+[Fast Multi-Level Foreground Estimation](https://arxiv.org/abs/2006.14970)
 in **Lean 4** (Dependent Type Theory), targeting **proof-directed optimal implementation
 derivation** through a three-stage pipeline.
 
@@ -38,6 +38,9 @@ FastMLFE2/
 │   └── LocalSemantics.lean         ← solution / stationarity relations
 ├── Compositing/
 │   └── OneChannel.lean             ← α·F + (1-α)·B semantics
+├── Level/
+│   ├── Jacobi.lean                ← simultaneous pointwise update on finite pixel set
+│   └── Locality.lean              ← abstract neighborhood-sensitive dependence laws
 ├── Canonical/
 │   ├── Builder.lean                ← CanonicalPixelData; canonical builder construction
 │   ├── Grid.lean                   ← Fin h × Fin w geometry, four-connected neighborhoods
@@ -55,6 +58,13 @@ FastMLFE2/
 │   └── DiscreteGradFamilies.lean   ← discrete step-pattern and witness-family definitions
 ├── Approximation/
 │   └── BlurFusion.lean             ← idealized PhotoRoom Blur-Fusion surrogate
+├── FixedPrecision/
+│   ├── Format.lean                ← FixedFormat, BitVec storage/accumulator, decode/encode
+│   ├── Coefficients.lean          ← reciprocal table spec, coefficient quantization budget
+│   ├── LocalSolver.lean           ← FixedLocalContext, fixed-point mean-residual step
+│   ├── Jacobi.lean                ← FixedLocalContextBuilder, fixed Jacobi step/iterate
+│   ├── Cost.lean                  ← WeightedCostModel, per-step and per-iteration cost
+│   └── Multilevel.lean            ← FixedGridState, nearest-neighbor resize, red-black sweep
 ├── Assumptions/
 │   ├── Bundles.lean                ← CoreMathAssumptions, variant bundles
 │   └── Grid.lean                   ← GridMathAssumptions, bridge to CoreMathAssumptions
@@ -94,6 +104,12 @@ FastMLFE2/
     ├── GridLocal.lean              ← closed-form theorems on GridPixelData.localCtx
     ├── InteriorKernel.lean         ← closed-form theorems on interior-pixel context
     ├── CanonicalBuilder.lean       ← field-correctness for canonical builders
+    ├── QuantizationBounds.lean     ← grid quantization error, geometric series helpers
+    ├── FixedPrecisionLocal.lean    ← no-wraparound ⇒ decoded step = quantized real step
+    ├── FixedPrecisionJacobi.lean   ← range-cert Jacobi update correctness
+    ├── FixedPrecisionCost.lean     ← safety-cert equivalence; cost model nonnegativity
+    ├── FixedPrecisionMultilevel.lean ← resize identity, red-black/Jacobi fixed-point equivalence
+    ├── FixedPrecisionWraparound.lean ← 4-bit wraparound counterexample
     ├── ForegroundMetrics.lean      ← SAD/MSE bounds and adversarial-family equalities
     ├── ContinuousGrad.lean         ← continuous GRAD bounds for vertical step-edge families
     └── DiscreteGrad.lean           ← discrete GRAD kernel facts and step-family certificates
@@ -121,6 +137,8 @@ pipeline stages:
 - Canonical commitments: 4-connected stencil, nearest-neighbor resize, deterministic
   simultaneous update (`Canonical`)
 - Idealized Blur-Fusion approximation semantics (`Approximation.BlurFusion`)
+- Fixed-precision format, local solver, Jacobi iteration, cost model, and multilevel
+  schedule (`FixedPrecision`)
 
 **Stage 2 (Design-Space Exploration):**
 
@@ -195,6 +213,21 @@ pipeline stages:
 - **Iteration Budgets** — `E₀ q^k ≤ η` gives a sufficient early-termination threshold via a
   reusable log-based theorem.
 
+**Fixed-Precision Refinement:**
+
+- **Quantization Bounds** — grid quantization error `|q(x) − x| < 1/S`; geometric series
+  helpers for accumulation analysis.
+- **Fixed-Precision Local** — Under `NoWrapLocalStep` (no accumulator wraparound), the
+  decoded fixed-point step equals the quantized real step.
+- **Fixed-Precision Jacobi** — `LocalRangeCert` lifts no-wrap guarantees to
+  `fixedJacobiUpdateAt`; `LocalSafetyCert` equivalence for the fully-fixed step.
+- **Fixed-Precision Cost** — Weighted operation cost model; per-step, per-iteration, and
+  multilevel cost nonnegativity; cost saving from reciprocal-table reuse.
+- **Fixed-Precision Multilevel** — Same-size resize is identity; red-black sweep and
+  Jacobi step share the same fixed-point set; multilevel cost nonnegativity.
+- **Fixed-Precision Wraparound** — Explicit 4-bit counterexample showing accumulator
+  wraparound produces incorrect results (`7 + 7 = −2` in 4-bit signed).
+
 ## Prerequisites
 
 - **Lean 4** — version specified in `lean-toolchain` (currently `v4.28.0`)
@@ -212,13 +245,13 @@ lake env lean FastMLFE2/Theorems/Invertibility.lean
 
 ## Project Structure
 
-| Path              | Role                                                        |
-| ----------------- | ----------------------------------------------------------- |
-| `FastMLFE2/`      | Main Lean source modules                                    |
-| `docs/`           | Architecture and design documents ([index](docs/README.md)) |
-| `evaluation/`     | Evaluation scripts                                          |
-| `lakefile.toml`   | Lake build configuration                                    |
-| `lean-toolchain`  | Lean version pin                                            |
+| Path             | Role                                                        |
+| ---------------- | ----------------------------------------------------------- |
+| `FastMLFE2/`     | Main Lean source modules                                    |
+| `docs/`          | Architecture and design documents ([index](docs/README.md)) |
+| `evaluation/`    | Evaluation scripts                                          |
+| `lakefile.toml`  | Lake build configuration                                    |
+| `lean-toolchain` | Lean version pin                                            |
 
 ## Dependencies
 

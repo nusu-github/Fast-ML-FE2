@@ -60,7 +60,7 @@ principle.
 │  │  PropagationRadius · SpatialDecay              │ │
 │  │  CompositingError · Jacobi · Locality          │ │
 │  │  IterationInvariance · CanonicalBuilder        │ │
-│  │  Grid* · InteriorKernel                        │ │
+│  │  Grid* · InteriorKernel · FixedPrecision*      │ │
 │  ├────────────────────────────────────────────────┤ │
 │  │  Assumptions                                   │ │
 │  │  CoreMathAssumptions · GridMathAssumptions     │ │
@@ -81,6 +81,10 @@ principle.
 │  ├────────────────────────────────────────────────┤ │
 │  │  Approximation                                 │ │
 │  │  BlurFusion surrogate semantics                │ │
+│  ├────────────────────────────────────────────────┤ │
+│  │  FixedPrecision                                │ │
+│  │  Format · Coefficients · LocalSolver           │ │
+│  │  Jacobi · Cost · Multilevel                    │ │
 │  ├────────────────────────────────────────────────┤ │
 │  │  Compositing                                   │ │
 │  │  OneChannel: α·F + (1-α)·B                     │ │
@@ -160,6 +164,26 @@ Metric semantics and adversarial test families used to stress foreground-estimat
   default `sigma = 1.4`, including sampled kernels, reflect padding, and separable correlation.
 - **DiscreteGradFamilies** — discrete witness families for step-pattern stress tests that mirror
   the Python-side synthetic generators.
+
+### Fixed Precision (`FastMLFE2.FixedPrecision`)
+
+Models fixed-width integer/floating-point arithmetic for the entire pipeline, from coefficient
+computation through multilevel scheduling.
+
+- **Format** — `FixedFormat` structure (word width, accumulator width, scale, rounding mode);
+  `Storage`, `Accumulator`, `Coefficient` as `BitVec` aliases; `decodeStorage`/`decodeAccumulator`
+  bridging bit-vectors to `ℝ`.
+- **Coefficients** — `ReciprocalTableSpec` defining weight/gain reciprocal domains;
+  `coefficientQuantizationBudget`; table-lookup reciprocals.
+- **LocalSolver** — `FixedLocalContext` carrying per-pixel fixed-point data; `NoWrapLocalStep`
+  and `LocalRangeCert`/`LocalSafetyCert` predicates; `fixedMeanResidualStep` and
+  `fullyFixedMeanResidualStep` update functions.
+- **Jacobi** — `FixedLocalContextBuilder`, `fixedJacobiStep`/`fullyFixedJacobiStep`, and
+  their `n`-fold iterates.
+- **Cost** — `WeightedCostModel` with per-operation weights; `localStepCost`,
+  `referenceLocalStepCost`, and per-iteration/multilevel cost functions.
+- **Multilevel** — `FixedGridState`, `FixedGridBuilder`, `FixedLevelSpec`; nearest-neighbor
+  resize; red-black sweep ordering (`CheckerColor`); `multilevelCost`.
 
 ### Assumptions (`FastMLFE2.Assumptions`)
 
@@ -262,6 +286,19 @@ Machine-checked results under explicit assumptions.
 - **InteriorKernel** — equivalence between `ValidDir`-indexed and `Direction4`-indexed
   contexts for interior pixels; `interiorLocalCtx` matches `localCtx` up to the
   `validDirEquivDirection4` bijection; closed-form solution correctness on interior contexts.
+- **QuantizationBounds** — grid quantization error `|q(x) − x| < 1/S`; geometric series
+  helpers for accumulation analysis.
+- **FixedPrecisionLocal** — `NoWrapLocalStep` ⇒ decoded fixed-point step equals quantized
+  real step; decoded wrapped sums match unwrapped integer sums.
+- **FixedPrecisionJacobi** — `LocalRangeCert` lifts no-wrap to `fixedJacobiUpdateAt`;
+  `LocalSafetyCert` equivalence for `fullyFixedJacobiUpdateAt`.
+- **FixedPrecisionCost** — Safety-cert decoded step equals reference; cost model
+  nonnegativity for local step, Jacobi iteration, and multilevel pipeline; reciprocal-table
+  cost saving.
+- **FixedPrecisionMultilevel** — Same-size nearest-neighbor resize is identity; red-black
+  sweep and Jacobi step share fixed-point sets; multilevel cost nonnegativity.
+- **FixedPrecisionWraparound** — Explicit 4-bit counterexample: `7 + 7 = −2` in signed
+  `BitVec 4`, showing accumulator overflow invalidates decoded results.
 
 ## Import Graph
 
@@ -281,9 +318,15 @@ FastMLFE2  (default target)
         ├── Canonical.LocalCommitments
         ├── Canonical.MultilevelSchedule
         ├── Approximation.BlurFusion
+        ├── FixedPrecision.Format ──► Core.LocalEquation
+        ├── FixedPrecision.Coefficients ──► FixedPrecision.Format, Theorems.QuantizationBounds
+        ├── FixedPrecision.LocalSolver ──► FixedPrecision.Format, FixedPrecision.Coefficients
+        ├── FixedPrecision.Jacobi ──► FixedPrecision.LocalSolver
+        ├── FixedPrecision.Cost ──► FixedPrecision.Jacobi
+        ├── FixedPrecision.Multilevel ──► FixedPrecision.Cost, Canonical.MultilevelSchedule
         ├── Assumptions.Bundles ──► Core.LocalEquation
         ├── Assumptions.Grid ──► Canonical.Grid, Assumptions.Bundles
-        └── Theorems.*  ──► Core.*, Compositing.*, Level.*, Canonical.*, Assumptions.*
+        └── Theorems.*  ──► Core.*, Compositing.*, Level.*, Canonical.*, FixedPrecision.*, Assumptions.*
 
 Experimental (not in FastMLFE2.lean umbrella, work in progress):
   ├── FastMLFE2.GlobalSystem  ──► ConcreteImage, NormalEquation (pending)
