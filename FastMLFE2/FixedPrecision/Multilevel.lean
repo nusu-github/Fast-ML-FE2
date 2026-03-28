@@ -46,8 +46,8 @@ noncomputable def fullyFixedNearestNeighborResize
     (state : FixedGridState cfg h w) :
     fullyFixedNearestNeighborResize (cfg := cfg) (hSrc := h) (wSrc := w) (hDst := h) (wDst := w)
       state = state := by
-  simpa [fullyFixedNearestNeighborResize] using
-    (nearestNeighborResize_self (h := h) (w := w) state)
+  simp only [fullyFixedNearestNeighborResize,
+    nearestNeighborResize_self (h := h) (w := w) state]
 
 inductive CheckerColor where
   | red
@@ -158,8 +158,7 @@ theorem redHalfStep_eq_self_of_sweepFixed
   funext p
   by_cases hRed : pixelColor p = .red
   · have hp := congrArg (fun s => s p) hSweep
-    simp [fullyFixedRedBlackSweep, fullyFixedRedBlackHalfStep, hRed,
-      pixelColor_not_black_of_red p hRed] at hp ⊢
+    simp [fullyFixedRedBlackSweep, fullyFixedRedBlackHalfStep, hRed] at hp ⊢
     exact hp
   · simp [fullyFixedRedBlackHalfStep, hRed]
 

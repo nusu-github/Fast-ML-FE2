@@ -74,7 +74,7 @@ theorem reflectNat_lt (n : Nat) (hn : 0 < n) (i : Int) :
     reflectNat n i < n := by
   by_cases hsmall : n ≤ 1
   · have hn1 : n = 1 := by omega
-    simp [reflectNat, hsmall, hn1]
+    simp [reflectNat, hn1]
   · simp [reflectNat, hsmall]
     set period := 2 * n - 2
     set j : Nat := Int.toNat (i.emod period)

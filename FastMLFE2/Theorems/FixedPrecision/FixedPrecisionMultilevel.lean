@@ -14,7 +14,7 @@ theorem fullyFixedNearestNeighborResize_sameSize
     [Fact (0 < h)] [Fact (0 < w)]
     (state : FixedGridState cfg h w) :
     fullyFixedNearestNeighborResize (hSrc := h) (wSrc := w) (hDst := h) (wDst := w) state = state := by
-  simpa using FastMLFE2.FixedPrecision.fullyFixedNearestNeighborResize_self
+  exact FastMLFE2.FixedPrecision.fullyFixedNearestNeighborResize_self
     (cfg := cfg) (h := h) (w := w) state
 
 theorem redBlackSweep_eq_self_of_jacobiFixed

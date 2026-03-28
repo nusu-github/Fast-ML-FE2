@@ -23,7 +23,7 @@ structure FixedFormat where
   accWidthPos : 0 < accWidth
   scalePos : 0 < scale
   weightScalePos : 0 < weightScale := by
-    simpa using scalePos
+    simp_all
   deriving Repr
 
 abbrev Storage (cfg : FixedFormat) := BitVec cfg.wordWidth
