@@ -35,7 +35,9 @@ FastMLFE2.lean                          ← umbrella import
 FastMLFE2/
 ├── Core/
 │   ├── LocalEquation.lean          ← local context, cost, normal matrix, RHS
-│   └── LocalSemantics.lean         ← solution / stationarity relations
+│   ├── LocalSemantics.lean         ← solution / stationarity relations
+│   ├── ClosedForm.lean             ← closed-form solution definitions and @[simp] accessors
+│   └── JacobiIteration.lean        ← per-pixel Jacobi step, iterate, spectral radius defs
 ├── Compositing/
 │   └── OneChannel.lean             ← α·F + (1-α)·B semantics
 ├── Level/
@@ -69,60 +71,57 @@ FastMLFE2/
 │   ├── Bundles.lean                ← CoreMathAssumptions, variant bundles
 │   └── Grid.lean                   ← GridMathAssumptions, bridge to CoreMathAssumptions
 └── Theorems/
-    ├── Invertibility.lean          ← det > 0, IsUnit det
-    ├── ClosedForm.lean             ← explicit 2×2 inverse, uniqueness
-    ├── ClosedFormBox.lean          ← conditional [0,1] membership from numerator bounds
-    ├── ClosedFormBoxInput.lean     ← mean-affine form; counterexample for naive box-input
-    ├── ClosedFormMeanResidual.lean ← meanResidual-corrected solution characterization
-    ├── NormalizedWeights.lean      ← normalized weight form of fore-/backgroundMean
-    ├── CostToNormalEquation.lean   ← ∂cost/∂t = 0 ↔ normal equation
-    ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
-    ├── BinaryAlpha.lean            ← normalMatrix / rhs degenerations for α ∈ {0, 1}
-    ├── BinaryAlphaCost.lean        ← localCost and stationarity for binary α
-    ├── ChannelReuse.lean           ← SameWeightData; matrix coefficient invariance across channels
-    ├── ClampLocal.lean             ← clamp01 self-identity and nonexpansiveness
-    ├── JacobiContraction.lean      ← jacobiStep, spectral radius, contraction bound
-    ├── ClampPlacement.lean         ← clamp ordering (inside vs end) and rawStepGain
-    ├── ClampPlacementCounterexample.lean ← inside-clamped ≠ end-clamped witness
-    ├── MeanResidualBounds.lean     ← mean residual bounds and correction terms
-    ├── ResidualCompositeBounds.lean  ← closed-form composite error vs mean residual
-    ├── ContractionBounds.lean      ← relaxed updates, λ_max, and iteration budgets
-    ├── NearBinary.lean             ← meanResidual correction around weighted means
-    ├── NearBinaryCounterexample.lean ← clamp-binary swap counterexample
-    ├── IterationInvariance.lean    ← weight/matrix coefficients state-independent in canonical builders
-    ├── BleedThrough.lean           ← component-wise Jacobi iterate error vs closed form
-    ├── BlurFusionGap.lean          ← synthetic Blur-Fusion stage-two context; joint vs sequential gap
-    ├── BlurFusionFixedPoint.lean   ← Blur-Fusion x1 fixed-point counterexample
-    ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
-    ├── SpatialDecay.lean           ← abstract radius-decay and halo-width interfaces
-    ├── CompositingError.lean       ← |Δcompose| ≤ α|ΔF| + (1-α)|ΔB|
-    ├── Jacobi.lean                 ← pointwise Jacobi lifting to closed-form solutions
-    ├── Locality.lean               ← builder locality lifts to jacobiUpdateAt / jacobiStep
-    ├── Grid.lean                   ← faithful 2D four-neighbor geometry theorems
-    ├── GridNonempty.lean           ← constructive ValidDir nonemptiness witnesses
-    ├── GridAssumptions.lean        ← GridMathAssumptions → CoreMathAssumptions bridge
-    ├── GridLocal.lean              ← closed-form theorems on GridPixelData.localCtx
-    ├── InteriorKernel.lean         ← closed-form theorems on interior-pixel context
-    ├── CanonicalBuilder.lean       ← field-correctness for canonical builders
-    ├── QuantizationBounds.lean     ← grid quantization error, geometric series helpers
-    ├── FixedPrecisionLocal.lean    ← no-wraparound ⇒ decoded step = quantized real step
-    ├── FixedPrecisionJacobi.lean   ← range-cert Jacobi update correctness
-    ├── FixedPrecisionCost.lean     ← safety-cert equivalence; cost model nonnegativity
-    ├── FixedPrecisionMultilevel.lean ← resize identity, red-black/Jacobi fixed-point equivalence
-    ├── FixedPrecisionWraparound.lean ← 4-bit wraparound counterexample
-    ├── ForegroundMetrics.lean      ← SAD/MSE bounds and adversarial-family equalities
-    ├── ContinuousGrad.lean         ← continuous GRAD bounds for vertical step-edge families
-    └── DiscreteGrad.lean           ← discrete GRAD kernel facts and step-family certificates
-```
-
-Experimental modules (not part of the default umbrella import):
-
-```txt
-FastMLFE2/
-├── GlobalSystem.lean               ← global block linear system; weighted Laplacian,
-│                                     globalLinearResidual, bridge to local residuals
-└── MultigridSpec.lean              ← abstract V-cycle skeleton (GridTransfer, VCycleOps)
-                                      and fixed-point theorem (work in progress)
+    ├── Solvability/
+    │   ├── Invertibility.lean          ← det > 0, IsUnit det
+    │   ├── ClosedForm.lean             ← explicit 2×2 inverse, uniqueness
+    │   ├── CostToNormalEquation.lean   ← ∂cost/∂t = 0 ↔ normal equation
+    │   ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
+    │   ├── NormalizedWeights.lean      ← normalized weight form of fore-/backgroundMean
+    │   └── MeanResidualBounds.lean     ← mean residual bounds and correction terms
+    ├── Clamping/
+    │   ├── ClampLocal.lean             ← clamp01 self-identity and nonexpansiveness
+    │   ├── ClampPlacement.lean         ← clamp ordering (inside vs end) and rawStepGain
+    │   ├── ClampPlacementCounterexample.lean ← inside-clamped ≠ end-clamped witness
+    │   ├── ClosedFormBox.lean          ← conditional [0,1] membership from numerator bounds
+    │   └── ClosedFormBoxInput.lean     ← mean-affine form; counterexample for naive box-input
+    ├── Iteration/
+    │   ├── BinaryAlpha.lean            ← normalMatrix / rhs degenerations for α ∈ {0, 1}
+    │   ├── BinaryAlphaCost.lean        ← localCost and stationarity for binary α
+    │   ├── JacobiContraction.lean      ← spectral radius, contraction bound
+    │   ├── ContractionBounds.lean      ← relaxed updates, λ_max, and iteration budgets
+    │   └── Jacobi.lean                 ← pointwise Jacobi lifting to closed-form solutions
+    ├── Approximation/
+    │   ├── NearBinary.lean             ← meanResidual correction around weighted means
+    │   ├── NearBinaryCounterexample.lean ← clamp-binary swap counterexample
+    │   ├── ClosedFormMeanResidual.lean ← meanResidual-corrected solution characterization
+    │   ├── ResidualCompositeBounds.lean  ← closed-form composite error vs mean residual
+    │   ├── BleedThrough.lean           ← component-wise Jacobi iterate error vs closed form
+    │   ├── CompositingError.lean       ← |Δcompose| ≤ α|ΔF| + (1-α)|ΔB|
+    │   ├── BlurFusionGap.lean          ← synthetic Blur-Fusion stage-two context; joint vs sequential gap
+    │   └── BlurFusionFixedPoint.lean   ← Blur-Fusion x1 fixed-point counterexample
+    ├── Grid/
+    │   ├── Grid.lean                   ← faithful 2D four-neighbor geometry theorems
+    │   ├── GridNonempty.lean           ← constructive ValidDir nonemptiness witnesses
+    │   ├── GridAssumptions.lean        ← GridMathAssumptions → CoreMathAssumptions bridge
+    │   ├── GridLocal.lean              ← closed-form theorems on GridPixelData.localCtx
+    │   ├── InteriorKernel.lean         ← closed-form theorems on interior-pixel context
+    │   ├── CanonicalBuilder.lean       ← field-correctness for canonical builders
+    │   ├── ChannelReuse.lean           ← SameWeightData; matrix coefficient invariance
+    │   ├── IterationInvariance.lean    ← weight/matrix coefficients state-independent
+    │   ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
+    │   └── Locality.lean               ← builder locality lifts to jacobiUpdateAt / jacobiStep
+    ├── FixedPrecision/
+    │   ├── QuantizationBounds.lean     ← grid quantization error, geometric series helpers
+    │   ├── FixedPrecisionLocal.lean    ← no-wraparound ⇒ decoded step = quantized real step
+    │   ├── FixedPrecisionJacobi.lean   ← range-cert Jacobi update correctness
+    │   ├── FixedPrecisionCost.lean     ← safety-cert equivalence; cost model nonnegativity
+    │   ├── FixedPrecisionMultilevel.lean ← resize identity, red-black/Jacobi fixed-point equiv
+    │   └── FixedPrecisionWraparound.lean ← 4-bit wraparound counterexample
+    └── Evaluation/
+        ├── ForegroundMetrics.lean      ← SAD/MSE bounds and adversarial-family equalities
+        ├── ContinuousGrad.lean         ← continuous GRAD bounds for vertical step-edge families
+        ├── DiscreteGrad.lean           ← discrete GRAD kernel facts and step-family certificates
+        └── SpatialDecay.lean           ← abstract radius-decay and halo-width interfaces
 ```
 
 ## Proved Theorems

@@ -327,10 +327,6 @@ FastMLFE2  (default target)
         ├── Assumptions.Bundles ──► Core.LocalEquation
         ├── Assumptions.Grid ──► Canonical.Grid, Assumptions.Bundles
         └── Theorems.*  ──► Core.*, Compositing.*, Level.*, Canonical.*, FixedPrecision.*, Assumptions.*
-
-Experimental (not in FastMLFE2.lean umbrella, work in progress):
-  ├── FastMLFE2.GlobalSystem  ──► ConcreteImage, NormalEquation (pending)
-  └── FastMLFE2.MultigridSpec ──► FastMLFE2.GlobalSystem
 ```
 
 ## Design Rationale

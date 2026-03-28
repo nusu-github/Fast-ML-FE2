@@ -379,3 +379,83 @@ Theorems/
 | Theorems/ サブディレクトリ化 | 推奨 | **未実施** |
 
 → 前回分析で指摘された全改善点が未着手。今回の計画で優先度付けし、フェーズ化して実行する。
+
+---
+
+## 実施結果 (Implementation Results)
+
+### Phase 0: ハウスキーピング ✅
+
+- `FixedPrecision/Coefficients.lean`: `Theorems.QuantizationBounds` stale import 削除
+- `FixedPrecision/LocalSolver.lean`: `Theorems.ClosedFormMeanResidual` stale import 削除
+- `GlobalSystem.lean` (294行) 削除 (コンパイル不能)
+- `MultigridSpec.lean` (120行) 削除 (コンパイル不能)
+
+### Phase 1: 定義抽出 ✅
+
+**1-1: Core.ClosedForm 抽出**
+- `Theorems/ClosedForm.lean` から 5定義 + 2 @[simp] を `Core/ClosedForm.lean` へ移動
+- `Level/Jacobi.lean` のレイヤリング違反を解消 (Theorems.ClosedForm → Core.ClosedForm)
+- `export` パターンで後方互換性を確保
+
+**1-2: Core.JacobiIteration 抽出**
+- `Theorems/JacobiContraction.lean` から 12定義 + 6 @[simp] を `Core/JacobiIteration.lean` へ移動
+- 同じ `export` パターンで後方互換性を確保
+
+**1-3: NearBinary 分割** → 不要と判断
+- 定義2個のみ (binaryZeroCtx, weightDriftBudget)、いずれもファイル内部でのみ使用
+- 554行だが線形依存構造で自己完結。分割の価値なし
+
+### Phase 2: MathLib 移行 (部分実施)
+
+**2-1: clamp01Scalar → Set.projIcc** → 既存ブリッジ定理で対応済み
+- `ClampPlacement.lean` に `clamp01Scalar_eq_projIcc` が既に存在
+- 定義自体の変更は counterexample 6箇所の `norm_num` を壊すため不実施
+
+**2-2: ContractingWith 移行** → ブロック (別PR推奨)
+- `LocalUnknown` を `PiLp ∞` でラップし MetricSpace 変更が必要 (~20ファイル影響)
+- 高リスク・別PR で段階的に実施推奨
+
+**2-3: geomSeries 移行** → ブロック (2-2 に依存)
+
+### Phase 3: Theorems/ サブディレクトリ化 ✅
+
+44ファイルを7サブディレクトリに再編成:
+
+| サブディレクトリ | ファイル数 | 内容 |
+|-----------------|-----------|------|
+| Solvability/ | 6 | 方程式求解性 (ClosedForm, Invertibility 等) |
+| Clamping/ | 5 | 値クランプ (ClampLocal, ClosedFormBox 等) |
+| Iteration/ | 5 | 収束・縮小 (JacobiContraction, BinaryAlpha 等) |
+| Approximation/ | 8 | 近似・合成誤差 (NearBinary, BlurFusion 等) |
+| Grid/ | 10 | グリッド・カノニカル (GridLocal, InteriorKernel 等) |
+| FixedPrecision/ | 6 | 固定精度算術 (QuantizationBounds 等) |
+| Evaluation/ | 4 | メトリクス・勾配 (ForegroundMetrics, DiscreteGrad 等) |
+
+### Phase 4: 未接続リンク (分析完了)
+
+| リンク | 結論 |
+|--------|------|
+| SpatialDecay ↔ PropagationRadius | PropagationRadius は完全等式 (C=0 で自明)。非自明な接続はグリッド層の収縮理論が必要 → 将来課題 |
+| IterationInvariance → FixedPrecision | FP が既に直接証明済み。ブリッジは抽象化向上のみ → 低優先度 |
+| NormalizedWeights → NearBinary | 直交する結果。NearBinary は生のweight境界を使用 → 接続不要 |
+| ContractionBounds → JacobiContraction | LocalUnknown のノルムインスタンスが必要 → Phase 2-2 に依存 |
+
+### Phase 5: simp 監査 ✅
+
+- `unnecessarySimpa` 警告 3箇所修正 (Format.lean, Multilevel.lean, FPMultilevel.lean)
+- `unusedSimpArgs` 警告 2箇所修正 (DiscreteGrad.lean, Multilevel.lean)
+- 残存警告: `longLine` (5), `flexible` (8), `unusedVariable` (2) — 全て既存・低優先度
+
+### 最終ステータス
+
+| 指標 | 変更前 | 変更後 |
+|------|--------|--------|
+| レイヤリング違反 | 3 | **1** (Level.Jacobi 解消済み) |
+| コンパイル不能ファイル | 2 | **0** |
+| stale import | 2 | **0** |
+| unnecessarySimpa 警告 | 3 | **0** |
+| unusedSimpArgs 警告 | 2 | **0** |
+| Theorems/ 構造 | flat (44ファイル) | **7サブディレクトリ** |
+| Core/ 新モジュール | 2 (LocalEquation, LocalSemantics) | **4** (+ClosedForm, JacobiIteration) |
+| 削除行数 | — | **414行** (GlobalSystem 294 + MultigridSpec 120) |
