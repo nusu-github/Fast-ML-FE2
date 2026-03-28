@@ -13,9 +13,9 @@ theorem fullyFixedNearestNeighborResize_sameSize
     {cfg : FixedFormat} {h w : Nat}
     [Fact (0 < h)] [Fact (0 < w)]
     (state : FixedGridState cfg h w) :
-    fullyFixedNearestNeighborResize (hSrc := h) (wSrc := w) (hDst := h) (wDst := w) state = state := by
-  exact FastMLFE2.FixedPrecision.fullyFixedNearestNeighborResize_self
-    (cfg := cfg) (h := h) (w := w) state
+    fullyFixedNearestNeighborResize (hSrc := h) (wSrc := w)
+      (hDst := h) (wDst := w) state = state :=
+  FastMLFE2.FixedPrecision.fullyFixedNearestNeighborResize_self state
 
 theorem redBlackSweep_eq_self_of_jacobiFixed
     {cfg : FixedFormat} {h w : Nat}
@@ -39,8 +39,8 @@ theorem multilevelCost_nonneg'
     (family : FixedGridBuilderFamily cfg)
     (seed : SomeFixedGridState cfg)
     (levels : List FixedLevelSpec) :
-    0 ≤ multilevelCost model family seed levels := by
-  exact FastMLFE2.FixedPrecision.multilevelCost_nonneg model family seed levels
+    0 ≤ multilevelCost model family seed levels :=
+  FastMLFE2.FixedPrecision.multilevelCost_nonneg model family seed levels
 
 theorem fullyFixedMultilevelRun_nil
     {cfg : FixedFormat}

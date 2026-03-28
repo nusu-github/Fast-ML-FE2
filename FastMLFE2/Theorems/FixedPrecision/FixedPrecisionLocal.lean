@@ -15,30 +15,26 @@ theorem decodedWrappedTotalWeight_eq_of_noWrap (ctx : FixedLocalContext cfg ι)
     (h : ctx.NoWrapLocalStep) :
     decodeAccumulator cfg ctx.wrappedTotalWeight =
       (ctx.unwrappedTotalWeightInt : ℝ) / cfg.scale := by
-  rcases h with ⟨hW, _, _⟩
-  simp [decodeAccumulator, hW]
+  simp [decodeAccumulator, h.1]
 
 theorem decodedWrappedForegroundSum_eq_of_noWrap (ctx : FixedLocalContext cfg ι)
     (h : ctx.NoWrapLocalStep) :
     decodeAccumulator cfg ctx.wrappedForegroundSum =
       (ctx.unwrappedForegroundSumInt : ℝ) / cfg.scale := by
-  rcases h with ⟨_, hF, _⟩
-  simp [decodeAccumulator, hF]
+  simp [decodeAccumulator, h.2.1]
 
 theorem decodedWrappedBackgroundSum_eq_of_noWrap (ctx : FixedLocalContext cfg ι)
     (h : ctx.NoWrapLocalStep) :
     decodeAccumulator cfg ctx.wrappedBackgroundSum =
       (ctx.unwrappedBackgroundSumInt : ℝ) / cfg.scale := by
-  rcases h with ⟨_, _, hB⟩
-  simp [decodeAccumulator, hB]
+  simp [decodeAccumulator, h.2.2]
 
 theorem decodedStep_eq_quantizedRealStep_of_noWrap (ctx : FixedLocalContext cfg ι)
     (h : ctx.NoWrapLocalStep) :
     decodeUnknown cfg (ctx.fixedMeanResidualStep) =
       decodeUnknown cfg (ctx.quantizedMeanResidualStep) := by
-  rcases h with ⟨hW, hF, hB⟩
   simp [FixedLocalContext.fixedMeanResidualStep, FixedLocalContext.quantizedMeanResidualStep,
-    decodeUnknown, decodeAccumulator, hW, hF, hB]
+    decodeUnknown, decodeAccumulator, h.1, h.2.1, h.2.2]
 
 omit [Fintype ι] in
 theorem decodeLocalContext_alphaCenter_eq (ctx : FixedLocalContext cfg ι) :

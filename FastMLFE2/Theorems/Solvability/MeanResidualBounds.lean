@@ -22,8 +22,8 @@ theorem foregroundMean_le_one
     (hfg : ∀ j, ctx.fgNeighbor j ≤ 1) :
     ctx.foregroundMean ≤ 1 := by
   rw [foregroundMean, foregroundSum, div_le_one (totalWeight_pos ctx), totalWeight]
-  exact Finset.sum_le_sum fun j _ =>
-    by simpa using mul_le_mul_of_nonneg_left (hfg j) (neighborWeight_nonneg ctx j)
+  exact Finset.sum_le_sum fun j _ => by
+    simpa using mul_le_mul_of_nonneg_left (hfg j) (neighborWeight_nonneg ctx j)
 
 theorem backgroundMean_nonneg
     (ctx : LocalContext ι) [CoreMathAssumptions ctx]
@@ -37,8 +37,8 @@ theorem backgroundMean_le_one
     (hbg : ∀ j, ctx.bgNeighbor j ≤ 1) :
     ctx.backgroundMean ≤ 1 := by
   rw [backgroundMean, backgroundSum, div_le_one (totalWeight_pos ctx), totalWeight]
-  exact Finset.sum_le_sum fun j _ =>
-    by simpa using mul_le_mul_of_nonneg_left (hbg j) (neighborWeight_nonneg ctx j)
+  exact Finset.sum_le_sum fun j _ => by
+    simpa using mul_le_mul_of_nonneg_left (hbg j) (neighborWeight_nonneg ctx j)
 
 /-- H9: If all inputs are in [0, 1], then |meanResidual| ≤ 1. -/
 theorem abs_meanResidual_le_one_of_boxed_inputs
@@ -49,11 +49,11 @@ theorem abs_meanResidual_le_one_of_boxed_inputs
     (hbg : ∀ j, 0 ≤ ctx.bgNeighbor j ∧ ctx.bgNeighbor j ≤ 1) :
     |meanResidual ctx| ≤ 1 := by
   rw [meanResidual, abs_le]
-  have hfm0 := foregroundMean_nonneg ctx (fun j => (hfg j).1)
-  have hfm1 := foregroundMean_le_one ctx (fun j => (hfg j).2)
-  have hbm0 := backgroundMean_nonneg ctx (fun j => (hbg j).1)
-  have hbm1 := backgroundMean_le_one ctx (fun j => (hbg j).2)
-  constructor <;> nlinarith [hI.1, hI.2, hα.1, hα.2]
+  constructor <;> nlinarith [foregroundMean_nonneg ctx (fun j => (hfg j).1),
+    foregroundMean_le_one ctx (fun j => (hfg j).2),
+    backgroundMean_nonneg ctx (fun j => (hbg j).1),
+    backgroundMean_le_one ctx (fun j => (hbg j).2),
+    hI.1, hI.2, hα.1, hα.2]
 
 theorem alpha_sq_add_one_minus_alpha_sq_ge_half (α : ℝ) :
     1/2 ≤ α^2 + (1-α)^2 := by nlinarith [sq_nonneg (α - 1/2)]
@@ -90,7 +90,7 @@ theorem abs_background_correction_le
     |(1 - ctx.alphaCenter) * meanResidual ctx / ctx.weightedMeanDenom| ≤
       2 * (1 - ctx.alphaCenter) := by
   have hden := weightedMeanDenom_pos ctx
-  have hβ : 0 ≤ 1 - ctx.alphaCenter := by linarith
+  have hβ : 0 ≤ 1 - ctx.alphaCenter := by linarith [hα.2]
   rw [abs_div, abs_mul, abs_of_nonneg hβ, abs_of_pos hden]
   have hr := abs_meanResidual_le_one_of_boxed_inputs ctx hI hα hfg hbg
   have hD : 1/2 ≤ ctx.weightedMeanDenom := by

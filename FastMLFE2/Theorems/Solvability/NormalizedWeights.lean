@@ -18,9 +18,7 @@ private theorem weightedSum_div_totalWeight_eq_sum_normalizedWeight_mul
     (ctx : LocalContext ι) [CoreMathAssumptions ctx] (x : ι → ℝ) :
     (∑ j, ctx.neighborWeight j * x j) / ctx.totalWeight =
       ∑ j, normalizedWeight ctx j * x j := by
-  have htw0 : ctx.totalWeight ≠ 0 := (totalWeight_pos ctx).ne'
-  simp_rw [normalizedWeight, div_mul_eq_mul_div]
-  rw [← Finset.sum_div]
+  simp_rw [normalizedWeight, div_mul_eq_mul_div]; rw [← Finset.sum_div]
 
 theorem foregroundMean_eq_sum_normalizedWeight_mul
     (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
@@ -37,8 +35,7 @@ theorem backgroundMean_eq_sum_normalizedWeight_mul
 theorem sum_normalizedWeight_eq_one
     (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     ∑ j, normalizedWeight ctx j = 1 := by
-  simp_rw [normalizedWeight, ← Finset.sum_div,
-    LocalContext.totalWeight_eq_sum_neighborWeight]
+  simp_rw [normalizedWeight, ← Finset.sum_div, LocalContext.totalWeight_eq_sum_neighborWeight]
   exact div_self (totalWeight_pos ctx).ne'
 
 end LocalContext

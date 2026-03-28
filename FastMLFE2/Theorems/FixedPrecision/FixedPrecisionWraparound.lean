@@ -17,12 +17,10 @@ def tinyWrapFormat : FixedFormat where
 def wrappedFourBitSum : Accumulator tinyWrapFormat :=
   wrapAdd tinyWrapFormat (BitVec.ofNat 4 7) (BitVec.ofNat 4 7)
 
-example : wrappedFourBitSum.toInt = -2 := by
-  decide
+example : wrappedFourBitSum.toInt = -2 := by decide
 
 theorem wraparound_counterexample :
-    wrappedFourBitSum.toInt ≠ (14 : Int) := by
-  decide
+    wrappedFourBitSum.toInt ≠ (14 : Int) := by decide
 
 end FixedPrecision
 
