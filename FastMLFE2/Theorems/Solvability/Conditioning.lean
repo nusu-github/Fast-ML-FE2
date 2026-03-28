@@ -4,6 +4,7 @@ namespace FastMLFE2.Theorems
 
 open FastMLFE2.Core
 open FastMLFE2.Assumptions
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
 

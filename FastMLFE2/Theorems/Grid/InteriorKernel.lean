@@ -1,4 +1,5 @@
 import FastMLFE2.Canonical.InteriorKernel
+import FastMLFE2.Core.ClosedForm
 import FastMLFE2.Theorems.Solvability.ClosedForm
 import FastMLFE2.Theorems.Grid.GridLocal
 

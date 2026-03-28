@@ -236,9 +236,9 @@ Machine-checked results under explicit assumptions.
   only α, ε_r, ω. Formally guarantees shared-coefficient reuse in multi-channel processing.
 - **ClampLocal** — `clamp01Scalar` is a fixed point exactly on `[0,1]`; `clamp01` and
   `clamp01Scalar` are non-expanding under the infinity norm.
-- **JacobiContraction** — Local Jacobi step (`jacobiStep`, `jacobiDiagForeground/Background`,
-  `jacobiCrossTerm`); spectral radius `ρ < 1` under `CoreMathAssumptions`; geometric error
-  contraction.
+- **JacobiContraction** — Contraction theorems for the core Jacobi definitions
+  (`Core.LocalContext.jacobiStep`, `jacobiDiagForeground/Background`, `jacobiCrossTerm`);
+  spectral radius `ρ < 1` under `CoreMathAssumptions`; geometric error contraction.
 - **ClampPlacement** — `rawStepGain < 1`; inside-clamped and end-clamped iterates have
   distinct fixed-point sets (explicit counterexample supplied by `ClampPlacementCounterexample`).
 - **CompositingError** — Triangle-inequality bound on compositing difference in terms of

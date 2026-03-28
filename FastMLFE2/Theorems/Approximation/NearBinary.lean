@@ -1,14 +1,16 @@
-import FastMLFE2.Theorems.Solvability.ClosedForm
+import FastMLFE2.Core.ClosedForm
+import FastMLFE2.Core.JacobiIteration
 import FastMLFE2.Theorems.Clamping.ClosedFormBoxInput
-import FastMLFE2.Theorems.Iteration.JacobiContraction
 import FastMLFE2.Theorems.Solvability.Invertibility
 import FastMLFE2.Theorems.Solvability.Conditioning
+import FastMLFE2.Theorems.Solvability.ClosedForm
 import FastMLFE2.Theorems.Solvability.MeanResidualBounds
 
 namespace FastMLFE2.Theorems
 
 open FastMLFE2.Core
 open FastMLFE2.Assumptions
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
 

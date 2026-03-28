@@ -396,11 +396,11 @@ Theorems/
 **1-1: Core.ClosedForm 抽出**
 - `Theorems/ClosedForm.lean` から 5定義 + 2 @[simp] を `Core/ClosedForm.lean` へ移動
 - `Level/Jacobi.lean` のレイヤリング違反を解消 (Theorems.ClosedForm → Core.ClosedForm)
-- `export` パターンで後方互換性を確保
+- 一時的に `export` パターンで後方互換性を確保（後で削除）
 
 **1-2: Core.JacobiIteration 抽出**
 - `Theorems/JacobiContraction.lean` から 12定義 + 6 @[simp] を `Core/JacobiIteration.lean` へ移動
-- 同じ `export` パターンで後方互換性を確保
+- 同じ `export` パターンで一時的に後方互換性を確保（後で削除）
 
 **1-3: NearBinary 分割** → 不要と判断
 - 定義2個のみ (binaryZeroCtx, weightDriftBudget)、いずれもファイル内部でのみ使用

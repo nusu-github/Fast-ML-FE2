@@ -1,9 +1,13 @@
+import FastMLFE2.Core.ClosedForm
+import FastMLFE2.Core.LocalSemantics
 import FastMLFE2.Theorems.Clamping.ClampLocal
+import FastMLFE2.Theorems.Solvability.ClosedForm
 
 namespace FastMLFE2.Theorems
 
 open FastMLFE2.Core
 open FastMLFE2.Assumptions
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
 

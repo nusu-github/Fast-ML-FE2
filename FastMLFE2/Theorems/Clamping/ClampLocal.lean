@@ -1,9 +1,11 @@
+import FastMLFE2.Assumptions.Bundles
 import FastMLFE2.Core.LocalEquation
-import FastMLFE2.Theorems.Solvability.ClosedForm
+import FastMLFE2.Core.ClosedForm
 
 namespace FastMLFE2.Theorems
 
 open FastMLFE2.Core
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
 

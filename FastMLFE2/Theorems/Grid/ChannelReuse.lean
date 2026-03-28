@@ -1,3 +1,4 @@
+import FastMLFE2.Core.ClosedForm
 import FastMLFE2.Theorems.Solvability.ClosedForm
 
 namespace FastMLFE2.Theorems
@@ -7,6 +8,7 @@ Channel-independent coefficient reuse for the local 2×2 system.
 -/
 
 open FastMLFE2.Core
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
 

@@ -1,19 +1,15 @@
 import FastMLFE2.Core.JacobiIteration
 import FastMLFE2.Theorems.Solvability.Conditioning
+import FastMLFE2.Theorems.Solvability.ClosedForm
 import FastMLFE2.Theorems.Iteration.BinaryAlpha
 
 namespace FastMLFE2.Theorems
 
 open FastMLFE2.Core
 open FastMLFE2.Assumptions
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
-
-export FastMLFE2.Core.LocalContext (jacobiDiagForeground jacobiDiagBackground jacobiCrossTerm
-  jacobiForegroundCoeff jacobiBackgroundCoeff jacobiStep jacobiDifferenceMap localInfinityNorm
-  jacobiSpectralRadiusSq jacobiSpectralRadius jacobiIterate jacobiOneStepGain
-  jacobiStep_foreground jacobiStep_background jacobiDifferenceMap_foreground
-  jacobiDifferenceMap_background jacobiIterate_zero jacobiIterate_succ)
 
 variable {ι : Type*} [Fintype ι]
 

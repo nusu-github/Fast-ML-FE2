@@ -1,4 +1,5 @@
 import FastMLFE2.Level.Jacobi
+import FastMLFE2.Core.ClosedForm
 import FastMLFE2.Theorems.Solvability.ClosedForm
 
 namespace FastMLFE2.Theorems

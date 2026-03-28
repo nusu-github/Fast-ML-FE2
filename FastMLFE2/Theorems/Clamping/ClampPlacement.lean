@@ -1,7 +1,8 @@
 import FastMLFE2.Canonical.ClampPlacement
-import FastMLFE2.Theorems.Solvability.ClosedForm
+import FastMLFE2.Core.ClosedForm
+import FastMLFE2.Core.JacobiIteration
 import FastMLFE2.Theorems.Clamping.ClampLocal
-import FastMLFE2.Theorems.Iteration.JacobiContraction
+import FastMLFE2.Theorems.Solvability.Invertibility
 
 namespace FastMLFE2.Theorems
 
@@ -9,6 +10,7 @@ open FastMLFE2.Core
 open FastMLFE2.Canonical
 open FastMLFE2.Assumptions
 open FastMLFE2.Level
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
 

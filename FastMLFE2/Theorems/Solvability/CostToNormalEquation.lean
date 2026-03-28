@@ -7,6 +7,7 @@ Bridge the local cost to the normal-equation semantics via genuine derivatives.
 -/
 
 open FastMLFE2.Core
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
 

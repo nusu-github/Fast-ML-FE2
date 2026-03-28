@@ -14,12 +14,9 @@ This file proves they actually solve the normal equation and are cost-stationary
 
 open FastMLFE2.Core
 open FastMLFE2.Assumptions
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
-
-export FastMLFE2.Core.LocalContext (closedFormDenom closedFormForegroundNumerator
-  closedFormBackgroundNumerator closedFormSolution inverseSolution
-  foreground_closedFormSolution background_closedFormSolution)
 
 variable {ι : Type*} [Fintype ι]
 

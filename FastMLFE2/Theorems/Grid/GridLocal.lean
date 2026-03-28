@@ -1,4 +1,5 @@
 import FastMLFE2.Canonical.GridContext
+import FastMLFE2.Core.ClosedForm
 import FastMLFE2.Theorems.Solvability.ClosedForm
 import FastMLFE2.Theorems.Grid.GridAssumptions
 import FastMLFE2.Theorems.Grid.GridNonempty

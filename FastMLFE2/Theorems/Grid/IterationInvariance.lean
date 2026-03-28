@@ -52,8 +52,8 @@ theorem closedFormDenom_eq_of_build
     (data : CanonicalPixelData κ η)
     (p : κ)
     (state₁ state₂ : PixelState κ) :
-    FastMLFE2.Theorems.LocalContext.closedFormDenom (data.canonicalBuilder.build p state₁) =
-      FastMLFE2.Theorems.LocalContext.closedFormDenom (data.canonicalBuilder.build p state₂) :=
+    FastMLFE2.Core.LocalContext.closedFormDenom (data.canonicalBuilder.build p state₁) =
+      FastMLFE2.Core.LocalContext.closedFormDenom (data.canonicalBuilder.build p state₂) :=
   FastMLFE2.Theorems.LocalContext.closedFormDenom_eq_of_sameWeightData
     (canonicalBuilder_sameWeightData data p state₁ state₂)
 
@@ -77,8 +77,8 @@ theorem cacheRelevantCoefficients_eq_of_build
       (data.canonicalBuilder.build p state₂).totalWeight ∧
     (data.canonicalBuilder.build p state₁).weightedMeanDenom =
       (data.canonicalBuilder.build p state₂).weightedMeanDenom ∧
-    FastMLFE2.Theorems.LocalContext.closedFormDenom (data.canonicalBuilder.build p state₁) =
-      FastMLFE2.Theorems.LocalContext.closedFormDenom (data.canonicalBuilder.build p state₂) ∧
+    FastMLFE2.Core.LocalContext.closedFormDenom (data.canonicalBuilder.build p state₁) =
+      FastMLFE2.Core.LocalContext.closedFormDenom (data.canonicalBuilder.build p state₂) ∧
     (data.canonicalBuilder.build p state₁).normalMatrix =
       (data.canonicalBuilder.build p state₂).normalMatrix ∧
     (if (data.canonicalBuilder.build p state₁).alphaCenter ≤ tau then 0 else

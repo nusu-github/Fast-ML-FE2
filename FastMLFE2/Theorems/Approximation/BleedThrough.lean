@@ -1,3 +1,5 @@
+import FastMLFE2.Core.ClosedForm
+import FastMLFE2.Core.JacobiIteration
 import FastMLFE2.Theorems.Approximation.CompositingError
 import FastMLFE2.Theorems.Iteration.ContractionBounds
 import FastMLFE2.Theorems.Iteration.JacobiContraction
@@ -8,6 +10,7 @@ namespace FastMLFE2.Theorems
 open FastMLFE2.Core
 open FastMLFE2.Assumptions
 open FastMLFE2.Compositing
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
 

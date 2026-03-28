@@ -1,3 +1,4 @@
+import FastMLFE2.Core.ClosedForm
 import FastMLFE2.Theorems.Iteration.BinaryAlpha
 import FastMLFE2.Theorems.Clamping.ClampLocal
 
@@ -5,6 +6,7 @@ namespace FastMLFE2.Theorems
 
 open FastMLFE2.Core
 open FastMLFE2.Assumptions
+open FastMLFE2.Core.LocalContext
 
 namespace LocalContext
 
