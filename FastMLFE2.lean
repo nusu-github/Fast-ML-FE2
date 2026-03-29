@@ -11,6 +11,7 @@ import FastMLFE2.Canonical.GridContext
 import FastMLFE2.Canonical.InteriorKernel
 import FastMLFE2.Canonical.ClampPlacement
 import FastMLFE2.Canonical.ClampedMultilevelRun
+import FastMLFE2.Canonical.RelaxedMultilevelRun
 import FastMLFE2.Canonical.LocalCommitments
 import FastMLFE2.Canonical.MultilevelSchedule
 import FastMLFE2.Canonical.MultilevelRun
@@ -48,6 +49,7 @@ import FastMLFE2.Theorems.Solvability.MeanResidualBounds
 import FastMLFE2.Theorems.Approximation.ResidualCompositeBounds
 import FastMLFE2.Theorems.Iteration.JacobiContraction
 import FastMLFE2.Theorems.Iteration.ContractionBounds
+import FastMLFE2.Theorems.Iteration.RelaxedPairedJacobi
 import FastMLFE2.Theorems.FixedPrecision.QuantizationBounds
 import FastMLFE2.Theorems.Approximation.BlurFusionGap
 import FastMLFE2.Theorems.Approximation.BlurFusionFixedPoint
