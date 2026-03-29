@@ -239,7 +239,7 @@ Machine-checked results under explicit assumptions.
 - **JacobiContraction** — Contraction theorems for the core Jacobi definitions
   (`Core.LocalContext.jacobiStep`, `jacobiDiagForeground/Background`, `jacobiCrossTerm`);
   spectral radius `ρ < 1` under `CoreMathAssumptions`; geometric error contraction.
-- **ClampPlacement** — `rawStepGain < 1`; inside-clamped and end-clamped iterates have
+- **ClampPlacement** — `rawStepGain ≥ 1` (unclamped step can overshoot); inside-clamped and end-clamped iterates have
   distinct fixed-point sets (explicit counterexample supplied by `ClampPlacementCounterexample`).
 - **CompositingError** — Triangle-inequality bound on compositing difference in terms of
   component errors; tighter authored form when `0 ≤ α ≤ 1`.
