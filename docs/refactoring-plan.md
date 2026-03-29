@@ -8,18 +8,18 @@
 
 ## 現状サマリー
 
-| 指標 | 値 | 評価 |
-|------|------|------|
-| 定理ファイル数 | 44 | — |
-| 定理層 総行数 | 5,999 | — |
-| 定義層 総行数 | 3,034 | — |
-| `sorry` 使用数 | **0** | ✅ 全証明完了 |
-| `axiom` 宣言数 | **0** | ✅ 不当な公理なし |
-| `maxHeartbeats` 設定数 | **0** | ✅ パフォーマンス問題なし |
-| レイヤリング違反 | **3** | ⚠️ 修正必要 |
-| デッドエンド定理 | **19/44 (43%)** | ⚠️ 接続性改善の余地 |
-| 未接続リンク | **4** | ⚠️ 論理的接続が不足 |
-| コンパイル不能ファイル | **2** (GlobalSystem, MultigridSpec) | ❌ 削除/隔離必要 |
+| 指標                   | 値                                  | 評価                      |
+| ---------------------- | ----------------------------------- | ------------------------- |
+| 定理ファイル数         | 44                                  | —                         |
+| 定理層 総行数          | 5,999                               | —                         |
+| 定義層 総行数          | 3,034                               | —                         |
+| `sorry` 使用数         | **0**                               | ✅ 全証明完了             |
+| `axiom` 宣言数         | **0**                               | ✅ 不当な公理なし         |
+| `maxHeartbeats` 設定数 | **0**                               | ✅ パフォーマンス問題なし |
+| レイヤリング違反       | **3**                               | ⚠️ 修正必要             |
+| デッドエンド定理       | **19/44 (43%)**                     | ⚠️ 接続性改善の余地     |
+| 未接続リンク           | **4**                               | ⚠️ 論理的接続が不足     |
+| コンパイル不能ファイル | **2** (GlobalSystem, MultigridSpec) | ❌ 削除/隔離必要          |
 
 ---
 
@@ -37,20 +37,22 @@
 44ファイル中19ファイルが他の定理ファイルから参照されていない。カテゴリ別:
 
 **純粋孤立 (7ファイル)** — 他の定理と接続なし:
+
 - `SpatialDecay`, `ContinuousGrad`, `DiscreteGrad`, `Grid`, `Jacobi`, `ForegroundMetrics`, `FixedPrecisionMultilevel`
 
 **終端出力 (12ファイル)** — 他の定理を使うが、自身は使われない:
+
 - `BinaryAlphaCost`, `BleedThrough`, `BlurFusionFixedPoint`, `ClampPlacementCounterexample`, `FixedPrecisionCost`, `FixedPrecisionWraparound`, `InteriorKernel`, `IterationInvariance`, `NearBinaryCounterexample`, `NormalizedWeights`, `PropagationRadius`, `ResidualCompositeBounds`
 
 **評価**: 反例ファイル4つ (`*Counterexample`, `BlurFusionFixedPoint`, `FixedPrecisionWraparound`) は終端であること自体が正しい。評価系3ファイル (`ForegroundMetrics`, `ContinuousGrad`, `DiscreteGrad`) もメトリクス定義の性質上終端で問題ない。しかし、以下は **接続すべき**:
 
-| ファイル | 接続先候補 | 理由 |
-|----------|-----------|------|
-| `SpatialDecay` | `PropagationRadius` | 抽象decay interface → 具体的Jacobi伝播 |
-| `IterationInvariance` | `FixedPrecisionCost` | 係数キャッシュ正当性 → FPコストモデル |
-| `ContractionBounds` | `JacobiContraction` | 汎用緩和理論 → Jacobi特化 |
-| `NormalizedWeights` | `NearBinary` | 正規化重み特性 → 近似バイナリ補正 |
-| `BinaryAlphaCost` | Stage 3 refinement chain | コスト形式 → 実装導出 |
+| ファイル              | 接続先候補               | 理由                                   |
+| --------------------- | ------------------------ | -------------------------------------- |
+| `SpatialDecay`        | `PropagationRadius`      | 抽象decay interface → 具体的Jacobi伝播 |
+| `IterationInvariance` | `FixedPrecisionCost`     | 係数キャッシュ正当性 → FPコストモデル  |
+| `ContractionBounds`   | `JacobiContraction`      | 汎用緩和理論 → Jacobi特化              |
+| `NormalizedWeights`   | `NearBinary`             | 正規化重み特性 → 近似バイナリ補正      |
+| `BinaryAlphaCost`     | Stage 3 refinement chain | コスト形式 → 実装導出                  |
 
 #### A-2. 未接続の論理リンク (4箇所)
 
@@ -67,12 +69,12 @@
 
 ### 改善案
 
-| ID | 改善 | 優先度 |
-|----|------|--------|
-| A-1a | 4つの未接続リンクを接続する定理を追加 | **高** |
-| A-1b | `BinaryAlphaCost` を Stage 3 チェーンに接続 | 中 |
-| A-2 | `ClosedForm` から定義を `Core.ClosedForm` に抽出 | **高** |
-| A-3 | `NearBinary.lean` を定義モジュールと定理モジュールに分割 | 中 |
+| ID   | 改善                                                     | 優先度 |
+| ---- | -------------------------------------------------------- | ------ |
+| A-1a | 4つの未接続リンクを接続する定理を追加                    | **高** |
+| A-1b | `BinaryAlphaCost` を Stage 3 チェーンに接続              | 中     |
+| A-2  | `ClosedForm` から定義を `Core.ClosedForm` に抽出         | **高** |
+| A-3  | `NearBinary.lean` を定義モジュールと定理モジュールに分割 | 中     |
 
 ---
 
@@ -86,11 +88,11 @@
 
 #### B-1. 独自実装が MathLib に既存
 
-| ファイル | 独自定義 | MathLib代替 | 推定削減行数 | 難度 |
-|----------|----------|-------------|-------------|------|
-| `ClampLocal` | `clamp01Scalar` = `max 0 (min 1 x)` | `Set.projIcc 0 1` + `projIcc_nonexpansive` | ~12行 | **低** |
-| `ContractionBounds` | `relaxedUpdate`, `relaxationContractionRate`, `relaxationLambdaMax` (67行) | `ContractingWith` API (`Topology.MetricSpace.Contracting`) | ~50-70行 (ただし型変換コスト有) | **高** |
-| `QuantizationBounds` | `gridQuantize` = `Int.floor(x*S)/S` | **既に `Int.floor` 使用済み** ✅。`geomSeries` は `Finset.geom_sum_def` で置換可能 | ~10行 | 低 |
+| ファイル             | 独自定義                                                                   | MathLib代替                                                                        | 推定削減行数                    | 難度   |
+| -------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------- | ------ |
+| `ClampLocal`         | `clamp01Scalar` = `max 0 (min 1 x)`                                        | `Set.projIcc 0 1` + `projIcc_nonexpansive`                                         | ~12行                           | **低** |
+| `ContractionBounds`  | `relaxedUpdate`, `relaxationContractionRate`, `relaxationLambdaMax` (67行) | `ContractingWith` API (`Topology.MetricSpace.Contracting`)                         | ~50-70行 (ただし型変換コスト有) | **高** |
+| `QuantizationBounds` | `gridQuantize` = `Int.floor(x*S)/S`                                        | **既に `Int.floor` 使用済み** ✅。`geomSeries` は `Finset.geom_sum_def` で置換可能 | ~10行                           | 低     |
 
 #### B-2. 命名規則
 
@@ -99,6 +101,7 @@
 #### B-3. `Set.projIcc` への移行 (最優先)
 
 `clamp01Scalar x` ≡ `Set.projIcc 0 1 x` であり、以下の MathLib 定理が直接使用可能:
+
 - `projIcc_of_mem` → `clamp01Scalar_eq_self_of_mem_Icc` を置換
 - `projIcc_nonexpansive` → カスタム非拡大性証明を置換
 
@@ -108,6 +111,7 @@
 #### B-4. `ContractingWith` への移行 (中優先)
 
 MathLib の `ContractingWith` API は以下を提供:
+
 - `ContractingWith.exists_unique_fixed_point` — 不動点の存在と一意性
 - `ContractingWith.dist_fixedPoint_le` — 不動点への距離上界
 - `tsum_geometric_of_lt_one` — 幾何級数の和
@@ -117,11 +121,11 @@ MathLib の `ContractingWith` API は以下を提供:
 
 ### 改善案
 
-| ID | 改善 | 優先度 |
-|----|------|--------|
-| B-1 | `clamp01Scalar` → `Set.projIcc` 移行 | **高** |
-| B-2 | `ContractionBounds` → `ContractingWith` 移行 | 中 |
-| B-3 | `geomSeries` → MathLib `Finset.geom_sum_def` 移行 | 低 |
+| ID  | 改善                                              | 優先度 |
+| --- | ------------------------------------------------- | ------ |
+| B-1 | `clamp01Scalar` → `Set.projIcc` 移行              | **高** |
+| B-2 | `ContractionBounds` → `ContractingWith` 移行      | 中     |
+| B-3 | `geomSeries` → MathLib `Finset.geom_sum_def` 移行 | 低     |
 
 ---
 
@@ -138,15 +142,18 @@ MathLib の `ContractingWith` API は以下を提供:
 #### C-1. 定理ファイルに混在する定義
 
 **`JacobiContraction.lean` (351行)**:
+
 - 12個の `noncomputable def` が定理と混在
 - `jacobiDiagForeground`, `jacobiDiagBackground`, `jacobiCrossTerm`, `jacobiForegroundCoeff`, `jacobiBackgroundCoeff`, `jacobiStep`, `jacobiDifferenceMap`, `localInfinityNorm`, `jacobiSpectralRadiusSq`, `jacobiSpectralRadius`, `jacobiIterate`, `jacobiOneStepGain`
 - これらは **定義** であり、`Core.JacobiIteration` または `Level.JacobiIteration` に属すべき
 
 **`NearBinary.lean` (554行)**:
+
 - 2個の定義 (`binaryZeroCtx`, `weightDriftBudget`) が24定理と混在
 - 定義数は少ないが、ファイル長が突出 (他の最長ファイルの1.57倍)
 
 **`ClosedForm.lean` (136行)**:
+
 - `closedFormSolution`, `closedFormDenom`, `closedFormForegroundNumerator`, `closedFormBackgroundNumerator`, `inverseSolution` が定理と混在
 - これが `Level.Jacobi` からの逆参照 (レイヤリング違反) の根本原因
 
@@ -160,12 +167,12 @@ MathLib の `ContractingWith` API は以下を提供:
 
 ### 改善案
 
-| ID | 改善 | 優先度 |
-|----|------|--------|
-| C-1a | `ClosedForm` の定義を `Core.ClosedForm` に抽出 (A-2 と同一) | **高** |
-| C-1b | `JacobiContraction` の12定義を `Level.JacobiIteration` に抽出 | **高** |
-| C-1c | `NearBinary` を定義+定理に分割 (554行 → ~100行定義 + ~454行定理) | 中 |
-| C-2 | `ContractionBounds` の `relaxedUpdate` 等を utility モジュールに抽出 | 中 |
+| ID   | 改善                                                                 | 優先度 |
+| ---- | -------------------------------------------------------------------- | ------ |
+| C-1a | `ClosedForm` の定義を `Core.ClosedForm` に抽出 (A-2 と同一)          | **高** |
+| C-1b | `JacobiContraction` の12定義を `Level.JacobiIteration` に抽出        | **高** |
+| C-1c | `NearBinary` を定義+定理に分割 (554行 → ~100行定義 + ~454行定理)     | 中     |
+| C-2  | `ContractionBounds` の `relaxedUpdate` 等を utility モジュールに抽出 | 中     |
 
 ---
 
@@ -195,10 +202,10 @@ MathLib の `ContractingWith` API は以下を提供:
 
 ### 改善案
 
-| ID | 改善 | 優先度 |
-|----|------|--------|
-| D-1 | `NearBinary.lean` にセクション構造を追加 | 低 |
-| D-2 | ゴール変形目的の `have` → `suffices` 置換 (選択的) | 低 |
+| ID  | 改善                                               | 優先度 |
+| --- | -------------------------------------------------- | ------ |
+| D-1 | `NearBinary.lean` にセクション構造を追加           | 低     |
+| D-2 | ゴール変形目的の `have` → `suffices` 置換 (選択的) | 低     |
 
 ---
 
@@ -230,11 +237,11 @@ MathLib の `ContractingWith` API は以下を提供:
 
 ### 改善案
 
-| ID | 改善 | 優先度 |
-|----|------|--------|
-| E-1 | `GlobalSystem.lean` / `MultigridSpec.lean` を削除 or `Experimental/` に隔離 | **高** |
-| E-2 | stale import 2箇所を除去 | **高** |
-| E-3 | `ClosedForm` 定義抽出によるハブ分散 | **高** (C-1a と同一) |
+| ID  | 改善                                                                        | 優先度               |
+| --- | --------------------------------------------------------------------------- | -------------------- |
+| E-1 | `GlobalSystem.lean` / `MultigridSpec.lean` を削除 or `Experimental/` に隔離 | **高**               |
+| E-2 | stale import 2箇所を除去                                                    | **高**               |
+| E-3 | `ClosedForm` 定義抽出によるハブ分散                                         | **高** (C-1a と同一) |
 
 ---
 
@@ -285,64 +292,64 @@ Theorems/
 
 **ゴール**: デッドコード除去・stale import 修正
 
-| タスク | 内容 | ゲート |
-|--------|------|--------|
-| 0-1 | `FixedPrecision/Coefficients.lean` から `Theorems.QuantizationBounds` import を除去 | `lake build` |
-| 0-2 | `FixedPrecision/LocalSolver.lean` から `Theorems.ClosedFormMeanResidual` import を除去 | `lake build` |
-| 0-3 | `GlobalSystem.lean` と `MultigridSpec.lean` を削除 (or `Experimental/` に移動) | `lake build` |
+| タスク | 内容                                                                                   | ゲート       |
+| ------ | -------------------------------------------------------------------------------------- | ------------ |
+| 0-1    | `FixedPrecision/Coefficients.lean` から `Theorems.QuantizationBounds` import を除去    | `lake build` |
+| 0-2    | `FixedPrecision/LocalSolver.lean` から `Theorems.ClosedFormMeanResidual` import を除去 | `lake build` |
+| 0-3    | `GlobalSystem.lean` と `MultigridSpec.lean` を削除 (or `Experimental/` に移動)         | `lake build` |
 
 ### Phase 1 — 定義抽出 (レイヤリング違反解消)
 
 **ゴール**: 定理ファイルから定義を抽出し、レイヤリング違反を解消
 
-| タスク | 内容 | ゲート |
-|--------|------|--------|
-| 1-1 | `Core.ClosedForm` モジュールを新規作成。`closedFormSolution`, `closedFormDenom`, `closedFormForegroundNumerator`, `closedFormBackgroundNumerator`, `inverseSolution` を `Theorems.ClosedForm` から移動 | `lake build` |
-| 1-2 | `Level.Jacobi` を `Core.ClosedForm` から import するよう更新 (Theorems.ClosedForm への依存を除去) | `lake build` |
-| 1-3 | `Theorems.ClosedForm` を `Core.ClosedForm` から import するよう更新 (定理のみ残す) | `lake build` |
-| 1-4 | `Level.JacobiIteration` モジュールを新規作成。`JacobiContraction.lean` から12個の定義 (`jacobiStep`, `jacobiIterate`, `jacobiSpectralRadius` 等) を移動 | `lake build` |
-| 1-5 | `NearBinary.lean` から `binaryZeroCtx`, `weightDriftBudget` を適切なモジュールに抽出 (or 同ファイル内でセクション整理) | `lake build` |
+| タスク | 内容                                                                                                                                                                                                   | ゲート       |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| 1-1    | `Core.ClosedForm` モジュールを新規作成。`closedFormSolution`, `closedFormDenom`, `closedFormForegroundNumerator`, `closedFormBackgroundNumerator`, `inverseSolution` を `Theorems.ClosedForm` から移動 | `lake build` |
+| 1-2    | `Level.Jacobi` を `Core.ClosedForm` から import するよう更新 (Theorems.ClosedForm への依存を除去)                                                                                                      | `lake build` |
+| 1-3    | `Theorems.ClosedForm` を `Core.ClosedForm` から import するよう更新 (定理のみ残す)                                                                                                                     | `lake build` |
+| 1-4    | `Level.JacobiIteration` モジュールを新規作成。`JacobiContraction.lean` から12個の定義 (`jacobiStep`, `jacobiIterate`, `jacobiSpectralRadius` 等) を移動                                                | `lake build` |
+| 1-5    | `NearBinary.lean` から `binaryZeroCtx`, `weightDriftBudget` を適切なモジュールに抽出 (or 同ファイル内でセクション整理)                                                                                 | `lake build` |
 
 ### Phase 2 — MathLib 移行
 
 **ゴール**: 独自実装を MathLib 既存機能で置換
 
-| タスク | 内容 | ゲート |
-|--------|------|--------|
-| 2-1 | `clamp01Scalar` → `Set.projIcc 0 1` に移行。`ClampLocal.lean` の非拡大性証明を `projIcc_nonexpansive` で置換 | `lake build` |
-| 2-2 | `ContractionBounds` の relaxation theory → MathLib `ContractingWith` API に移行 (要: 型変換レイヤー設計) | `lake build` |
-| 2-3 | `QuantizationBounds.geomSeries` → MathLib `Finset.geom_sum_def` に置換 | `lake build` |
+| タスク | 内容                                                                                                         | ゲート       |
+| ------ | ------------------------------------------------------------------------------------------------------------ | ------------ |
+| 2-1    | `clamp01Scalar` → `Set.projIcc 0 1` に移行。`ClampLocal.lean` の非拡大性証明を `projIcc_nonexpansive` で置換 | `lake build` |
+| 2-2    | `ContractionBounds` の relaxation theory → MathLib `ContractingWith` API に移行 (要: 型変換レイヤー設計)     | `lake build` |
+| 2-3    | `QuantizationBounds.geomSeries` → MathLib `Finset.geom_sum_def` に置換                                       | `lake build` |
 
 ### Phase 3 — 構造改善
 
 **ゴール**: Theorems/ をサブディレクトリに整理
 
-| タスク | 内容 | ゲート |
-|--------|------|--------|
-| 3-1 | Foundation/ サブディレクトリ作成・ファイル移動 (10ファイル) | `lake build` |
-| 3-2 | Iteration/ サブディレクトリ作成・ファイル移動 (10ファイル) | `lake build` |
-| 3-3 | 残り5サブディレクトリ (DesignSpace, Grid, FixedPrecision, Evaluation, Counterexamples) を作成・移動 | `lake build` |
-| 3-4 | `FastMLFE2.lean` umbrella import パスを全更新 | `lake build` |
-| 3-5 | `docs/architecture.md` を更新 | — |
+| タスク | 内容                                                                                                | ゲート       |
+| ------ | --------------------------------------------------------------------------------------------------- | ------------ |
+| 3-1    | Foundation/ サブディレクトリ作成・ファイル移動 (10ファイル)                                         | `lake build` |
+| 3-2    | Iteration/ サブディレクトリ作成・ファイル移動 (10ファイル)                                          | `lake build` |
+| 3-3    | 残り5サブディレクトリ (DesignSpace, Grid, FixedPrecision, Evaluation, Counterexamples) を作成・移動 | `lake build` |
+| 3-4    | `FastMLFE2.lean` umbrella import パスを全更新                                                       | `lake build` |
+| 3-5    | `docs/architecture.md` を更新                                                                       | —            |
 
 ### Phase 4 — 未接続リンクの接続
 
 **ゴール**: 論理的に接続されるべき定理間のブリッジ定理を追加
 
-| タスク | 内容 | ゲート |
-|--------|------|--------|
-| 4-1 | `SpatialDecay` → `PropagationRadius`: `RadiusDecay` を Jacobi 伝播で instantiate | `lake build` |
-| 4-2 | `IterationInvariance` → `FixedPrecisionCost`: 係数キャッシュ正当性の形式的引用 | `lake build` |
-| 4-3 | `ContractionBounds` → `JacobiContraction`: Jacobi を `r=1` relaxed update として接続 | `lake build` |
-| 4-4 | `NormalizedWeights` → `NearBinary`: 正規化重み特性を NearBinary で活用 | `lake build` |
+| タスク | 内容                                                                                 | ゲート       |
+| ------ | ------------------------------------------------------------------------------------ | ------------ |
+| 4-1    | `SpatialDecay` → `PropagationRadius`: `RadiusDecay` を Jacobi 伝播で instantiate     | `lake build` |
+| 4-2    | `IterationInvariance` → `FixedPrecisionCost`: 係数キャッシュ正当性の形式的引用       | `lake build` |
+| 4-3    | `ContractionBounds` → `JacobiContraction`: Jacobi を `r=1` relaxed update として接続 | `lake build` |
+| 4-4    | `NormalizedWeights` → `NearBinary`: 正規化重み特性を NearBinary で活用               | `lake build` |
 
 ### Phase 5 — 証明簡素化 (継続的)
 
-| タスク | 内容 | ゲート |
-|--------|------|--------|
-| 5-1 | `NearBinary.lean` の `have` チェーン (74箇所) にセクション構造追加 | `lake build` |
-| 5-2 | `@[simp]` lemma の監査 (33個, 定理層): 競合する rewrite がないか確認 | `lake build` |
-| 5-3 | 冗長な `nlinarith` を特定 lemma 適用に置換 (選択的) | `lake build` |
+| タスク | 内容                                                                 | ゲート       |
+| ------ | -------------------------------------------------------------------- | ------------ |
+| 5-1    | `NearBinary.lean` の `have` チェーン (74箇所) にセクション構造追加   | `lake build` |
+| 5-2    | `@[simp]` lemma の監査 (33個, 定理層): 競合する rewrite がないか確認 | `lake build` |
+| 5-3    | 冗長な `nlinarith` を特定 lemma 適用に置換 (選択的)                  | `lake build` |
 
 ---
 
@@ -368,15 +375,15 @@ Theorems/
 
 ## 前回分析からの差分
 
-| 項目 | 前回分析 | 今回確認結果 |
-|------|----------|-------------|
-| レイヤリング違反 3箇所 | 確認 | **全3箇所そのまま残存** |
-| 未接続リンク 4箇所 | 確認 | **全4箇所未接続のまま** |
-| GlobalSystem/MultigridSpec | 削除/隔離推奨 | **そのまま残存 (コンパイル不能)** |
-| stale import 2箇所 | 除去推奨 | **そのまま残存** |
-| NearBinary 分割 | 推奨 | **554行のまま (変更なし)** |
-| MathLib `Set.projIcc` 移行 | 推奨 | **未実施** |
-| Theorems/ サブディレクトリ化 | 推奨 | **未実施** |
+| 項目                         | 前回分析      | 今回確認結果                      |
+| ---------------------------- | ------------- | --------------------------------- |
+| レイヤリング違反 3箇所       | 確認          | **全3箇所そのまま残存**           |
+| 未接続リンク 4箇所           | 確認          | **全4箇所未接続のまま**           |
+| GlobalSystem/MultigridSpec   | 削除/隔離推奨 | **そのまま残存 (コンパイル不能)** |
+| stale import 2箇所           | 除去推奨      | **そのまま残存**                  |
+| NearBinary 分割              | 推奨          | **554行のまま (変更なし)**        |
+| MathLib `Set.projIcc` 移行   | 推奨          | **未実施**                        |
+| Theorems/ サブディレクトリ化 | 推奨          | **未実施**                        |
 
 → 前回分析で指摘された全改善点が未着手。今回の計画で優先度付けし、フェーズ化して実行する。
 
@@ -394,25 +401,30 @@ Theorems/
 ### Phase 1: 定義抽出 ✅
 
 **1-1: Core.ClosedForm 抽出**
+
 - `Theorems/ClosedForm.lean` から 5定義 + 2 @[simp] を `Core/ClosedForm.lean` へ移動
 - `Level/Jacobi.lean` のレイヤリング違反を解消 (Theorems.ClosedForm → Core.ClosedForm)
 - 一時的に `export` パターンで後方互換性を確保（後で削除）
 
 **1-2: Core.JacobiIteration 抽出**
+
 - `Theorems/JacobiContraction.lean` から 12定義 + 6 @[simp] を `Core/JacobiIteration.lean` へ移動
 - 同じ `export` パターンで一時的に後方互換性を確保（後で削除）
 
 **1-3: NearBinary 分割** → 不要と判断
+
 - 定義2個のみ (binaryZeroCtx, weightDriftBudget)、いずれもファイル内部でのみ使用
 - 554行だが線形依存構造で自己完結。分割の価値なし
 
 ### Phase 2: MathLib 移行 (部分実施)
 
 **2-1: clamp01Scalar → Set.projIcc** → 既存ブリッジ定理で対応済み
+
 - `ClampPlacement.lean` に `clamp01Scalar_eq_projIcc` が既に存在
 - 定義自体の変更は counterexample 6箇所の `norm_num` を壊すため不実施
 
 **2-2: ContractingWith 移行** → ブロック (別PR推奨)
+
 - `LocalUnknown` を `PiLp ∞` でラップし MetricSpace 変更が必要 (~20ファイル影響)
 - 高リスク・別PR で段階的に実施推奨
 
@@ -422,24 +434,24 @@ Theorems/
 
 44ファイルを7サブディレクトリに再編成:
 
-| サブディレクトリ | ファイル数 | 内容 |
-|-----------------|-----------|------|
-| Solvability/ | 6 | 方程式求解性 (ClosedForm, Invertibility 等) |
-| Clamping/ | 5 | 値クランプ (ClampLocal, ClosedFormBox 等) |
-| Iteration/ | 5 | 収束・縮小 (JacobiContraction, BinaryAlpha 等) |
-| Approximation/ | 8 | 近似・合成誤差 (NearBinary, BlurFusion 等) |
-| Grid/ | 10 | グリッド・カノニカル (GridLocal, InteriorKernel 等) |
-| FixedPrecision/ | 6 | 固定精度算術 (QuantizationBounds 等) |
-| Evaluation/ | 4 | メトリクス・勾配 (ForegroundMetrics, DiscreteGrad 等) |
+| サブディレクトリ | ファイル数 | 内容                                                  |
+| ---------------- | ---------- | ----------------------------------------------------- |
+| Solvability/     | 6          | 方程式求解性 (ClosedForm, Invertibility 等)           |
+| Clamping/        | 5          | 値クランプ (ClampLocal, ClosedFormBox 等)             |
+| Iteration/       | 5          | 収束・縮小 (JacobiContraction, BinaryAlpha 等)        |
+| Approximation/   | 8          | 近似・合成誤差 (NearBinary, BlurFusion 等)            |
+| Grid/            | 10         | グリッド・カノニカル (GridLocal, InteriorKernel 等)   |
+| FixedPrecision/  | 6          | 固定精度算術 (QuantizationBounds 等)                  |
+| Evaluation/      | 4          | メトリクス・勾配 (ForegroundMetrics, DiscreteGrad 等) |
 
 ### Phase 4: 未接続リンク (分析完了)
 
-| リンク | 結論 |
-|--------|------|
-| SpatialDecay ↔ PropagationRadius | PropagationRadius は完全等式 (C=0 で自明)。非自明な接続はグリッド層の収縮理論が必要 → 将来課題 |
-| IterationInvariance → FixedPrecision | FP が既に直接証明済み。ブリッジは抽象化向上のみ → 低優先度 |
-| NormalizedWeights → NearBinary | 直交する結果。NearBinary は生のweight境界を使用 → 接続不要 |
-| ContractionBounds → JacobiContraction | LocalUnknown のノルムインスタンスが必要 → Phase 2-2 に依存 |
+| リンク                                | 結論                                                                                           |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| SpatialDecay ↔ PropagationRadius      | PropagationRadius は完全等式 (C=0 で自明)。非自明な接続はグリッド層の収縮理論が必要 → 将来課題 |
+| IterationInvariance → FixedPrecision  | FP が既に直接証明済み。ブリッジは抽象化向上のみ → 低優先度                                     |
+| NormalizedWeights → NearBinary        | 直交する結果。NearBinary は生のweight境界を使用 → 接続不要                                     |
+| ContractionBounds → JacobiContraction | LocalUnknown のノルムインスタンスが必要 → Phase 2-2 に依存                                     |
 
 ### Phase 5: simp 監査 ✅
 
@@ -449,13 +461,13 @@ Theorems/
 
 ### 最終ステータス
 
-| 指標 | 変更前 | 変更後 |
-|------|--------|--------|
-| レイヤリング違反 | 3 | **1** (Level.Jacobi 解消済み) |
-| コンパイル不能ファイル | 2 | **0** |
-| stale import | 2 | **0** |
-| unnecessarySimpa 警告 | 3 | **0** |
-| unusedSimpArgs 警告 | 2 | **0** |
-| Theorems/ 構造 | flat (44ファイル) | **7サブディレクトリ** |
-| Core/ 新モジュール | 2 (LocalEquation, LocalSemantics) | **4** (+ClosedForm, JacobiIteration) |
-| 削除行数 | — | **414行** (GlobalSystem 294 + MultigridSpec 120) |
+| 指標                   | 変更前                            | 変更後                                           |
+| ---------------------- | --------------------------------- | ------------------------------------------------ |
+| レイヤリング違反       | 3                                 | **1** (Level.Jacobi 解消済み)                    |
+| コンパイル不能ファイル | 2                                 | **0**                                            |
+| stale import           | 2                                 | **0**                                            |
+| unnecessarySimpa 警告  | 3                                 | **0**                                            |
+| unusedSimpArgs 警告    | 2                                 | **0**                                            |
+| Theorems/ 構造         | flat (44ファイル)                 | **7サブディレクトリ**                            |
+| Core/ 新モジュール     | 2 (LocalEquation, LocalSemantics) | **4** (+ClosedForm, JacobiIteration)             |
+| 削除行数               | —                                 | **414行** (GlobalSystem 294 + MultigridSpec 120) |
