@@ -34,6 +34,7 @@ import FastMLFE2.Theorems.Clamping.ClosedFormBoxInput
 import FastMLFE2.Theorems.Solvability.NormalizedWeights
 import FastMLFE2.Theorems.Solvability.CostToNormalEquation
 import FastMLFE2.Theorems.Solvability.Conditioning
+import FastMLFE2.Theorems.Solvability.GlobalMinimality
 import FastMLFE2.Theorems.Iteration.BinaryAlpha
 import FastMLFE2.Theorems.Iteration.BinaryAlphaCost
 import FastMLFE2.Theorems.Grid.ChannelReuse
