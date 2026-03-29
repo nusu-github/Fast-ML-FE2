@@ -85,4 +85,10 @@ theorem nonempty_validDir_of_width_two_le
   · refine ⟨⟨.left, ?_⟩⟩
     simpa [IsValidDir] using Nat.pos_of_ne_zero hleft
 
+theorem nonempty_validDir_of_two_le
+    {h w : Nat} [Fact (2 ≤ h)] [Fact (2 ≤ w)]
+    (p : Pixel h w) :
+    Nonempty (ValidDir p) :=
+  nonempty_validDir_of_height_two_le p
+
 end FastMLFE2.Theorems

@@ -287,10 +287,20 @@ Machine-checked results under explicit assumptions.
 - **MultilevelStability** — additive-defect coarse-to-fine stability skeleton for
   reference families that are not exact fixed points of the level solver.
 - **CanonicalStepStability** — one-step gain factors for simultaneous exact local solves on
-  canonical grids, together with nondegenerate-grid `ValidDir` nonemptiness helpers.
+  canonical grids, concrete near-binary one-step proxy defects, boxedness preservation, and
+  nondegenerate-grid `ValidDir` nonemptiness helpers.
+- **CanonicalTransferGap** — nearest-neighbor resize is nonexpansive for the canonical
+  grid-state sup norm, so exact and proxy schedules share the same inter-level bridge.
 - **CanonicalMultilevelStability** — canonical wrapper over the additive-defect stability
   skeleton. This is the correct interface for future near-binary proxy theorems, but the
   concrete proxy defect and transfer-gap bounds are still open.
+- **MultilevelProxySimulation** — abstract exact-vs-proxy coarse-to-fine simulation
+  skeleton with shared resize, multiplicative run gains, and additive per-level proxy gaps.
+- **CanonicalMultilevelProxyStability** — concrete canonical wrapper instantiating the
+  exact-vs-proxy simulation theorem for the nearest-neighbor pyramid and branch-conditioned
+  near-binary proxy schedule. This closes the canonical stability interface, but strict
+  fixed-point convergence (`gain < 1`) and the fully clamped Algorithm 1 semantics remain
+  out of scope.
 - **CanonicalBuilder** — field-correctness theorems for authored canonical builders and the
   proof that they satisfy the abstract builder-locality law.
 - **Grid** — faithful two-dimensional four-neighbor geometry; proves the canonical grid

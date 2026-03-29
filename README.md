@@ -114,7 +114,10 @@ FastMLFE2/
     │   ├── CanonicalMultilevelConvergence.lean ← concrete wrapper for canonical multilevel runs
     │   ├── MultilevelStability.lean    ← abstract coarse-to-fine stability with additive run defects
     │   ├── CanonicalStepStability.lean ← exact local-solve gain factors for canonical grid steps
+    │   ├── CanonicalTransferGap.lean   ← resize nonexpansiveness for grid-state sup norms
     │   ├── CanonicalMultilevelStability.lean ← canonical wrapper for additive-defect stability bounds
+    │   ├── MultilevelProxySimulation.lean ← abstract exact-vs-proxy multilevel simulation
+    │   ├── CanonicalMultilevelProxyStability.lean ← canonical exact-vs-proxy wrapper
     │   ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
     │   └── Locality.lean               ← builder locality lifts to jacobiUpdateAt / jacobiStep
     ├── FixedPrecision/
@@ -221,9 +224,15 @@ pipeline stages:
 - **Multilevel Stability Skeleton** — additive-defect coarse-to-fine bounds now separate
   solver Lipschitz growth from reference-state defect, which is the correct abstraction for
   proxy-based quality theorems where the reference is not a fixed point.
-- **Canonical Step Stability** — canonical exact local solves expose explicit one-step gain
-  factors and nondegenerate-grid nonemptiness lemmas, but the full near-binary proxy defect
-  theorem is still pending.
+- **Exact-vs-Proxy Simulation Skeleton** — multilevel simulation now supports a shared-resize
+  exact run and proxy run, with per-level Lipschitz gains and additive one-step proxy gaps.
+- **Canonical Step Stability** — canonical exact local solves now prove the concrete
+  near-binary one-step proxy defect `≤ 4τ` and preserve boxed `[0,1]` state bounds on
+  nondegenerate grids.
+- **Canonical Multilevel Proxy Stability** — the canonical nearest-neighbor pyramid now has a
+  concrete exact-vs-proxy multilevel bound against the near-binary proxy schedule. What
+  remains open is strict fixed-point convergence (`gain < 1`) and the fully clamped
+  Algorithm 1 semantics.
 - **Jacobi Bleed-Through Bounds** — Component-wise error bound
   `|fg_k − fg*| ≤ jacobiOneStepGain × ρ^(k−1) × ‖x₀ − x*‖∞` (`BleedThrough`).
 - **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend
