@@ -116,14 +116,13 @@ theorem meanResidualSolution_background_of_alpha_one
 
 /-- The compositing residual at the closed-form solution equals
 `-(totalWeight / weightedMeanDenom) * meanResidual`.
-As `totalWeight → ∞` (many neighbours) or `meanResidual → 0` (inputs already consistent)
-the residual vanishes. -/
+When `meanResidual → 0` (inputs already consistent with the compositing equation) the residual
+vanishes. The correction factor `totalWeight / weightedMeanDenom` is always in (0, 1). -/
 theorem compositingResidual_closedFormSolution_eq
     (ctx : LocalContext ι) [CoreMathAssumptions ctx] :
     ctx.compositingResidual (closedFormSolution ctx) =
       -(ctx.totalWeight / ctx.weightedMeanDenom) * ctx.meanResidual := by
-  have hden : ctx.weightedMeanDenom ≠ 0 := (weightedMeanDenom_pos ctx).ne'
-  simp only [LocalContext.compositingResidual_eq,
+  simp only [compositingResidual_eq,
     foreground_correction_uses_meanResidual ctx,
     background_correction_uses_meanResidual ctx]
   have hD : ctx.weightedMeanDenom =
@@ -132,8 +131,8 @@ theorem compositingResidual_closedFormSolution_eq
   have hmr : ctx.alphaCenter * ctx.foregroundMean + (1 - ctx.alphaCenter) * ctx.backgroundMean -
       ctx.imageValue = -ctx.meanResidual := by
     simp [LocalContext.meanResidual]; ring
-  have hden2 : ctx.totalWeight + ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2 ≠ 0 := by
-    rw [← hD]; exact hden
+  have hden : ctx.weightedMeanDenom ≠ 0 := (weightedMeanDenom_pos ctx).ne'
+  have hden2 : ctx.totalWeight + ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2 ≠ 0 := hD ▸ hden
   rw [hD]
   field_simp [hden2]
   linear_combination (ctx.totalWeight + ctx.alphaCenter ^ 2 + (1 - ctx.alphaCenter) ^ 2) * hmr
