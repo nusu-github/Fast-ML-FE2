@@ -239,6 +239,8 @@ Machine-checked results under explicit assumptions.
 - **JacobiContraction** — Contraction theorems for the core Jacobi definitions
   (`Core.LocalContext.jacobiStep`, `jacobiDiagForeground/Background`, `jacobiCrossTerm`);
   spectral radius `ρ < 1` under `CoreMathAssumptions`; geometric error contraction.
+- **Canonical.MultilevelRun** — real-valued `SomeGridState`, nearest-neighbor resize between
+  levels, and coarse-to-fine multilevel execution via foldl over level specs.
 - **ClampPlacement** — `rawStepGain ≥ 1` (unclamped step can overshoot); inside-clamped and end-clamped iterates have
   distinct fixed-point sets (explicit counterexample supplied by `ClampPlacementCounterexample`).
 - **CompositingError** — Triangle-inequality bound on compositing difference in terms of
@@ -272,6 +274,10 @@ Machine-checked results under explicit assumptions.
 - **PropagationRadius** — lifts builder locality through repeated Jacobi / Blur-Fusion passes,
   yielding recursive `k`-hop support bounds for fixed-level propagation.
 - **SpatialDecay** — abstract exponential radius-decay and fixed-exterior halo envelopes.
+- **MultilevelConvergence** — abstract contractive-witness theorem for coarse-to-fine
+  schedules: final error is bounded by a product of per-level gains times the initial error
+  plus a weighted transfer-gap series. This does not yet specialize the concrete canonical
+  builder to a proved grid-level contraction.
 - **CanonicalBuilder** — field-correctness theorems for authored canonical builders and the
   proof that they satisfy the abstract builder-locality law.
 - **Grid** — faithful two-dimensional four-neighbor geometry; proves the canonical grid
@@ -317,6 +323,7 @@ FastMLFE2  (default target)
         ├── Canonical.ClampPlacement ──► Canonical.Builder
         ├── Canonical.LocalCommitments
         ├── Canonical.MultilevelSchedule
+        ├── Canonical.MultilevelRun ──► Canonical.Grid, Canonical.MultilevelSchedule
         ├── Approximation.BlurFusion
         ├── FixedPrecision.Format ──► Core.LocalEquation
         ├── FixedPrecision.Coefficients ──► FixedPrecision.Format, Theorems.QuantizationBounds

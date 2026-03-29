@@ -50,7 +50,8 @@ FastMLFE2/
 │   ├── InteriorKernel.lean         ← interior-pixel specialized context and closed-form solver
 │   ├── ClampPlacement.lean         ← projection variants (raw / inside-clamped / end-clamped)
 │   ├── LocalCommitments.lean       ← stencil, resize rule, iteration semantics
-│   └── MultilevelSchedule.lean     ← level-size computation
+│   ├── MultilevelSchedule.lean     ← level-size computation
+│   └── MultilevelRun.lean          ← real-valued coarse-to-fine execution operator
 ├── Evaluation/
 │   ├── ForegroundMetrics.lean      ← RGB image model; paper SAD/MSE; abstract GRAD
 │   ├── AdversarialFamilies.lean    ← near-opaque alpha and saturating black/white families
@@ -108,6 +109,7 @@ FastMLFE2/
     │   ├── CanonicalBuilder.lean       ← field-correctness for canonical builders
     │   ├── ChannelReuse.lean           ← SameWeightData; matrix coefficient invariance
     │   ├── IterationInvariance.lean    ← weight/matrix coefficients state-independent
+    │   ├── MultilevelConvergence.lean  ← abstract coarse-to-fine contractive error bounds
     │   ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
     │   └── Locality.lean               ← builder locality lifts to jacobiUpdateAt / jacobiStep
     ├── FixedPrecision/
@@ -202,8 +204,11 @@ pipeline stages:
 - **Jacobi Contraction** — Local Jacobi step has spectral radius
   `ρ = jacobiCrossTerm / √(diagFg · diagBg) < 1` under `CoreMathAssumptions`; error
   contracts geometrically with each step.
-- **Clamp Placement Ordering** — `rawStepGain < 1` under `CoreMathAssumptions`; inside-clamped
+- **Clamp Placement Ordering** — `rawStepGain ≥ 1` under `CoreMathAssumptions`; inside-clamped
   and end-clamped iterates are provably distinct (explicit counterexample).
+- **Multilevel Convergence Skeleton** — canonical coarse-to-fine execution is defined
+  explicitly, and abstract contractive level witnesses yield affine multilevel error bounds
+  against fine-level reference states.
 - **Jacobi Bleed-Through Bounds** — Component-wise error bound
   `|fg_k − fg*| ≤ jacobiOneStepGain × ρ^(k−1) × ‖x₀ − x*‖∞` (`BleedThrough`).
 - **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend
