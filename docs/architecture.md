@@ -298,9 +298,16 @@ Machine-checked results under explicit assumptions.
   skeleton with shared resize, multiplicative run gains, and additive per-level proxy gaps.
 - **CanonicalMultilevelProxyStability** — concrete canonical wrapper instantiating the
   exact-vs-proxy simulation theorem for the nearest-neighbor pyramid and branch-conditioned
-  near-binary proxy schedule. This closes the canonical stability interface, but strict
-  fixed-point convergence (`gain < 1`) and the fully clamped Algorithm 1 semantics remain
-  out of scope.
+  near-binary proxy schedule. This closes the canonical stability interface for exact-vs-proxy
+  comparison, but it is not a Banach-style convergence theorem.
+- **InsideClampedFixedPointCounterexample** — paper-faithful inside-clamped semantics already
+  fail unique-fixed-point / seed-independent global convergence in a binary-α one-pixel
+  canonical instance: every `(f, 0)` with `f ∈ [0,1]` is a fixed point.
+- **ClampedMultilevelRun / ClampedMultilevelCounterexample** — the same paper-faithful
+  inside-clamped update is lifted to the nearest-neighbor coarse-to-fine runner, and the
+  singleton same-size schedule preserves the non-uniqueness counterexample. The next phase
+  therefore should target an explicitly modified or more strongly constrained clamped
+  semantics if a positive convergence theorem is desired.
 - **CanonicalBuilder** — field-correctness theorems for authored canonical builders and the
   proof that they satisfy the abstract builder-locality law.
 - **Grid** — faithful two-dimensional four-neighbor geometry; proves the canonical grid

@@ -49,6 +49,7 @@ FastMLFE2/
 │   ├── GridContext.lean            ← GridPixelData.localCtx aliases
 │   ├── InteriorKernel.lean         ← interior-pixel specialized context and closed-form solver
 │   ├── ClampPlacement.lean         ← projection variants (raw / inside-clamped / end-clamped)
+│   ├── ClampedMultilevelRun.lean   ← paper-faithful inside-clamped coarse-to-fine runner
 │   ├── LocalCommitments.lean       ← stencil, resize rule, iteration semantics
 │   ├── MultilevelSchedule.lean     ← level-size computation
 │   ├── MultilevelRun.lean          ← real-valued coarse-to-fine execution operator
@@ -84,6 +85,7 @@ FastMLFE2/
     │   ├── ClampLocal.lean             ← clamp01 self-identity and nonexpansiveness
     │   ├── ClampPlacement.lean         ← clamp ordering (inside vs end) and rawStepGain
     │   ├── ClampPlacementCounterexample.lean ← inside-clamped ≠ end-clamped witness
+    │   ├── InsideClampedFixedPointCounterexample.lean ← 1-pixel non-uniqueness witness
     │   ├── ClosedFormBox.lean          ← conditional [0,1] membership from numerator bounds
     │   └── ClosedFormBoxInput.lean     ← mean-affine form; counterexample for naive box-input
     ├── Iteration/
@@ -118,6 +120,7 @@ FastMLFE2/
     │   ├── CanonicalMultilevelStability.lean ← canonical wrapper for additive-defect stability bounds
     │   ├── MultilevelProxySimulation.lean ← abstract exact-vs-proxy multilevel simulation
     │   ├── CanonicalMultilevelProxyStability.lean ← canonical exact-vs-proxy wrapper
+    │   ├── ClampedMultilevelCounterexample.lean ← singleton multilevel non-uniqueness lift
     │   ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
     │   └── Locality.lean               ← builder locality lifts to jacobiUpdateAt / jacobiStep
     ├── FixedPrecision/
@@ -231,8 +234,15 @@ pipeline stages:
   nondegenerate grids.
 - **Canonical Multilevel Proxy Stability** — the canonical nearest-neighbor pyramid now has a
   concrete exact-vs-proxy multilevel bound against the near-binary proxy schedule. What
-  remains open is strict fixed-point convergence (`gain < 1`) and the fully clamped
-  Algorithm 1 semantics.
+  remains open is a positive convergence theorem for a modified or more strongly constrained
+  clamped semantics.
+- **Inside-Clamped Fixed-Point Counterexample** — in a paper-faithful binary-α canonical
+  instance, the inside-clamped map has the whole family `(f, 0)` as fixed points on
+  `f ∈ [0,1]`; in particular `0` and `1` give distinct fixed points, so unique fixed-point
+  and seed-independent global convergence fail for this natural reading.
+- **Clamped Multilevel Counterexample Lift** — the same non-uniqueness survives the
+  singleton same-size coarse-to-fine semantics via `insideClampedMultilevelRun`, so the
+  failure is not confined to the single-pixel standalone map.
 - **Jacobi Bleed-Through Bounds** — Component-wise error bound
   `|fg_k − fg*| ≤ jacobiOneStepGain × ρ^(k−1) × ‖x₀ − x*‖∞` (`BleedThrough`).
 - **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend

@@ -10,6 +10,7 @@ import FastMLFE2.Canonical.Grid
 import FastMLFE2.Canonical.GridContext
 import FastMLFE2.Canonical.InteriorKernel
 import FastMLFE2.Canonical.ClampPlacement
+import FastMLFE2.Canonical.ClampedMultilevelRun
 import FastMLFE2.Canonical.LocalCommitments
 import FastMLFE2.Canonical.MultilevelSchedule
 import FastMLFE2.Canonical.MultilevelRun
@@ -58,6 +59,7 @@ import FastMLFE2.Theorems.Approximation.ClosedFormMeanResidual
 import FastMLFE2.Theorems.Approximation.NearBinaryCounterexample
 import FastMLFE2.Theorems.Clamping.ClampPlacement
 import FastMLFE2.Theorems.Clamping.ClampPlacementCounterexample
+import FastMLFE2.Theorems.Clamping.InsideClampedFixedPointCounterexample
 import FastMLFE2.Theorems.Approximation.BleedThrough
 import FastMLFE2.Theorems.Iteration.Jacobi
 import FastMLFE2.Theorems.Grid.Locality
@@ -75,6 +77,7 @@ import FastMLFE2.Theorems.Grid.CanonicalTransferGap
 import FastMLFE2.Theorems.Grid.CanonicalMultilevelStability
 import FastMLFE2.Theorems.Grid.MultilevelProxySimulation
 import FastMLFE2.Theorems.Grid.CanonicalMultilevelProxyStability
+import FastMLFE2.Theorems.Grid.ClampedMultilevelCounterexample
 import FastMLFE2.Theorems.FixedPrecision.FixedPrecisionLocal
 import FastMLFE2.Theorems.FixedPrecision.FixedPrecisionJacobi
 import FastMLFE2.Theorems.FixedPrecision.FixedPrecisionCost
