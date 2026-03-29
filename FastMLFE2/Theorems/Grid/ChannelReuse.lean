@@ -112,6 +112,14 @@ example (ctx₁ ctx₂ : LocalContext ι) (h : SameRhsData ctx₁ ctx₂) :
     ctx₁.rhs = ctx₂.rhs :=
   rhs_eq_of_sameRhsData h
 
+/-- The normal-matrix inverse is channel-independent: only weight data (α, ε_r, ω)
+determines the inverse; image values and neighbor colors do not. -/
+theorem normalMatrixInv_eq_of_sameWeightData
+    {ctx₁ ctx₂ : LocalContext ι} (h : SameWeightData ctx₁ ctx₂) :
+    ctx₁.normalMatrix⁻¹ = ctx₂.normalMatrix⁻¹ := by
+  congr 1
+  exact normalMatrix_eq_of_sameWeightData h
+
 end LocalContext
 
 end FastMLFE2.Theorems
