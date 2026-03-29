@@ -37,6 +37,7 @@ import FastMLFE2.Theorems.Solvability.Conditioning
 import FastMLFE2.Theorems.Solvability.GlobalMinimality
 import FastMLFE2.Theorems.Iteration.BinaryAlpha
 import FastMLFE2.Theorems.Iteration.BinaryAlphaCost
+import FastMLFE2.Theorems.Iteration.JacobiTermination
 import FastMLFE2.Theorems.Grid.ChannelReuse
 import FastMLFE2.Theorems.Clamping.ClampLocal
 import FastMLFE2.Theorems.Approximation.CompositingError
