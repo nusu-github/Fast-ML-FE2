@@ -51,7 +51,8 @@ FastMLFE2/
 │   ├── ClampPlacement.lean         ← projection variants (raw / inside-clamped / end-clamped)
 │   ├── LocalCommitments.lean       ← stencil, resize rule, iteration semantics
 │   ├── MultilevelSchedule.lean     ← level-size computation
-│   └── MultilevelRun.lean          ← real-valued coarse-to-fine execution operator
+│   ├── MultilevelRun.lean          ← real-valued coarse-to-fine execution operator
+│   └── MultilevelPyramid.lean      ← nearest-neighbor canonical data pyramid
 ├── Evaluation/
 │   ├── ForegroundMetrics.lean      ← RGB image model; paper SAD/MSE; abstract GRAD
 │   ├── AdversarialFamilies.lean    ← near-opaque alpha and saturating black/white families
@@ -110,6 +111,7 @@ FastMLFE2/
     │   ├── ChannelReuse.lean           ← SameWeightData; matrix coefficient invariance
     │   ├── IterationInvariance.lean    ← weight/matrix coefficients state-independent
     │   ├── MultilevelConvergence.lean  ← abstract coarse-to-fine contractive error bounds
+    │   ├── CanonicalMultilevelConvergence.lean ← concrete wrapper for canonical multilevel runs
     │   ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
     │   └── Locality.lean               ← builder locality lifts to jacobiUpdateAt / jacobiStep
     ├── FixedPrecision/
@@ -209,6 +211,10 @@ pipeline stages:
 - **Multilevel Convergence Skeleton** — canonical coarse-to-fine execution is defined
   explicitly, and abstract contractive level witnesses yield affine multilevel error bounds
   against fine-level reference states.
+- **Canonical Multilevel Wrapper** — nearest-neighbor pyramid data and a concrete wrapper
+  restate the abstract multilevel theorem for canonical runs with grid-state sup norms. The
+  remaining open analysis is to prove simultaneous grid-level contraction and an explicit
+  transfer-gap bound, rather than assuming them.
 - **Jacobi Bleed-Through Bounds** — Component-wise error bound
   `|fg_k − fg*| ≤ jacobiOneStepGain × ρ^(k−1) × ‖x₀ − x*‖∞` (`BleedThrough`).
 - **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend

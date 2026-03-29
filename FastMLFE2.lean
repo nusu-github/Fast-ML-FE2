@@ -13,6 +13,7 @@ import FastMLFE2.Canonical.ClampPlacement
 import FastMLFE2.Canonical.LocalCommitments
 import FastMLFE2.Canonical.MultilevelSchedule
 import FastMLFE2.Canonical.MultilevelRun
+import FastMLFE2.Canonical.MultilevelPyramid
 import FastMLFE2.Evaluation.ForegroundMetrics
 import FastMLFE2.Evaluation.AdversarialFamilies
 import FastMLFE2.Evaluation.ContinuousGrad
@@ -67,6 +68,7 @@ import FastMLFE2.Theorems.Grid.InteriorKernel
 import FastMLFE2.Theorems.Grid.GridLocal
 import FastMLFE2.Theorems.Grid.CanonicalBuilder
 import FastMLFE2.Theorems.Grid.MultilevelConvergence
+import FastMLFE2.Theorems.Grid.CanonicalMultilevelConvergence
 import FastMLFE2.Theorems.FixedPrecision.FixedPrecisionLocal
 import FastMLFE2.Theorems.FixedPrecision.FixedPrecisionJacobi
 import FastMLFE2.Theorems.FixedPrecision.FixedPrecisionCost

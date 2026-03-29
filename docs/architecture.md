@@ -241,6 +241,8 @@ Machine-checked results under explicit assumptions.
   spectral radius `ρ < 1` under `CoreMathAssumptions`; geometric error contraction.
 - **Canonical.MultilevelRun** — real-valued `SomeGridState`, nearest-neighbor resize between
   levels, and coarse-to-fine multilevel execution via foldl over level specs.
+- **Canonical.MultilevelPyramid** — nearest-neighbor resizing of `GridPixelData.alpha` /
+  `image` into a canonical per-level data family, reusing `epsilonR` and `omega`.
 - **ClampPlacement** — `rawStepGain ≥ 1` (unclamped step can overshoot); inside-clamped and end-clamped iterates have
   distinct fixed-point sets (explicit counterexample supplied by `ClampPlacementCounterexample`).
 - **CompositingError** — Triangle-inequality bound on compositing difference in terms of
@@ -278,6 +280,10 @@ Machine-checked results under explicit assumptions.
   schedules: final error is bounded by a product of per-level gains times the initial error
   plus a weighted transfer-gap series. This does not yet specialize the concrete canonical
   builder to a proved grid-level contraction.
+- **CanonicalMultilevelConvergence** — concrete wrapper that packages canonical grid runs,
+  grid-state infinity norms, and nearest-neighbor pyramid data into the abstract multilevel
+  theorem. It still leaves two explicit analysis obligations open: simultaneous grid-level
+  contraction for canonical Jacobi updates, and a concrete transfer-gap bound between levels.
 - **CanonicalBuilder** — field-correctness theorems for authored canonical builders and the
   proof that they satisfy the abstract builder-locality law.
 - **Grid** — faithful two-dimensional four-neighbor geometry; proves the canonical grid
@@ -324,6 +330,7 @@ FastMLFE2  (default target)
         ├── Canonical.LocalCommitments
         ├── Canonical.MultilevelSchedule
         ├── Canonical.MultilevelRun ──► Canonical.Grid, Canonical.MultilevelSchedule
+        ├── Canonical.MultilevelPyramid ──► Canonical.MultilevelRun, Canonical.GridContext
         ├── Approximation.BlurFusion
         ├── FixedPrecision.Format ──► Core.LocalEquation
         ├── FixedPrecision.Coefficients ──► FixedPrecision.Format, Theorems.QuantizationBounds

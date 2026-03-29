@@ -59,4 +59,36 @@ noncomputable def multilevelRun
     multilevelRun family seed [] = seed := by
   rfl
 
+@[simp] theorem multilevelRun_cons
+    (family : GridBuilderFamily)
+    (seed : SomeGridState)
+    (target : RealLevelSpec)
+    (levels : List RealLevelSpec) :
+    multilevelRun family seed (target :: levels) =
+      multilevelRun family (multilevelStep family target seed) levels := by
+  rfl
+
+@[simp] theorem resizeSomeGridState_sameSize
+    (target : RealLevelSpec)
+    (state : GridState target.height target.width) :
+    resizeSomeGridState target ⟨target, state⟩ = state := by
+  simp [resizeSomeGridState]
+
+@[simp] theorem multilevelStep_sameSize_eq
+    (family : GridBuilderFamily)
+    (target : RealLevelSpec)
+    (state : GridState target.height target.width) :
+    multilevelStep family target ⟨target, state⟩ =
+      ⟨target,
+        Nat.iterate ((family.builder target.height target.width).jacobiStep)
+          target.iterations state⟩ := by
+  simp [multilevelStep]
+
+@[simp] theorem multilevelRun_singleton
+    (family : GridBuilderFamily)
+    (seed : SomeGridState)
+    (target : RealLevelSpec) :
+    multilevelRun family seed [target] = multilevelStep family target seed := by
+  simp [multilevelRun]
+
 end FastMLFE2.Canonical
