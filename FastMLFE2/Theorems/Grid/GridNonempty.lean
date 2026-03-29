@@ -61,4 +61,28 @@ theorem nonempty_validDir_of_isBottomRightCorner
     rcases hCorner with ⟨hB, _⟩
     simp [IsValidDir]; have : 2 ≤ h := Fact.out; omega⟩⟩
 
+theorem nonempty_validDir_of_height_two_le
+    {h w : Nat} [Fact (2 ≤ h)]
+    (p : Pixel h w) :
+    Nonempty (ValidDir p) := by
+  by_cases htop : p.1.1 = 0
+  · refine ⟨⟨.down, ?_⟩⟩
+    have hh : 2 ≤ h := Fact.out
+    have hdown : 1 < h := by omega
+    simpa [IsValidDir, htop] using hdown
+  · refine ⟨⟨.up, ?_⟩⟩
+    simpa [IsValidDir] using Nat.pos_of_ne_zero htop
+
+theorem nonempty_validDir_of_width_two_le
+    {h w : Nat} [Fact (2 ≤ w)]
+    (p : Pixel h w) :
+    Nonempty (ValidDir p) := by
+  by_cases hleft : p.2.1 = 0
+  · refine ⟨⟨.right, ?_⟩⟩
+    have hw : 2 ≤ w := Fact.out
+    have hright : 1 < w := by omega
+    simpa [IsValidDir, hleft] using hright
+  · refine ⟨⟨.left, ?_⟩⟩
+    simpa [IsValidDir] using Nat.pos_of_ne_zero hleft
+
 end FastMLFE2.Theorems

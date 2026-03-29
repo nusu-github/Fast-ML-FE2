@@ -69,6 +69,9 @@ import FastMLFE2.Theorems.Grid.GridLocal
 import FastMLFE2.Theorems.Grid.CanonicalBuilder
 import FastMLFE2.Theorems.Grid.MultilevelConvergence
 import FastMLFE2.Theorems.Grid.CanonicalMultilevelConvergence
+import FastMLFE2.Theorems.Grid.MultilevelStability
+import FastMLFE2.Theorems.Grid.CanonicalStepStability
+import FastMLFE2.Theorems.Grid.CanonicalMultilevelStability
 import FastMLFE2.Theorems.FixedPrecision.FixedPrecisionLocal
 import FastMLFE2.Theorems.FixedPrecision.FixedPrecisionJacobi
 import FastMLFE2.Theorems.FixedPrecision.FixedPrecisionCost

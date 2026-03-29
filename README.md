@@ -112,6 +112,9 @@ FastMLFE2/
     │   ├── IterationInvariance.lean    ← weight/matrix coefficients state-independent
     │   ├── MultilevelConvergence.lean  ← abstract coarse-to-fine contractive error bounds
     │   ├── CanonicalMultilevelConvergence.lean ← concrete wrapper for canonical multilevel runs
+    │   ├── MultilevelStability.lean    ← abstract coarse-to-fine stability with additive run defects
+    │   ├── CanonicalStepStability.lean ← exact local-solve gain factors for canonical grid steps
+    │   ├── CanonicalMultilevelStability.lean ← canonical wrapper for additive-defect stability bounds
     │   ├── PropagationRadius.lean      ← k-pass locality / support growth bounds
     │   └── Locality.lean               ← builder locality lifts to jacobiUpdateAt / jacobiStep
     ├── FixedPrecision/
@@ -215,6 +218,12 @@ pipeline stages:
   restate the abstract multilevel theorem for canonical runs with grid-state sup norms. The
   remaining open analysis is to prove simultaneous grid-level contraction and an explicit
   transfer-gap bound, rather than assuming them.
+- **Multilevel Stability Skeleton** — additive-defect coarse-to-fine bounds now separate
+  solver Lipschitz growth from reference-state defect, which is the correct abstraction for
+  proxy-based quality theorems where the reference is not a fixed point.
+- **Canonical Step Stability** — canonical exact local solves expose explicit one-step gain
+  factors and nondegenerate-grid nonemptiness lemmas, but the full near-binary proxy defect
+  theorem is still pending.
 - **Jacobi Bleed-Through Bounds** — Component-wise error bound
   `|fg_k − fg*| ≤ jacobiOneStepGain × ρ^(k−1) × ‖x₀ − x*‖∞` (`BleedThrough`).
 - **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend

@@ -284,6 +284,13 @@ Machine-checked results under explicit assumptions.
   grid-state infinity norms, and nearest-neighbor pyramid data into the abstract multilevel
   theorem. It still leaves two explicit analysis obligations open: simultaneous grid-level
   contraction for canonical Jacobi updates, and a concrete transfer-gap bound between levels.
+- **MultilevelStability** — additive-defect coarse-to-fine stability skeleton for
+  reference families that are not exact fixed points of the level solver.
+- **CanonicalStepStability** — one-step gain factors for simultaneous exact local solves on
+  canonical grids, together with nondegenerate-grid `ValidDir` nonemptiness helpers.
+- **CanonicalMultilevelStability** — canonical wrapper over the additive-defect stability
+  skeleton. This is the correct interface for future near-binary proxy theorems, but the
+  concrete proxy defect and transfer-gap bounds are still open.
 - **CanonicalBuilder** — field-correctness theorems for authored canonical builders and the
   proof that they satisfy the abstract builder-locality law.
 - **Grid** — faithful two-dimensional four-neighbor geometry; proves the canonical grid
