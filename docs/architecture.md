@@ -303,6 +303,13 @@ Machine-checked results under explicit assumptions.
 - **InsideClampedFixedPointCounterexample** — paper-faithful inside-clamped semantics already
   fail unique-fixed-point / seed-independent global convergence in a binary-α one-pixel
   canonical instance: every `(f, 0)` with `f ∈ [0,1]` is a fixed point.
+- **AnchoredLocalEquation / AnchoredClosedForm / AnchoredGlobalMinimality** — a
+  VarPro-inspired sibling local semantics adds absolute quadratic anchors toward abstract
+  priors, shifts the normal matrix by a positive diagonal, preserves a closed-form solve,
+  and restores a global minimizer theorem under nonnegative anchor weights.
+- **AnchoredFixedPointCounterexample** — the same one-pixel binary-α witness that breaks the
+  paper-faithful inside-clamped map is repaired by positive anchor weight: the old `(f, 0)`
+  family collapses to the chosen prior instead of remaining a continuum of fixed points.
 - **ClampedMultilevelRun / ClampedMultilevelCounterexample** — the same paper-faithful
   inside-clamped update is lifted to the nearest-neighbor coarse-to-fine runner, and the
   singleton same-size schedule preserves the non-uniqueness counterexample. The next phase

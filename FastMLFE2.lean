@@ -1,6 +1,8 @@
 import FastMLFE2.Core.LocalEquation
 import FastMLFE2.Core.LocalSemantics
 import FastMLFE2.Core.ClosedForm
+import FastMLFE2.Core.AnchoredLocalEquation
+import FastMLFE2.Core.AnchoredClosedForm
 import FastMLFE2.Core.JacobiIteration
 import FastMLFE2.Compositing.OneChannel
 import FastMLFE2.Level.Jacobi
@@ -33,12 +35,15 @@ import FastMLFE2.Assumptions.Bundles
 import FastMLFE2.Assumptions.Grid
 import FastMLFE2.Theorems.Solvability.Invertibility
 import FastMLFE2.Theorems.Solvability.ClosedForm
+import FastMLFE2.Theorems.Solvability.AnchoredInvertibility
+import FastMLFE2.Theorems.Solvability.AnchoredClosedForm
 import FastMLFE2.Theorems.Clamping.ClosedFormBox
 import FastMLFE2.Theorems.Clamping.ClosedFormBoxInput
 import FastMLFE2.Theorems.Solvability.NormalizedWeights
 import FastMLFE2.Theorems.Solvability.CostToNormalEquation
 import FastMLFE2.Theorems.Solvability.Conditioning
 import FastMLFE2.Theorems.Solvability.GlobalMinimality
+import FastMLFE2.Theorems.Solvability.AnchoredGlobalMinimality
 import FastMLFE2.Theorems.Iteration.BinaryAlpha
 import FastMLFE2.Theorems.Iteration.BinaryAlphaCost
 import FastMLFE2.Theorems.Iteration.JacobiTermination
@@ -62,6 +67,7 @@ import FastMLFE2.Theorems.Approximation.NearBinaryCounterexample
 import FastMLFE2.Theorems.Clamping.ClampPlacement
 import FastMLFE2.Theorems.Clamping.ClampPlacementCounterexample
 import FastMLFE2.Theorems.Clamping.InsideClampedFixedPointCounterexample
+import FastMLFE2.Theorems.Clamping.AnchoredFixedPointCounterexample
 import FastMLFE2.Theorems.Approximation.BleedThrough
 import FastMLFE2.Theorems.Iteration.Jacobi
 import FastMLFE2.Theorems.Grid.Locality

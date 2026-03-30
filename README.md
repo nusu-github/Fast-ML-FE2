@@ -37,6 +37,8 @@ FastMLFE2/
 │   ├── LocalEquation.lean          ← local context, cost, normal matrix, RHS
 │   ├── LocalSemantics.lean         ← solution / stationarity relations
 │   ├── ClosedForm.lean             ← closed-form solution definitions and @[simp] accessors
+│   ├── AnchoredLocalEquation.lean  ← absolute-anchor sibling local equation
+│   ├── AnchoredClosedForm.lean     ← anchored closed-form solution definitions
 │   └── JacobiIteration.lean        ← per-pixel Jacobi step, iterate, spectral radius defs
 ├── Compositing/
 │   └── OneChannel.lean             ← α·F + (1-α)·B semantics
@@ -77,8 +79,11 @@ FastMLFE2/
     ├── Solvability/
     │   ├── Invertibility.lean          ← det > 0, IsUnit det
     │   ├── ClosedForm.lean             ← explicit 2×2 inverse, uniqueness
+    │   ├── AnchoredInvertibility.lean  ← anchored determinant positivity
+    │   ├── AnchoredClosedForm.lean     ← anchored closed-form solve
     │   ├── CostToNormalEquation.lean   ← ∂cost/∂t = 0 ↔ normal equation
     │   ├── Conditioning.lean           ← eigenvalues, κ = 1 + q(α)/s
+    │   ├── AnchoredGlobalMinimality.lean ← anchored quadratic global minimizer
     │   ├── NormalizedWeights.lean      ← normalized weight form of fore-/backgroundMean
     │   └── MeanResidualBounds.lean     ← mean residual bounds and correction terms
     ├── Clamping/
@@ -86,6 +91,7 @@ FastMLFE2/
     │   ├── ClampPlacement.lean         ← clamp ordering (inside vs end) and rawStepGain
     │   ├── ClampPlacementCounterexample.lean ← inside-clamped ≠ end-clamped witness
     │   ├── InsideClampedFixedPointCounterexample.lean ← 1-pixel non-uniqueness witness
+    │   ├── AnchoredFixedPointCounterexample.lean ← anchored repair removes old α=0 family
     │   ├── ClosedFormBox.lean          ← conditional [0,1] membership from numerator bounds
     │   └── ClosedFormBoxInput.lean     ← mean-affine form; counterexample for naive box-input
     ├── Iteration/
@@ -161,6 +167,10 @@ pipeline stages:
   `κ = 1 + q(α)/s` with bounds `1 + 1/(2s) ≤ κ ≤ 1 + 1/s`.
 - **Relaxation Bounds** — relaxed updates contract for `0 < λ < λ_max = 2/(1+q)`;
   a scalar sign-flip example shows the bound is sharp.
+- **Anchored Local Equation** — a VarPro-inspired sibling semantics adds absolute
+  quadratic anchors `λF(F-F_prior)^2 + λB(B-B_prior)^2`, shifts the normal matrix by a
+  positive diagonal, preserves a closed-form solve, and keeps the anchored closed-form
+  solution as a global minimizer under nonnegative anchor weights.
 - **Normalized-Weight Means** — With `λ_j = w_j / W`, the weighted means admit equivalent
   forms `foregroundMean = ∑ j, λ_j F_j` and `backgroundMean = ∑ j, λ_j B_j`; normalized
   weights sum to `1`.
@@ -243,6 +253,9 @@ pipeline stages:
 - **Clamped Multilevel Counterexample Lift** — the same non-uniqueness survives the
   singleton same-size coarse-to-fine semantics via `insideClampedMultilevelRun`, so the
   failure is not confined to the single-pixel standalone map.
+- **Anchored Degeneracy Repair** — in the same binary-α one-pixel setting, positive
+  anchor weight collapses the old `(f, 0)` family to the selected prior, so the Phase 0
+  anchored sibling semantics repairs the original local degeneracy.
 - **Jacobi Bleed-Through Bounds** — Component-wise error bound
   `|fg_k − fg*| ≤ jacobiOneStepGain × ρ^(k−1) × ‖x₀ − x*‖∞` (`BleedThrough`).
 - **Propagation Radius Bounds** — fixed-level Jacobi and Blur-Fusion `k`-pass outputs depend
